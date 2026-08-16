@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Flask (OpsDesk)",
+      "type": "shell",
+      "command": "${workspaceFolder}/venv/bin/python",
+      "args": ["${workspaceFolder}/run.py"],
+      "isBackground": true,
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

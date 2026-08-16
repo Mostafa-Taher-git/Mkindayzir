@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "OpsDesk: Start + Open",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "bash",
+      "args": ["${workspaceFolder}/run.sh"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}

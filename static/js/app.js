@@ -630,6 +630,23 @@
 
   /* ----------------------------- boot ----------------------------- */
   function boot() {
+    // This app must be served by the Flask backend (it calls /api/*).
+    // Opening index.html directly via file:// will silently fail.
+    if (location.protocol === "file:") {
+      document.getElementById("app").innerHTML =
+        '<div style="max-width:560px;margin:15vh auto;padding:24px;' +
+        'border:1px solid var(--outline-variant);border-radius:8px;' +
+        'font-family:Inter,sans-serif;color:var(--on-surface)">' +
+        '<h2 style="margin:0 0 8px">OpsDesk needs the server</h2>' +
+        '<p>This page was opened as a file. OpsDesk is a server-backed app and ' +
+        'will not load this way.</p>' +
+        '<p style="color:var(--on-surface-variant)">Start the server and open it ' +
+        'through the browser instead:</p>' +
+        '<pre style="background:#0d1117;color:#e6edf3;padding:12px;border-radius:6px">'
+        + 'cd /path/to/OpsDesk\npython run.py\n# then open http://127.0.0.1:5000'
+        + '</pre></div>';
+      return;
+    }
     window.addEventListener("hashchange", router);
     API.me().then(({ user }) => {
       state.user = user;
