@@ -1,0 +1,68 @@
+/* ==========================================================================
+   OpsDesk API client.
+   Thin wrapper around fetch. Every backend call goes through here so the
+   rest of the app never touches URLs directly. Session cookie is sent
+   automatically by the browser.
+   ========================================================================== */
+const API = (() => {
+  const base = "";
+
+  async function req(method, path, body, isForm) {
+    const opts = { method, credentials: "same-origin" };
+    if (body !== undefined) {
+      if (isForm) {
+        opts.body = body; // FormData
+      } else {
+        opts.headers = { "Content-Type": "application/json" };
+        opts.body = JSON.stringify(body);
+      }
+    }
+    const res = await fetch(base + path, opts);
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      const err = new Error((data && data.error) || `Request failed (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  return {
+    login:    (email, password) => req("POST", "/api/auth/login", { email, password }),
+    logout:   () => req("POST", "/api/auth/logout"),
+    me:       () => req("GET", "/api/auth/me"),
+
+    listTickets: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return req("GET", "/api/tickets" + (q ? "?" + q : ""));
+    },
+    getTicket:  (id) => req("GET", `/api/tickets/${id}`),
+    createTicket: (payload) => req("POST", "/api/tickets", payload),
+    assign:     (id, payload) => req("POST", `/api/tickets/${id}/assign`, payload),
+    setStatus:  (id, payload) => req("POST", `/api/tickets/${id}/status`, payload),
+    reopen:     (id) => req("POST", `/api/tickets/${id}/reopen`),
+    comment:    (id, payload) => req("POST", `/api/tickets/${id}/comments`, payload),
+    upload:     (id, file) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return req("POST", `/api/tickets/${id}/attachments`, fd, true);
+    },
+    attachmentUrl: (tid, aid) => `${base}/api/tickets/${tid}/attachments/${aid}`,
+
+    dashboard: () => req("GET", "/api/dashboard"),
+    meta:      () => req("GET", "/api/meta"),
+
+    // Admin
+    adminTeams:    () => req("GET", "/api/admin/teams"),
+    adminCreateTeam: (name) => req("POST", "/api/admin/teams", { name }),
+    adminDeleteTeam: (id) => req("DELETE", `/api/admin/teams/${id}`),
+    adminCategories: () => req("GET", "/api/admin/categories"),
+    adminCreateCategory: (name, description) => req("POST", "/api/admin/categories", { name, description }),
+    adminDeleteCategory: (id) => req("DELETE", `/api/admin/categories/${id}`),
+    adminUsers:    () => req("GET", "/api/admin/users"),
+    adminCreateUser: (u) => req("POST", "/api/admin/users", u),
+    adminUpdateUser: (id, u) => req("PATCH", `/api/admin/users/${id}`, u),
+    adminDeleteUser: (id) => req("DELETE", `/api/admin/users/${id}`),
+  };
+})();
