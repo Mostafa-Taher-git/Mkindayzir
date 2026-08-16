@@ -13,8 +13,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Where the SQLite database file lives.
 DB_PATH = os.path.join(BASE_DIR, "data", "opsdesk.db")
 
+# Where the app shell and static assets live.
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
 # Where uploaded attachments are stored on disk.
-UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
 
 # Secret used to sign session cookies. In production set this via the
 # OPERATION environment variable. For local/dev it defaults to a fixed

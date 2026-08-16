@@ -4,12 +4,11 @@ OpsDesk application factory.
 Creates the Flask app, wires up the blueprints, serves the single-page
 frontend from /, and provides the auto-close background job.
 """
-import os
 import threading
 import time
 from datetime import datetime, timezone, timedelta
 
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, jsonify
 
 from . import config, db
 from . import helpers
@@ -19,7 +18,7 @@ from .routes_admin import admin as admin_bp
 
 
 def create_app():
-    app = Flask(__name__, static_folder=os.path.join(config.BASE_DIR, "static"))
+    app = Flask(__name__, static_folder=config.STATIC_DIR)
     app.secret_key = config.SECRET_KEY
 
     # Ensure DB + seed is ready before serving.
