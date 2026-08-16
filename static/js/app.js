@@ -630,6 +630,18 @@
 
   /* ----------------------------- boot ----------------------------- */
   function boot() {
+    // Surface any uncaught error on-screen (instead of a silent white page).
+    window.addEventListener("error", (e) => {
+      const root = document.getElementById("app");
+      if (root && root.childElementCount === 0) {
+        root.innerHTML = '<div style="max-width:640px;margin:12vh auto;padding:20px;'
+          + 'border:1px solid #f5c2c7;border-radius:8px;font-family:monospace;'
+          + 'background:#fff5f5;color:#842029"><b>Frontend error</b><pre style='
+          + '"white-space:pre-wrap;margin-top:8px">' + esc(e.message) + '\n'
+          + (e.filename || '') + ':' + (e.lineno || '') + '</pre>'
+          + '<p style="font-family:sans-serif">Open DevTools (F12) → Console for the full trace.</p></div>';
+      }
+    });
     // This app must be served by the Flask backend (it calls /api/*).
     // Opening index.html directly via file:// will silently fail.
     if (location.protocol === "file:") {
