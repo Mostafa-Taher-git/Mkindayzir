@@ -250,3 +250,15 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .kb-body { line-height: 1.6; }
 .pill.ok { background: var(--ok, #1a7f37); color: #fff; }
 .pill.warn { background: var(--warn, #b58105); color: #fff; }
+
+/* ---------- SLA badges (Phase 3) ---------- */
+.sla-badge { font-size: var(--fs-xs); font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.sla-badge.ok { background: rgba(26,127,55,.15); color: #1a7f37; }
+.sla-badge.atrisk { background: rgba(181,129,5,.18); color: #b58105; }
+.sla-badge.breached { background: rgba(197,38,38,.18); color: #c52626; }
+
+/* KB body preserves author formatting (Phase 2 fix) */
+.kb-body { white-space: pre-wrap; line-height: 1.55; }
+/* KB cards are now real links */
+a.kb-card { display: block; text-decoration: none; color: inherit; }
+a.kb-card:hover { border-color: var(--accent); }

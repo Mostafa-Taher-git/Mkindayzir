@@ -63,6 +63,8 @@ MAX_DESCRIPTION = 5000
 MAX_COMMENT = 5000
 # KB article body length cap (see routes_kb).
 MAX_KB_BODY = int(os.environ.get("OPERADESK_MAX_KB_BODY", "20000"))
+# KB article title length cap (see routes_kb).
+MAX_KB_TITLE = int(os.environ.get("OPERADESK_MAX_KB_TITLE", "200"))
 
 # Comma-separated list of values allowed for CATEGORY/TEAM seeds etc.
 # (kept here for easy editing)

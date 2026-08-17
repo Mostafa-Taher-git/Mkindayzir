@@ -57,6 +57,7 @@ def init_db():
     db.executescript(SCHEMA)
     db.commit()
     _seed(db)
+    _migrate(db)
 
 
 SCHEMA = """
@@ -78,7 +79,8 @@ CREATE TABLE IF NOT EXISTS categories (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
     description TEXT,
-    active      INTEGER NOT NULL DEFAULT 1
+    active      INTEGER NOT NULL DEFAULT 1,
+    default_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS tickets (
@@ -159,9 +161,31 @@ CREATE TABLE IF NOT EXISTS kb_articles (
     updated_at   TEXT NOT NULL
 );
 
+
+CREATE TABLE IF NOT EXISTS sla_policies (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    name             TEXT NOT NULL,
+    priority         TEXT NOT NULL DEFAULT 'normal',
+    category_id      INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    response_hours   REAL NOT NULL,
+    resolution_hours REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ticket_sla (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id        INTEGER NOT NULL UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
+    policy_id        INTEGER REFERENCES sla_policies(id),
+    first_response_at TEXT,
+    breach_at        TEXT NOT NULL,
+    breached         INTEGER NOT NULL DEFAULT 0,
+    response_met     INTEGER,
+    resolution_met   INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS kb_feedback (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
     helpful    INTEGER NOT NULL,      -- 1 = yes, 0 = no
     comment    TEXT,
     created_at TEXT NOT NULL
@@ -183,19 +207,27 @@ def _seed(db):
         team_ids[t] = cur.lastrowid
 
     # Categories
+    cat_teams = {
+        "Access & Accounts": "IT",
+        "Hardware": "IT",
+        "Software": "IT",
+        "HR Request": "HR",
+        "Finance": "Finance",
+        "Other": "Ops",
+    }
     cats = [
-        ("Access & Accounts", "Logins, permissions, provisioning", 1),
-        ("Hardware", "Laptops, peripherals, equipment", 1),
-        ("Software", "Installs, licenses, bugs", 1),
-        ("HR Request", "Leave, payroll, policy", 1),
-        ("Finance", "Invoices, expenses, budgets", 1),
-        ("Other", "Anything that does not fit above", 1),
+        ("Access & Accounts", "Logins, permissions, provisioning"),
+        ("Hardware", "Laptops, peripherals, equipment"),
+        ("Software", "Installs, licenses, bugs"),
+        ("HR Request", "Leave, payroll, policy"),
+        ("Finance", "Invoices, expenses, budgets"),
+        ("Other", "Anything that does not fit above"),
     ]
-    for name, desc, active in cats:
-        db.execute(
-            "INSERT INTO categories (name, description, active) VALUES (?,?,?)",
-            (name, desc, active),
-        )
+    team_by_name = {n: i for n, i in team_ids.items()}
+    for name, desc in cats:
+        cur = db.execute(
+            "INSERT INTO categories (name, description, active, default_team_id) VALUES (?,?,?,?)",
+            (name, desc, 1, team_by_name.get(cat_teams.get(name))))
 
     # Starter users. Password for every seeded account is "password".
     # In production you would change these immediately.
@@ -212,6 +244,48 @@ def _seed(db):
             (name, email, _hash("password"), role, team_id),
         )
 
+    db.commit()
+
+    # Sample SLA policies (one per priority + a couple category-specific).
+    if db.execute("SELECT COUNT(*) AS c FROM sla_policies").fetchone()["c"] == 0:
+        db.executemany(
+            "INSERT INTO sla_policies (name, priority, category_id, response_hours, resolution_hours) VALUES (?,?,?,?,?)",
+            [
+                ("Standard", "normal", None, 8, 72),
+                ("Urgent", "urgent", None, 1, 8),
+                ("HR - normal", "normal", _cat_id(db, "HR Request"), 4, 48),
+                ("Finance - normal", "normal", _cat_id(db, "Finance"), 4, 48),
+            ])
+        db.commit()
+
+
+def _cat_id(db, name):
+    row = db.execute("SELECT id FROM categories WHERE name=?", (name,)).fetchone()
+    return row["id"] if row else None
+
+
+def _migrate(db):
+    cols = [r[1] for r in db.execute("PRAGMA table_info(categories)").fetchall()]
+    if "default_team_id" not in cols:
+        db.execute("ALTER TABLE categories ADD COLUMN default_team_id INTEGER REFERENCES teams(id)")
+    fb_cols = [r[1] for r in db.execute("PRAGMA table_info(kb_feedback)").fetchall()]
+    if "user_id" not in fb_cols:
+        db.execute("ALTER TABLE kb_feedback ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+    team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
+    cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
+                 "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}
+    for name, team in cat_teams.items():
+        db.execute("UPDATE categories SET default_team_id=? WHERE name=? AND default_team_id IS NULL",
+                   (team_by_name.get(team), name))
+    if db.execute("SELECT COUNT(*) AS c FROM sla_policies").fetchone()["c"] == 0:
+        db.executemany(
+            "INSERT INTO sla_policies (name, priority, category_id, response_hours, resolution_hours) VALUES (?,?,?,?,?)",
+            [
+                ("Standard", "normal", None, 8, 72),
+                ("Urgent", "urgent", None, 1, 8),
+                ("HR - normal", "normal", _cat_id(db, "HR Request"), 4, 48),
+                ("Finance - normal", "normal", _cat_id(db, "Finance"), 4, 48),
+            ])
     db.commit()
 
 

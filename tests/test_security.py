@@ -317,3 +317,120 @@ def test_kb_authoring_and_visibility(client):
     # Feedback accepted.
     assert client.post(f"/api/kb/{aid}/feedback", json={"helpful": True},
                        headers={"X-CSRF-Token": _csrf(client)}).status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — SLA & routing
+# ---------------------------------------------------------------------------
+def test_category_routing_and_sla_attach(client):
+    # Requester creates a ticket in the HR category (id 4). It should route to
+    # the HR team and attach the matching SLA policy.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/tickets", json={"subject": "Payroll", "description": "x",
+                                          "category_id": 4},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    t = r.get_json()["ticket"]
+    assert t["team_id"] is not None          # routed, not unassigned
+    assert t["sla"] is not None
+    assert t["sla"]["policy_name"] == "HR - normal"
+
+
+def test_sla_first_response_and_resolution_eval(client, app):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    # category 2 (Hardware) routes to IT, which the seeded agent belongs to.
+    t = client.post("/api/tickets", json={"subject": "Laptop", "description": "x",
+                                         "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    # first response should now be recorded
+    with app.app_context():
+        from app import db as dbmod
+        row = dbmod.get_db().execute(
+            "SELECT first_response_at FROM ticket_sla WHERE ticket_id=?", (t["id"],)).fetchone()
+        assert row["first_response_at"] is not None
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    assert sla["resolution_met"] == 1
+    assert sla["breached"] == 0
+
+
+def test_recently_created_ticket_not_breached(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "VPN", "description": "x",
+                                         "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    assert sla["breached"] == 0
+    assert sla["resolution_met"] is None  # not resolved yet
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — fixes verified by the OpenCode review
+# ---------------------------------------------------------------------------
+def test_kb_feedback_on_missing_article_404(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/kb/9999/feedback", json={"helpful": True},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 404
+
+
+def test_kb_create_invalid_category_400(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/kb", json={"title": "x", "body": "y", "category_id": 9999},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 400
+
+
+def test_kb_list_bad_category_id_does_not_500(client):
+    _login(client, "agent@opsdesk.local")
+    r = client.get("/api/kb?category_id=abc")
+    assert r.status_code == 200  # guarded, not 500
+
+
+def test_kb_cross_agent_publish_forbidden(client):
+    # HR agent authors a draft, IT agent must NOT be able to publish/delete it.
+    _login(client, "hragent@opsdesk.local")
+    csrf = _csrf(client)
+    aid = client.post("/api/kb", json={"title": "HR draft", "body": "secret"},
+                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+    _login(client, "agent@opsdesk.local")  # different agent
+    csrf = _csrf(client)
+    assert client.post(f"/api/kb/{aid}/publish",
+                       headers={"X-CSRF-Token": csrf}).status_code == 403
+    assert client.delete(f"/api/kb/{aid}",
+                         headers={"X-CSRF-Token": csrf}).status_code == 403
+
+
+def test_kb_requester_draft_by_id_404(client):
+    _login(client, "hragent@opsdesk.local")
+    csrf = _csrf(client)
+    aid = client.post("/api/kb", json={"title": "hidden", "body": "x"},
+                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+    _login(client, "sam@opsdesk.local")  # requester
+    r = client.get(f"/api/kb/{aid}")
+    assert r.status_code == 404  # draft hidden from requesters
+
+
+def test_kb_views_counter_not_lagging(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    aid = client.post("/api/kb", json={"title": "Viewed", "body": "content"},
+                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+    # publish so requesters can view
+    assert client.post(f"/api/kb/{aid}/publish",
+                        headers={"X-CSRF-Token": _csrf(client)}).status_code == 200
+    _login(client, "sam@opsdesk.local")
+    art = client.get(f"/api/kb/{aid}").get_json()["article"]
+    assert art["views"] >= 1  # reflects the increment, not stale 0

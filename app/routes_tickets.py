@@ -23,6 +23,7 @@ from . import db, config, helpers
 from .helpers import login_required, is_agent_or_manager, can_view_ticket, csrf_protect
 from . import lifecycle
 from . import notifications
+from . import routes_sla as sla
 
 tickets = Blueprint("tickets", __name__)
 
@@ -107,6 +108,14 @@ def create_ticket():
     if priority not in config.PRIORITIES:
         return jsonify(error="Invalid priority"), 400
 
+    # Default category -> team routing: if no team specified, use the category's
+    # default team (so a requester's ticket lands with the right group).
+    if not team_id:
+        cat = db.get_db().execute(
+            "SELECT default_team_id FROM categories WHERE id=?", (category_id,)).fetchone()
+        if cat and cat["default_team_id"]:
+            team_id = cat["default_team_id"]
+
     # Requester is whoever is logged in, UNLESS an agent/manager creates on
     # behalf of someone else. A plain requester can never set requester_id.
     if helpers.is_agent_or_manager(request.current_user) and data.get("requester_id"):
@@ -129,6 +138,8 @@ def create_ticket():
     tid = cur.lastrowid
     helpers.log_activity(tid, request.current_user["id"], "created",
                          note=f"Ticket {ref} created")
+    # Phase 3: attach the matching SLA policy (once) at creation time.
+    sla.attach_sla(_fetch(tid))
     return jsonify(ticket=_serialize(_fetch(tid))), 201
 
 
@@ -173,6 +184,9 @@ def assign(tid):
     who = "self" if data.get("self") else f"user {assignee_id}"
     helpers.log_activity(tid, user["id"], "assigned", t["status"],
                          new_status, note=f"Assigned to {who}")
+    # Phase 3: an agent acting on the ticket counts as the first response.
+    if assignee_id and t["requester_id"] != user["id"]:
+        sla.record_first_response(tid)
     # Phase 1: tell the requester their ticket was picked up.
     if assignee_id and t["requester_id"] != user["id"]:
         assignee_name = db.get_db().execute(
@@ -251,6 +265,9 @@ def change_status(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "status_change",
                          t["status"], final_status, note=note or None)
+    # Phase 3: evaluate SLA when the ticket is resolved.
+    if final_status == config.STATUS_RESOLVED:
+        sla.evaluate_on_resolve(tid)
     # Phase 1: notify the requester when their ticket is resolved.
     if to == config.STATUS_RESOLVED and t["requester_id"] != user["id"]:
         notifications.notify(
@@ -593,6 +610,25 @@ def _serialize(t):
         "updated_at": t["updated_at"],
         "resolved_at": t["resolved_at"],
         "closed_at": t["closed_at"],
+        "sla": _sla_summary(t["id"]),
+    }
+
+def _sla_summary(tid):
+    """Lightweight SLA readout for ticket serialization (no extra auth check;
+    the caller already authorized the ticket)."""
+    row = db.get_db().execute(
+        "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
+        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
+        (tid,)).fetchone()
+    if not row:
+        return None
+    return {
+        "policy_name": row["policy_name"],
+        "breach_at": row["breach_at"],
+        "breached": bool(row["breached"]),
+        "first_response_at": row["first_response_at"],
+        "response_met": row["response_met"],
+        "resolution_met": row["resolution_met"],
     }
 
 

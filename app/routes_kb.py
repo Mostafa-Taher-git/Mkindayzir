@@ -52,8 +52,13 @@ def list_articles():
         params += [like, like]
     cat = request.args.get("category_id")
     if cat:
-        sql += " AND category_id=?"
-        params.append(int(cat))
+        try:
+            cat = int(cat)
+        except (TypeError, ValueError):
+            cat = None
+        if cat is not None:
+            sql += " AND category_id=?"
+            params.append(cat)
     sql += " ORDER BY updated_at DESC"
     rows = db.get_db().execute(sql, params).fetchall()
     out = []
@@ -79,7 +84,8 @@ def get_article(aid):
         db.get_db().execute(
             "UPDATE kb_articles SET views = views + 1 WHERE id=?", (aid,))
         db.get_db().commit()
-    a = dict(a)
+        a = dict(db.get_db().execute(
+            "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone())
     a["author_name"] = _author_name(a["author_id"])
     return jsonify(article=a)
 
@@ -98,7 +104,15 @@ def create_article():
         return jsonify(error="Title and body are required"), 400
     if len(body) > config.MAX_KB_BODY:
         return jsonify(error=f"Body must be ≤ {config.MAX_KB_BODY} characters"), 400
+    if len(title) > config.MAX_KB_TITLE:
+        return jsonify(error=f"Title must be ≤ {config.MAX_KB_TITLE} characters"), 400
     now = db.now_iso()
+    cid = data.get("category_id") or None
+    if cid is not None:
+        cat = db.get_db().execute(
+            "SELECT 1 FROM categories WHERE id=?", (cid,)).fetchone()
+        if not cat:
+            return jsonify(error="Unknown category"), 400
     cur = db.get_db().execute(
         """INSERT INTO kb_articles (title, body, category_id, author_id, status, views, created_at, updated_at)
            VALUES (?,?,?,?, 'draft', 0, ?, ?)""",
@@ -127,6 +141,14 @@ def edit_article(aid):
         return jsonify(error="Title and body are required"), 400
     if len(body) > config.MAX_KB_BODY:
         return jsonify(error=f"Body must be ≤ {config.MAX_KB_BODY} characters"), 400
+    if len(title) > config.MAX_KB_TITLE:
+        return jsonify(error=f"Title must be ≤ {config.MAX_KB_TITLE} characters"), 400
+    cid = data.get("category_id", a["category_id"])
+    if cid is not None:
+        cat = db.get_db().execute(
+            "SELECT 1 FROM categories WHERE id=?", (cid,)).fetchone()
+        if not cat:
+            return jsonify(error="Unknown category"), 400
     db.get_db().execute(
         "UPDATE kb_articles SET title=?, body=?, category_id=?, updated_at=? WHERE id=?",
         (title, body, data.get("category_id", a["category_id"]), db.now_iso(), aid))
@@ -146,6 +168,12 @@ def publish_article(aid):
         "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
     if not a:
         return jsonify(error="Article not found"), 404
+    if user["role"] == "agent" and a["author_id"] != user["id"]:
+        return jsonify(error="Not allowed to publish this article"), 403
+    db.get_db().execute(
+        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Article not found"), 404
     db.get_db().execute(
         "UPDATE kb_articles SET status='published', updated_at=? WHERE id=?",
         (db.now_iso(), aid))
@@ -161,6 +189,12 @@ def delete_article(aid):
     user = request.current_user
     if user["role"] not in ("agent", "manager", "admin"):
         return jsonify(error="Not allowed"), 403
+    a = db.get_db().execute(
+        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Article not found"), 404
+    if user["role"] == "agent" and a["author_id"] != user["id"]:
+        return jsonify(error="Not allowed to delete this article"), 403
     db.get_db().execute("DELETE FROM kb_articles WHERE id=?", (aid,))
     db.get_db().commit()
     return jsonify(ok=True)
@@ -170,13 +204,21 @@ def delete_article(aid):
 @helpers.login_required
 @helpers.csrf_protect
 def feedback(aid):
+    user = request.current_user
+    a = db.get_db().execute(
+        "SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Article not found"), 404
     data = request.get_json(force=True, silent=True) or {}
     helpful = data.get("helpful")
     if helpful not in (0, 1, True, False):
         return jsonify(error="helpful must be true/false"), 400
     helpful = 1 if helpful else 0
+    # One vote per user per article (upsert by replacing prior vote).
     db.get_db().execute(
-        "INSERT INTO kb_feedback (article_id, helpful, comment, created_at) VALUES (?,?,?,?)",
-        (aid, helpful, (data.get("comment") or "")[:1000] or None, db.now_iso()))
+        "DELETE FROM kb_feedback WHERE article_id=? AND user_id=?", (aid, user["id"]))
+    db.get_db().execute(
+        "INSERT INTO kb_feedback (article_id, user_id, helpful, comment, created_at) VALUES (?,?,?,?,?)",
+        (aid, user["id"], helpful, (data.get("comment") or "")[:1000] or None, db.now_iso()))
     db.get_db().commit()
     return jsonify(ok=True)

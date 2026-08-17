@@ -18,6 +18,7 @@ from .routes_tickets import tickets as tickets_bp
 from .routes_admin import admin as admin_bp
 from .routes_notif import notif as notif_bp
 from .routes_kb import kb as kb_bp
+from .routes_sla import sla as sla_bp
 
 
 def create_app():
@@ -52,6 +53,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(notif_bp)
     app.register_blueprint(kb_bp)
+    app.register_blueprint(sla_bp)
 
     # ---- Serve the single-page frontend ----
     # The shell is just static markup, so it does NOT require login. Client-side

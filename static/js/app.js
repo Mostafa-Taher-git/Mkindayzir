@@ -36,6 +36,16 @@
     new: "New", assigned: "Assigned", in_progress: "In Progress",
     blocked: "Blocked", resolved: "Resolved", closed: "Closed", reopened: "Reopened",
   };
+  const slaBadge = (t) => {
+    if (!t || !t.sla) return null;
+    const s = t.sla;
+    let label, cls;
+    if (s.breached) { label = "SLA breached"; cls = "breached"; }
+    else if (s.resolution_met === 0) { label = "SLA at risk"; cls = "atrisk"; }
+    else { label = "On track"; cls = "ok"; }
+    return el("span", { class: "sla-badge " + cls, title: "Policy: " + (s.policy_name || "default") + (s.breach_at ? " . due " + fmtDate(s.breach_at) : "") }, "SLA: " + label);
+  };
+
   const statusBadge = (s) => el("span", { class: `badge ${s}` }, el("span", { class: "dot" }), STATUS_LABELS[s] || s);
   const priorityPill = (p) => el("span", { class: `pill ${p}` }, p === "urgent" ? "Urgent" : "Normal");
 
@@ -85,9 +95,8 @@
       const { articles } = await API.listKb(q ? { q } : {});
       if (!articles.length) { list.replaceChildren(el("div", { class: "empty" }, "No articles yet.")); return; }
       list.replaceChildren(el("div", { class: "kb-list" },
-        ...articles.map((a) => el("div", { class: "card kb-card", role: "link", tabindex: "0",
-          onclick: () => navigate(`/kb/${a.id}`),
-          onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/kb/${a.id}`); } } },
+        ...articles.map((a) => el("a", { class: "card kb-card", href: `#/kb/${a.id}`,
+          onclick: () => navigate(`/kb/${a.id}`) },
           el("div", { class: "kb-title" }, a.title),
           el("div", { class: "muted", style: "font-size:13px" }, categoryName(a.category_id) + (a.views ? " . " + a.views + " views" : ""))))));
     } catch (e) { toast(e.message, "error"); }
@@ -107,16 +116,21 @@
         el("div", { class: "kb-body" }, el("p", {}, article.body)),
         el("div", { class: "mt-6 card", style: "padding:16px" },
           el("div", { class: "label mb-2" }, "Was this helpful?"),
-          el("div", {},
-            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, true) }, "Yes"),
+          el("div", { id: "kb-feedback-btns" },
+            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, true, this) }, "Yes"),
             " ",
-            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, false) }, "No"))));
+            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, false, this) }, "No"))));
     } catch (e) { toast(e.message, "error"); navigate("/kb"); }
   }
 
-  async function sendKbFeedback(id, helpful) {
-    try { await API.kbFeedback(id, helpful); toast(helpful ? "Thanks for the feedback!" : "Thanks - we will improve this.", "info"); }
-    catch (e) { toast(e.message, "error"); }
+  async function sendKbFeedback(id, helpful, btn) {
+    try {
+      await API.kbFeedback(id, helpful);
+      toast(helpful ? "Thanks for the feedback!" : "Thanks - we will improve this.", "info");
+      // Disable both buttons so one user cannot spam duplicate votes.
+      const wrap = document.getElementById("kb-feedback-btns");
+      if (wrap) wrap.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    } catch (e) { toast(e.message, "error"); }
   }
 
   async function viewKbManage() {
@@ -222,9 +236,17 @@
 
   function router() {
     const hash = location.hash.replace(/^#/, "") || (state.user ? "/dashboard" : "/login");
-    const [path, param] = hash.split("/").filter(Boolean);
-    const key = "/" + (path || (state.user ? "dashboard" : "login"));
-    const render = routes[key] || (state.user ? viewDashboard : viewLogin);
+    const parts = hash.split("/").filter(Boolean);
+    const path = parts[0] || (state.user ? "dashboard" : "login");
+    const param = parts[1];
+    const key = "/" + path;
+    let render = routes[key] || (state.user ? viewDashboard : viewLogin);
+    // Nested KB routes (/kb/manage, /kb/new, /kb/<id>) key to /kb in the flat
+    // map, so resolve the full path when a nested route is registered.
+    if (path === "kb") {
+      const nested = "/" + parts.join("/");
+      if (routes[nested]) render = routes[nested];
+    }
     try {
       render(param);
     } catch (e) {
@@ -245,6 +267,9 @@
       if (state.user.role === "requester") navItems.push(["/my", "My Requests", "📥"]);
     }
     navItems.push(["/new", "New Request", "➕"]);
+    // Knowledge Base: Help Center for everyone; Manage KB for staff.
+    navItems.push(["/kb", "Help Center", "📚"]);
+    if (state.user.role !== "requester") navItems.push(["/kb/manage", "Manage KB", "✍️"]);
     if (isAdmin()) navItems.push(["/admin", "Admin", "⚙️"]);
 
     const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
@@ -564,6 +589,7 @@
         el("td", {}, catName(t.category_id)),
         el("td", {}, statusBadge(t.status)),
         el("td", {}, priorityPill(t.priority)),
+        el("td", {}, slaBadge(t) || el("span", { class: "muted" }, "-")),
         el("td", {}, nameOf(t.assignee_id, "Unassigned")),
         el("td", {}, teamName(t.team_id)),
         el("td", { class: "muted" }, ago(t.updated_at)),
@@ -597,7 +623,7 @@
           el("div", { class: "ref mono" }, t.ticket_ref),
           el("h2", { class: "h2" }, t.subject)),
         el("div", { class: "spacer" }),
-        statusBadge(t.status), priorityPill(t.priority));
+        statusBadge(t.status), priorityPill(t.priority), slaBadge(t));
 
       // Left column: details + comments
       const detailCard = el("div", { class: "card" },
@@ -608,6 +634,7 @@
         kvRow("Priority", t.priority === "urgent" ? "Urgent" : "Normal"),
         kvRow("Created", fmtDate(t.created_at)),
         kvRow("Updated", fmtDate(t.updated_at)),
+        t.sla ? kvRow("SLA", (t.sla.breached ? "Breached" : (t.sla.resolution_met === 0 ? "At risk" : "On track")) + (t.sla.policy_name ? " (" + t.sla.policy_name + ")" : "") + (t.sla.breach_at ? " . due " + fmtDate(t.sla.breach_at) : "")) : null,
         t.blocked_reason ? el("div", { class: "mt-4" },
           el("span", { class: "label" }, "Blocked reason"),
           el("div", { class: "comment internal", style: "margin-top:4px" }, t.blocked_reason)) : null);
