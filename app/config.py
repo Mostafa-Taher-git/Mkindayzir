@@ -44,6 +44,20 @@ PASSWORD_MIN_LENGTH = 8
 # OPERADESK_SECRET var (reuse is fine) or its own OPERADESK_CSRF_SECRET.
 CSRF_SECRET = os.environ.get("OPERADESK_CSRF_SECRET", SECRET_KEY)
 
+# --- AI model selection (v2) ---
+# Default model used for AI assist when a user has not picked one. We default to
+# a FREE OpenRouter model so the feature works out-of-the-box for any user who
+# pastes their own OpenRouter key. Override per-deployment with OPERADESK_AI_MODEL.
+AI_MODEL_DEFAULT = os.environ.get("OPERADESK_AI_MODEL", "")
+# Curated list of free models offered in the settings UI (label + id).
+AI_FREE_MODELS = [
+    {"id": "deepseek/deepseek-chat:free", "label": "DeepSeek Chat (free)"},
+    {"id": "meta-llama/llama-3.1-8b-instruct:free", "label": "Llama 3.1 8B (free)"},
+    {"id": "google/gemma-2-9b-it:free", "label": "Gemma 2 9B (free)"},
+    {"id": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B (free)"},
+    {"id": "qwen/qwen2.5-7b-instruct:free", "label": "Qwen2.5 7B (free)"},
+]
+
 # --- AI assistance (v2) ---
 # Key-gated + fail-closed. The feature is available ONLY when a provider key is
 # set AND not explicitly disabled. Explicitly disable with OPERADESK_AI_ENABLED=0

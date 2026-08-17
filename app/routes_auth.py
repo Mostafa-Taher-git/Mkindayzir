@@ -89,11 +89,19 @@ def logout():
 @auth.route("/api/auth/me")
 @login_required
 def me():
-    # Tell the SPA whether the AI assist panel should render. False when no
-    # provider key is configured (fail-closed default) or the flag is off.
+    # Per-user AI availability: the panel shows when THIS user has supplied a
+    # key (or a deployment-wide key exists). Also hand the SPA the curated list
+    # of free models for the settings picker.
     from . import config as _cfg
-    return jsonify(user=row_to_public(request.current_user),
-                   ai_enabled=bool(_cfg.AI_ENABLED))
+    from .helpers import decrypt_secret
+    import os as _os
+    u = request.current_user
+    has_key = bool(decrypt_secret(u.get("ai_key")) or
+                   _os.environ.get("OPERADESK_OPENROUTER_KEY"))
+    return jsonify(user=row_to_public(u),
+                   ai_enabled=has_key,
+                   ai_model=u.get("ai_model") or _cfg.AI_MODEL_DEFAULT,
+                   ai_free_models=_cfg.AI_FREE_MODELS)
 
 
 def row_to_public(u):

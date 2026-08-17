@@ -275,6 +275,13 @@ def _migrate(db):
     t_cols = [r[1] for r in db.execute("PRAGMA table_info(tickets)").fetchall()]
     if "csat" not in t_cols:
         db.execute("ALTER TABLE tickets ADD COLUMN csat INTEGER")
+    u_cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
+    if "ai_key" not in u_cols:
+        # Encrypted (Fernet) user-supplied OpenRouter key, at rest only.
+        db.execute("ALTER TABLE users ADD COLUMN ai_key TEXT")
+    if "ai_model" not in u_cols:
+        # Per-user model override (defaults to the free model in config).
+        db.execute("ALTER TABLE users ADD COLUMN ai_model TEXT")
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}

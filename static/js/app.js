@@ -326,6 +326,7 @@
     "/kb/new": viewKbEdit,
     "/kb/:id": viewKbArticle,
     "/reports": viewReports,
+    "/settings": viewSettings,
   };
 
   function navigate(hash) {
@@ -355,6 +356,13 @@
   }
 
   /* ----------------------------- shell ----------------------------- */
+  // Brand mark: app logo + wordmark (icon from /static/logo.png).
+  function brandEl() {
+    return el("div", { class: "brand" },
+      el("img", { src: "/static/logo.png", alt: "OpsDesk logo", class: "brand-logo", width: 28, height: 28 }),
+      el("span", {}, "OpsDesk"));
+  }
+
   function shell(inner) {
     const navItems = [];
     if (state.user.role === "requester") {
@@ -371,6 +379,7 @@
     if (state.user.role !== "requester") navItems.push(["/kb/manage", "Manage KB", "✍️"]);
     if (state.user.role === "manager" || state.user.role === "admin") navItems.push(["/reports", "Reports", "📈"]);
     if (isAdmin()) navItems.push(["/admin", "Admin", "⚙️"]);
+    navItems.push(["/settings", "Settings", "🔑"]);
 
     const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
       ...navItems.map(([href, label, icon]) =>
@@ -383,7 +392,7 @@
     const root = $("#app");
     root.innerHTML = "";
     root.appendChild(el("div", { class: "topbar" },
-      el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+      brandEl(),
       el("div", { class: "spacer" }),
       el("div", { class: "who" }, "Signed in as ", el("b", {}, state.user.name),
         " · ", el("span", { class: "label" }, state.user.role)),
@@ -475,7 +484,7 @@
     root.innerHTML = "";
     const card = el("div", { class: "login-wrap" },
       el("div", { class: "card login-card" },
-        el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+        brandEl(),
         el("p", { class: "muted", style: "text-align:center" }, "Internal Service Request Platform"),
         el("form", { id: "loginForm", onsubmit: onLogin },
           field("Email", el("input", { type: "email", name: "email", required: "", autocomplete: "username", placeholder: "you@opsdesk.local" })),
@@ -507,7 +516,7 @@
     root.innerHTML = "";
     const card = el("div", { class: "login-wrap" },
       el("div", { class: "card login-card" },
-        el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+        brandEl(),
         el("h2", { class: "h3 mb-4" }, "Reset your password"),
         el("p", { class: "muted" }, "Enter your account email and we'll send a reset link."),
         el("form", { id: "forgotForm", onsubmit: onForgot },
@@ -533,7 +542,7 @@
     const token = new URLSearchParams(location.hash.split("?")[1] || "").get("token") || "";
     const card = el("div", { class: "login-wrap" },
       el("div", { class: "card login-card" },
-        el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+        brandEl(),
         el("h2", { class: "h3 mb-4" }, "Choose a new password"),
         el("form", { id: "resetForm", onsubmit: onReset },
           el("input", { type: "hidden", name: "token", value: token }),
@@ -937,6 +946,41 @@
   }
 
   /* ----------------------------- admin ----------------------------- */
+  async function viewSettings() {
+    if (!state.user) { navigate("/login"); return; }
+    const main = el("div", {}, el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Settings")));
+    shell(main);
+    let hasKey = false, model = state.user.ai_model || "", models = [];
+    try {
+      const s = await API.getAiSettings();
+      hasKey = s.has_key;
+      model = s.model;
+      models = s.free_models || [];
+    } catch (e) { toast(e.message, "error"); }
+
+    const card = el("div", { class: "card" },
+      el("div", { class: "label mb-2" }, "OpenRouter API key"),
+      el("p", { class: "muted mb-2" },
+        "Paste your own OpenRouter key to enable AI assist. The key is stored encrypted and used only for your requests. ",
+        el("a", { href: "https://openrouter.ai/keys", target: "_blank", rel: "noopener" }, "Get a free key")),
+      el("input", { id: "ai-key", type: "password", placeholder: hasKey ? "•••••••• (already set)" : "sk-or-...", class: "mb-2" }),
+      el("div", { class: "label mb-2" }, "Model"),
+      el("select", { id: "ai-model", class: "mb-2" },
+        ...models.map(m => el("option", { value: m.id, selected: m.id === model }, m.label))),
+      el("div", { class: "row wrap" },
+        el("button", { class: "btn sm", onclick: async () => {
+          const key = $("#ai-key").value.trim();
+          const mdl = $("#ai-model").value;
+          const r = await API.saveAiSettings({ api_key: key, model: mdl });
+          if (r.ok) { toast("Settings saved", "ok"); hasKey = r.has_key; model = r.model; }
+        }}, "Save"),
+        hasKey ? el("button", { class: "btn danger sm", onclick: async () => {
+          const r = await API.saveAiSettings({ api_key: "", model: model });
+          if (r.ok) { toast("API key cleared", "ok"); hasKey = false; $("#ai-key").value = ""; }
+        }}, "Clear key") : null));
+    main.appendChild(card);
+  }
+
   async function viewAdmin() {
     if (!isAdmin()) { navigate("/dashboard"); return; }
     shell(el("div", {},

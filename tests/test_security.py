@@ -722,3 +722,30 @@ def test_ai_fail_closed_when_content_is_null():
     aicl._complete = lambda p, **k: None
     assert aicl.suggest_reply({"subject": "x", "description": "y"}) is None
     assert aicl.summarize_ticket({"subject": "x", "description": "y"}) is None
+
+
+# ---------------------------------------------------------------------------
+# v2 AI — per-user settings: save key + model + list free models
+# ---------------------------------------------------------------------------
+def test_settings_ai_save_and_list(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    h = {"X-CSRF-Token": csrf}
+    # fresh user -> no key
+    r = client.get("/api/settings/ai")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["has_key"] is False
+    assert body["model"] == config.AI_MODEL_DEFAULT
+    assert isinstance(body["free_models"], list)
+    # save key + model
+    r = client.post("/api/settings/ai", json={"api_key": "sk-or-abc123", "model": "x/y:free"}, headers=h)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["has_key"] is True
+    assert body["model"] == "x/y:free"
+    # clear key
+    r = client.post("/api/settings/ai", json={"api_key": "", "model": "x/y:free"}, headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["has_key"] is False

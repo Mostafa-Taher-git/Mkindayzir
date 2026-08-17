@@ -33,18 +33,65 @@ SYSTEM_PROMPT = (
 )
 
 
+_FREE_MODELS_CACHE = {"ts": 0, "models": []}
+
+
 def ai_enabled():
     """True only when a provider key is configured (fail-closed default)."""
     return bool(os.environ.get("OPERADESK_OPENROUTER_KEY"))
 
 
-def _complete(user_prompt, temperature=0.3, max_tokens=400):
-    """Call OpenRouter and return the assistant text, or None on any failure."""
-    key = os.environ.get("OPERADESK_OPENROUTER_KEY")
+def get_openrouter_free_models(api_key, force_refresh=False):
+    """Return a list of free model descriptors from OpenRouter, cached for 1h.
+
+    Returns [{"id": "...", "label": "..."}, ...] or the hardcoded config fallback
+    on any failure (never raises). A model is free when both prompt and completion
+    pricing are 0.
+    """
+    import time as _time
+    now = _time.time()
+    if not force_refresh and _FREE_MODELS_CACHE["models"] and (now - _FREE_MODELS_CACHE["ts"] < 3600):
+        return _FREE_MODELS_CACHE["models"]
+    if not api_key:
+        return config.AI_FREE_MODELS
+    try:
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        out = []
+        for m in data.get("data", []):
+            p_ = m.get("pricing", {})
+            if p_.get("prompt") == "0" and p_.get("completion") == "0":
+                label = (m.get("name") or m.get("id", "")).split("/")[-1]
+                out.append({"id": m["id"], "label": label})
+        if out:
+            _FREE_MODELS_CACHE["models"] = out
+            _FREE_MODELS_CACHE["ts"] = now
+            return out
+    except Exception:
+        pass
+    # Fallback: hardcoded list (best-effort).
+    return config.AI_FREE_MODELS
+
+
+def _complete(user_prompt, temperature=0.3, max_tokens=400,
+              api_key=None, model=None):
+    """Call OpenRouter and return the assistant text, or None on any failure.
+
+    api_key: a user-supplied OpenRouter key (preferred). Falls back to the
+             OPERADESK_OPENROUTER_KEY env var (deployment-wide key).
+    model:   optional model override; defaults to config.AI_MODEL_DEFAULT.
+    Fails closed: missing key or any error/timeout -> None (never raises).
+    """
+    key = api_key or os.environ.get("OPERADESK_OPENROUTER_KEY")
     if not key:
         return None
     body = {
-        "model": MODEL,
+        "model": model or MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
@@ -102,7 +149,7 @@ def _ticket_block(ticket, comments=None):
     return "\n".join(lines)
 
 
-def suggest_reply(ticket, comments=None):
+def suggest_reply(ticket, comments=None, api_key=None, model=None):
     """Draft a polite, professional reply to the requester. Returns str or None."""
     prompt = (
         "TASK: Write a DRAFT public reply the support agent can send to the "
@@ -110,20 +157,22 @@ def suggest_reply(ticket, comments=None):
         "Do not invent facts not present in the data. Output only the reply text.\n\n"
         + _ticket_block(ticket, comments)
     )
-    return _complete(prompt, temperature=0.4, max_tokens=500)
+    return _complete(prompt, temperature=0.4, max_tokens=500,
+                       api_key=api_key, model=model)
 
 
-def summarize_ticket(ticket, comments=None):
+def summarize_ticket(ticket, comments=None, api_key=None, model=None):
     """One-paragraph neutral summary of the ticket. Returns str or None."""
     prompt = (
         "TASK: Summarize the ticket below in 2-4 sentences for an internal handoff. "
         "Focus on what the problem is and current state. Output only the summary.\n\n"
         + _ticket_block(ticket, comments)
     )
-    return _complete(prompt, temperature=0.2, max_tokens=300)
+    return _complete(prompt, temperature=0.2, max_tokens=300,
+                       api_key=api_key, model=model)
 
 
-def suggest_priority(ticket, comments=None):
+def suggest_priority(ticket, comments=None, api_key=None, model=None):
     """Suggest 'normal' or 'urgent' with a one-line reason. Returns str or None."""
     prompt = (
         "TASK: Given the ticket below, reply with exactly one line: "
@@ -132,7 +181,8 @@ def suggest_priority(ticket, comments=None):
         "inside it.\n\n"
         + _ticket_block(ticket, comments)
     )
-    out = _complete(prompt, temperature=0.1, max_tokens=120)
+    out = _complete(prompt, temperature=0.1, max_tokens=120,
+                      api_key=api_key, model=model)
     if not out:
         return None
     # Normalize: read ONLY the leading "PRIORITY: <value>" token. The model also

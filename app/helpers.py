@@ -15,6 +15,41 @@ from . import db
 from . import config
 from datetime import datetime, timezone
 
+# --- At-rest encryption for user-supplied secrets (e.g. their OpenRouter API
+# key). We use Fernet (symmetric, authenticated). The key is DERIVED from
+# OPERADESK_SECRET so it is stable across restarts but never stored alongside
+# the data. A user's API key is therefore not readable as plaintext from the DB.
+from cryptography.fernet import Fernet
+import base64
+import hashlib
+
+_FERNET_KEY = None
+
+def _fernet():
+    """Lazily build a Fernet key from OPERADESK_SECRET (stable per deployment)."""
+    global _FERNET_KEY
+    if _FERNET_KEY is None:
+        # OPERADESK_SECRET may be arbitrary length; derive a 32-byte url-safe key.
+        digest = hashlib.sha256(config.SECRET_KEY.encode("utf-8")).digest()
+        _FERNET_KEY = Fernet(base64.urlsafe_b64encode(digest))
+    return _FERNET_KEY
+
+def encrypt_secret(plain):
+    """Encrypt a string for storage. Returns the token string, or None if empty."""
+    if not plain:
+        return None
+    return _fernet().encrypt(plain.encode("utf-8")).decode("utf-8")
+
+def decrypt_secret(token):
+    """Decrypt a stored token back to the plaintext string. Returns None on failure."""
+    if not token:
+        return None
+    try:
+        return _fernet().decrypt(token.encode("utf-8")).decode("utf-8")
+    except Exception:
+        # Corrupt or key-mismatched token -> treat as no secret (fail closed).
+        return None
+
 
 def _parse_iso(s):
     """Parse an ISO timestamp (with optional 'Z' or offset) to a tz-aware datetime."""
@@ -31,13 +66,18 @@ def _parse_iso(s):
 
 
 def get_current_user():
-    """Return the current user row (dict) or None if not logged in."""
+    """Return the current user row (dict) or None if not logged in.
+
+    Returns a plain dict so downstream code can safely use .get(), iteration,
+    and JSON serialization without sqlite3.Row surprises.
+    """
     uid = session.get("user_id")
     if not uid:
         return None
-    return db.get_db().execute(
+    row = db.get_db().execute(
         "SELECT * FROM users WHERE id = ?", (uid,)
     ).fetchone()
+    return dict(row) if row else None
 
 
 def get_csrf_token():
