@@ -27,6 +27,49 @@ from . import routes_sla as sla
 
 tickets = Blueprint("tickets", __name__)
 
+# Simple attachment magic-byte guard (stdlib only). This does NOT need
+# python-magic; it checks a small whitelist of known file signatures
+# against the first 32 bytes and rejects obvious mismatches.
+_MAGIC = {
+    # images
+    "png": (b"\x89PNG\r\n\x1a\n",),
+    "jpg": (b"\xff\xd8\xff",),
+    "jpeg": (b"\xff\xd8\xff",),
+    "gif": (b"GIF87a", b"GIF89a"),
+    "bmp": (b"BM",),
+    "webp": (b"RIFF",),  # simplistic; actual container/type is later
+    "svg": (b"<svg", b"<?xml"),
+    "tiff": (b"II", b"MM"),
+    # docs/archives
+    "pdf": (b"%PDF-",),
+    "doc": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
+    "xls": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
+    "docx": (b"PK\x03\x04",),
+    "xlsx": (b"PK\x03\x04",),
+    "pptx": (b"PK\x03\x04",),
+    "zip": (b"PK\x03\x04",),
+    "rar": (b"Rar!\x1a\x07\x00",),
+    "7z": (b"7z\xbc\xaf\x27\x1c",),
+    "txt": (None,),  # text-like: require UTF-8 printable or empty
+}
+
+def _detect_upload_type(head: bytes, ext: str):
+    if not head:
+        return "ok", "empty"
+    ext = ext.lower().lstrip(".")
+    candidates = _MAGIC.get(ext, (None,))
+    if candidates == (None,):
+        # text/plain-ish fallback: allow printable/UTF-8-only payloads
+        try:
+            head.decode("utf-8")
+            return "ok", "text"
+        except UnicodeDecodeError:
+            return "Invalid file content for extension", ext
+    for sig in candidates:
+        if sig and head.startswith(sig):
+            return "ok", ext
+    return f"File content does not match {ext} format", ext
+
 
 # ---------------------------------------------------------------------------
 # Listing & detail
@@ -475,6 +518,11 @@ def upload_attachment(tid):
     ext = os.path.splitext(base)[1].lower()
     if ext not in config.ALLOWED_EXTENSIONS:
         return jsonify(error="File type not allowed"), 400
+    head = file.read(32)
+    file.seek(0)
+    kind, _ = _detect_upload_type(head, ext)
+    if kind != "ok":
+        return jsonify(error=kind), 400
     # Read the real size from the stream (content_length is client-supplied and
     # can be missing/forged). Rewind after measuring.
     file.seek(0, os.SEEK_END)

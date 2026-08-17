@@ -137,9 +137,10 @@ def role_required(*roles):
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
+            if _session_expired():
+                session.clear()
             user = get_current_user()
             if not user or user["role"] not in roles:
-                # Same as login_required: JSON only, no redirect (see above).
                 return jsonify(error="Forbidden"), 403
             request.current_user = user
             return f(*args, **kwargs)
