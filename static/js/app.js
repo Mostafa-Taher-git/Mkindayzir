@@ -41,9 +41,9 @@
     const s = t.sla;
     let label, cls;
     if (s.breached) { label = "SLA breached"; cls = "breached"; }
-    else if (s.resolution_met === 0) { label = "SLA at risk"; cls = "atrisk"; }
+    else if (s.resolution_met === 0) { label = "SLA missed"; cls = "atrisk"; }
     else { label = "On track"; cls = "ok"; }
-    return el("span", { class: "sla-badge " + cls, title: "Policy: " + (s.policy_name || "default") + (s.breach_at ? " . due " + fmtDate(s.breach_at) : "") }, "SLA: " + label);
+    return el("span", { class: "sla-badge " + cls, title: "Policy: " + (s.policy_name || "default") + (s.breach_at ? " · due " + fmtDate(s.breach_at) : "") }, "SLA: " + label);
   };
 
   const statusBadge = (s) => el("span", { class: `badge ${s}` }, el("span", { class: "dot" }), STATUS_LABELS[s] || s);

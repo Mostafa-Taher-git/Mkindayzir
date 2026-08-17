@@ -75,6 +75,35 @@ def record_first_response(ticket_id):
     conn.commit()
 
 
+def summarize(ticket_id):
+    """Single source of truth for a ticket's SLA state.
+
+    Computes `breached` LIVE (now > breach_at) so overdue open tickets show as
+    breached in the UI instead of always "on track". For resolved/closed tickets
+    the stored response_met / resolution_met are authoritative.
+    """
+    conn = db.get_db()
+    row = conn.execute(
+        "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
+        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
+        (ticket_id,)).fetchone()
+    if not row:
+        return None
+    now = datetime.now(timezone.utc)
+    breach_at = helpers._parse_iso(row["breach_at"])
+    ticket = conn.execute("SELECT status FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    is_open = ticket and ticket["status"] not in ("resolved", "closed")
+    breached = bool(row["breached"]) or (is_open and breach_at is not None and now > breach_at)
+    return {
+        "policy_name": row["policy_name"],
+        "breach_at": row["breach_at"],
+        "breached": breached,
+        "first_response_at": row["first_response_at"],
+        "response_met": row["response_met"],
+        "resolution_met": row["resolution_met"],
+    }
+
+
 def evaluate_on_resolve(ticket_id):
     """When a ticket is resolved, decide response_met / resolution_met / breached."""
     conn = db.get_db()
@@ -88,8 +117,17 @@ def evaluate_on_resolve(ticket_id):
                           (row["policy_id"],)).fetchone() if row["policy_id"] else None
     response_met = None
     if row["first_response_at"] and policy:
-        resp_target = helpers._parse_iso(row["first_response_at"]) + timedelta(hours=policy["response_hours"])
-        response_met = 1 if helpers._parse_iso(row["first_response_at"]) <= resp_target else 0
+        # Response SLA: first response must arrive within response_hours of *creation*.
+        created = helpers._parse_iso(conn.execute(
+            "SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()["created_at"])
+        if created:
+            resp_target = created + timedelta(hours=policy["response_hours"])
+            response_met = 1 if helpers._parse_iso(row["first_response_at"]) <= resp_target else 0
+        else:
+            response_met = 0
+    else:
+        # Resolved with no first response -> response SLA missed.
+        response_met = 0
     conn.execute(
         "UPDATE ticket_sla SET breached=?, response_met=?, resolution_met=? WHERE ticket_id=?",
         (breached, response_met, 0 if breached else 1, ticket_id))
@@ -142,4 +180,6 @@ def ticket_sla(tid):
         (tid,)).fetchone()
     if not row:
         return jsonify(sla=None)
-    return jsonify(sla=dict(row))
+    # Compute breach live (overdue open tickets) via summarize() so the client
+    # sees accurate state without a separate sweep.
+    return jsonify(sla=summarize(tid))

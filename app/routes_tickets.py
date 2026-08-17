@@ -107,14 +107,25 @@ def create_ticket():
         return jsonify(error=f"Description must be {config.MAX_DESCRIPTION} characters or fewer"), 400
     if priority not in config.PRIORITIES:
         return jsonify(error="Invalid priority"), 400
+    if category_id is not None:
+        cat = db.get_db().execute(
+            "SELECT id, default_team_id, active FROM categories WHERE id=?", (category_id,)).fetchone()
+        if not cat or not cat["active"]:
+            return jsonify(error="Unknown or inactive category"), 400
 
-    # Default category -> team routing: if no team specified, use the category's
-    # default team (so a requester's ticket lands with the right group).
-    if not team_id:
+    # Authoritative category -> team routing. Agents/managers may route to an
+    # explicit team; requesters CANNOT (the client-sent team_id is ignored for
+    # them) so a Hardware ticket can't be parked in Finance.
+    if helpers.is_agent_or_manager(request.current_user):
+        effective_team = team_id
+    else:
+        effective_team = None
+    if not effective_team:
         cat = db.get_db().execute(
             "SELECT default_team_id FROM categories WHERE id=?", (category_id,)).fetchone()
         if cat and cat["default_team_id"]:
-            team_id = cat["default_team_id"]
+            effective_team = cat["default_team_id"]
+    team_id = effective_team
 
     # Requester is whoever is logged in, UNLESS an agent/manager creates on
     # behalf of someone else. A plain requester can never set requester_id.
@@ -265,8 +276,9 @@ def change_status(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "status_change",
                          t["status"], final_status, note=note or None)
-    # Phase 3: evaluate SLA when the ticket is resolved.
-    if final_status == config.STATUS_RESOLVED:
+    # Phase 3: evaluate SLA when the ticket is resolved or closed (closed
+    # without resolving is still a terminal state that must lock in SLA results).
+    if final_status in (config.STATUS_RESOLVED, config.STATUS_CLOSED):
         sla.evaluate_on_resolve(tid)
     # Phase 1: notify the requester when their ticket is resolved.
     if to == config.STATUS_RESOLVED and t["requester_id"] != user["id"]:
@@ -347,6 +359,10 @@ def add_comment(tid):
         notifications.notify(
             t["requester_id"], tid, "internal_note",
             f"A private note was added to your ticket “{t['subject']}”.")
+    # Phase 3: an agent/manager touching the ticket (public reply or internal
+    # note) is the first response; record it exactly once.
+    if is_agent_or_manager(user) and t["requester_id"] != user["id"]:
+        sla.record_first_response(tid)
     return jsonify(comment=_serialize_comment(c)), 201
 
 
@@ -615,22 +631,13 @@ def _serialize(t):
     }
 
 def _sla_summary(tid):
-    """Lightweight SLA readout for ticket serialization (no extra auth check;
-    the caller already authorized the ticket)."""
-    row = db.get_db().execute(
-        "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
-        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
-        (tid,)).fetchone()
-    if not row:
-        return None
-    return {
-        "policy_name": row["policy_name"],
-        "breach_at": row["breach_at"],
-        "breached": bool(row["breached"]),
-        "first_response_at": row["first_response_at"],
-        "response_met": row["response_met"],
-        "resolution_met": row["resolution_met"],
-    }
+    """Lightweight SLA readout for ticket serialization.
+
+    Delegates to routes_sla.summarize, which computes breach LIVE (overdue open
+    tickets are reported as breached) so the badge is accurate without a sweep.
+    The caller has already authorized the ticket.
+    """
+    return sla.summarize(tid)
 
 
 def _serialize_comment(c):

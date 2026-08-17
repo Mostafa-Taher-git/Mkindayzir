@@ -507,3 +507,86 @@ def test_reports_trend_days_validation(client):
     r = client.get("/api/reports/trend?days=abc")
     assert r.status_code == 200
     assert r.get_json()["days"] == 30  # coerced to default
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — OpenCode review fixes (BUG-1..4 + nits)
+# ---------------------------------------------------------------------------
+def test_response_met_uses_creation_time_not_first_response(client, app):
+    # Late first response (well past the response SLA) must yield response_met=0.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Late reply", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    # backdate first_response_at far past creation via direct DB
+    with app.app_context():
+        from app import db as dbmod
+        # First response recorded FAR in the future (after the response SLA
+        # deadline of created_at + response_hours) -> must count as missed.
+        dbmod.get_db().execute(
+            "UPDATE ticket_sla SET first_response_at=? WHERE ticket_id=?",
+            ("2030-01-01T00:00:00+00:00", t["id"]))
+        dbmod.get_db().commit()
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    assert sla["response_met"] == 0  # missed, not always 1
+
+
+def test_open_ticket_breach_computed_live(client, app):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Overdue", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    with app.app_context():
+        from app import db as dbmod
+        dbmod.get_db().execute(
+            "UPDATE ticket_sla SET breach_at=? WHERE ticket_id=?",
+            ("2000-01-01T00:00:00+00:00", t["id"]))
+        dbmod.get_db().commit()
+    # ticket is still 'new' (open) but breach_at is in the past -> live breach
+    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    assert sla["breached"] is True
+
+
+def test_first_response_recorded_on_comment(client, app):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Comment first", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    # agent comments WITHOUT assigning -> first response should still be recorded
+    r = client.post(f"/api/tickets/{t['id']}/comments", json={"body": "Looking into it", "visibility": "public"},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    with app.app_context():
+        from app import db as dbmod
+        fr = dbmod.get_db().execute(
+            "SELECT first_response_at FROM ticket_sla WHERE ticket_id=?", (t["id"],)).fetchone()
+        assert fr["first_response_at"] is not None
+
+
+def test_invalid_category_id_returns_400_not_500(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/tickets", json={"subject": "x", "description": "y", "category_id": 99999},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 400
+
+
+def test_requester_cannot_override_team_routing(client):
+    # A requester sending team_id=Finance must be ignored; ticket routes by category.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    # category 2 (Hardware) -> IT team (id 1); try to force team 2 (HR)
+    t = client.post("/api/tickets", json={"subject": "route", "description": "y",
+                                          "category_id": 2, "team_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    assert t["team_id"] == 1  # routed by category, not the client value
