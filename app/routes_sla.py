@@ -63,6 +63,36 @@ def attach_sla(ticket):
     conn.commit()
 
 
+def update_sla_on_priority(ticket_id, category_id, new_priority):
+    """When a ticket's priority changes, re-evaluate the SLA policy.
+
+    Picks the best policy for the new priority and updates policy_id and
+    breach_at (rebased on the ticket creation time). Only called after a
+    successful priority change and only when a priority→policy mapping exists
+    for the new value. Open tickets get a fresh breach_at; already-resolved/closed
+    tickets are left alone (resolution_met/breached were set on close).
+    """
+    conn = db.get_db()
+    row = conn.execute("SELECT * FROM ticket_sla WHERE ticket_id=?", (ticket_id,)).fetchone()
+    if not row:
+        return
+    if row["first_response_at"] is not None or row["resolution_met"] is not None:
+        # Ticket is already resolved/closed — leave the historical SLA result intact.
+        return
+    policy = pick_policy(category_id, new_priority)
+    if not policy or policy["id"] == row["policy_id"]:
+        return
+    tick = conn.execute("SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    if not tick:
+        return
+    created = helpers._parse_iso(tick["created_at"]) or datetime.now(timezone.utc)
+    breach_at = created + timedelta(hours=policy["resolution_hours"])
+    conn.execute(
+        "UPDATE ticket_sla SET policy_id=?, breach_at=? WHERE ticket_id=?",
+        (policy["id"], breach_at.isoformat(), ticket_id))
+    conn.commit()
+
+
 def record_first_response(ticket_id):
     """Mark first agent response (assign/comment) if not already set."""
     conn = db.get_db()

@@ -304,6 +304,16 @@ def change_status(tid):
             f"Your ticket “{t['subject']}” was marked resolved. Reply if it’s not fixed.",
             email_subject=f"OpsDesk: ticket {t['ticket_ref']} resolved",
             email_body=f"Hi,\n\nYour ticket '{t['subject']}' ({t['ticket_ref']}) was marked resolved.\nIf the issue isn't actually fixed, just reply in the ticket: {config.APP_BASE_URL}/#/ticket/{tid}\n")
+    # Phase 1: notify the requester when their ticket is blocked.
+    if to == config.STATUS_BLOCKED and t["requester_id"] != user["id"] and note:
+        notifications.notify(
+            t["requester_id"], tid, "blocked",
+            f"Your ticket “{t['subject']}” is now blocked: {note}.")
+    # Phase 1: notify the requester when their ticket is reopened by an agent.
+    if to == config.STATUS_REOPENED and t["requester_id"] != user["id"]:
+        notifications.notify(
+            t["requester_id"], tid, "reopened",
+            f"Your ticket “{t['subject']}” was reopened. It is back in the queue.")
     return jsonify(ticket=_serialize(_fetch(tid)))
 
 
@@ -334,6 +344,11 @@ def reopen(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "reopened", t["status"],
                          config.STATUS_REOPENED)
+    # Phase 1: notify the requester that their ticket was reopened by a staff member.
+    if t["requester_id"] != user["id"]:
+        notifications.notify(
+            t["requester_id"], tid, "reopened",
+            f"Your ticket “{t['subject']}” was reopened. It is back in the queue.")
     # After reopen it sits in 'reopened'; assign routes it onward.
     return jsonify(ticket=_serialize(_fetch(tid)))
 
@@ -368,9 +383,14 @@ def change_priority(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "priority_change",
                          old_priority, new_priority)
-    # Re-attach SLA if priority changed (policy may differ).
+    # Re-evaluate SLA policy if priority changed (policy may differ).
     updated = _fetch(tid)
-    sla.attach_sla(updated)
+    sla.update_sla_on_priority(tid, updated["category_id"], new_priority)
+    # Notify the requester when an agent changes the priority.
+    if updated["requester_id"] != user["id"]:
+        notifications.notify(
+            updated["requester_id"], tid, "priority",
+            f"Your ticket “{t['subject']}” priority was set to {new_priority}.")
     return jsonify(ticket=_serialize(updated))
 
 
@@ -408,10 +428,16 @@ def add_comment(tid):
     ).fetchone()
     # Phase 1: an internal note is hidden from the requester, but we still alert
     # them that the team is actively working the ticket (without leaking content).
-    if visibility == config.VIS_INTERNAL and t["requester_id"] != user["id"]:
+    if visibility == config.VIS_INTERNAL and t["requester_id"] != user["id"] and is_agent_or_manager(user):
         notifications.notify(
             t["requester_id"], tid, "internal_note",
             f"A private note was added to your ticket “{t['subject']}”.")
+    # Phase 1: when an agent/manager posts a PUBLIC comment, notify the requester
+    # so they see the reply without polling.
+    if visibility == config.VIS_PUBLIC and t["requester_id"] != user["id"] and is_agent_or_manager(user):
+        notifications.notify(
+            t["requester_id"], tid, "comment",
+            f"{user['name']} replied to your ticket “{t['subject']}”.")
     # Phase 3: an agent/manager touching the ticket (public reply or internal
     # note) is the first response; record it exactly once.
     if is_agent_or_manager(user) and t["requester_id"] != user["id"]:
