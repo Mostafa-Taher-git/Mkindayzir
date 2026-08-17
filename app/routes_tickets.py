@@ -58,11 +58,20 @@ def list_tickets():
     for col, val in (("status", request.args.get("status")),
                      ("priority", request.args.get("priority")),
                      ("category_id", request.args.get("category_id")),
-                     ("assignee_id", request.args.get("assignee_id")),
                      ("team_id", request.args.get("team_id"))):
         if val:
             where.append(f"t.{col} = ?")
             params.append(val)
+
+    assignee_filter = request.args.get("assignee_id")
+    if assignee_filter == "me":
+        where.append("t.assignee_id = ?")
+        params.append(user["id"])
+    elif assignee_filter == "unassigned":
+        where.append("t.assignee_id IS NULL")
+    elif assignee_filter:
+        where.append("t.assignee_id = ?")
+        params.append(assignee_filter)
 
     search = request.args.get("q")
     if search:

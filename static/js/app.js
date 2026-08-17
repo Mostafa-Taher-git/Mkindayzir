@@ -285,7 +285,9 @@
     if (!state.aiEnabled) return null;
     if (!helpers_isStaff(state.user.role)) return null;
     const out = el("div", { class: "card compact mt-4" },
-      el("div", { class: "label mb-2" }, "AI assist (draft only)"));
+      el("div", { class: "label mb-2" }, "AI assist (draft only)"),
+      el("p", { class: "muted", style: "font-size:12px;margin:0 0 8px 0" },
+        "Generates draft text from ticket content. Does not send anything to the requester."));
     const result = el("div", { class: "muted mt-2", style: "white-space:pre-wrap" }, "");
     const btn = (label, fn) => el("button", { class: "btn ghost sm mr-2 mb-2", onclick: async () => {
       result.textContent = "Thinking…";
@@ -646,6 +648,11 @@
       labelled("Priority", fPriority),
       labelled("Category", fCat),
       ...(role !== "requester" ? [labelled("Team", fTeam)] : []),
+      ...(role !== "requester" ? [labelled("Assignee", el("select", { id: "f-assignee" },
+        el("option", { value: "" }, "Anyone"),
+        el("option", { value: "me" }, "Assigned to me"),
+        el("option", { value: "unassigned" }, "Unassigned"),
+        ...(m.users || []).map((u) => el("option", { value: u.id }, u.name))))] : []),
       el("button", { class: "btn primary sm", onclick: reload }, "Apply"));
   }
 
@@ -678,6 +685,7 @@
       category_id: $("#f-cat")?.value || "",
       team_id: $("#f-team")?.value || "",
       q: $("#f-q")?.value || "",
+      assignee_id: $("#f-assignee")?.value || "",
     };
     // requester view: backend already scopes to own; just load
     try {
@@ -970,6 +978,8 @@
       el("p", { class: "muted mb-2" },
         "Paste your own OpenRouter key to enable AI assist. The key is stored encrypted and used only for your requests. ",
         el("a", { href: "https://openrouter.ai/keys", target: "_blank", rel: "noopener" }, "Get a free key")),
+      el("p", { class: "muted mb-2", style: "font-size:12px" },
+        "AI assist generates draft text only. It never sends messages to requesters, updates tickets, or shares your key externally."),
       el("input", { id: "ai-key", type: "password", placeholder: hasKey ? "•••••••• (already set)" : "sk-or-...", class: "mb-2" }),
       el("div", { class: "label mb-2" }, "Model"),
       el("select", { id: "ai-model", class: "mb-2" },
