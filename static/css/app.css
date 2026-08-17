@@ -28,6 +28,7 @@ body {
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--r); }
 /* keep click focus subtle; mouse users don't need the ring */
 .btn:focus:not(:focus-visible),
+a.nav-item { text-decoration: none; color: inherit; }
 .nav-item:focus:not(:focus-visible),
 .card:focus:not(:focus-visible) { outline: none; }
 
@@ -256,6 +257,10 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .sla-badge.ok { background: rgba(26,127,55,.15); color: #1a7f37; }
 .sla-badge.atrisk { background: rgba(181,129,5,.18); color: #b58105; }
 .sla-badge.breached { background: rgba(197,38,38,.18); color: #c52626; }
+
+/* ticket-table links should look like plain text until hover */
+.link-strong { color: var(--on-surface); text-decoration: none; font-weight: 600; }
+.link-strong:hover { text-decoration: underline; }
 
 /* KB body preserves author formatting (Phase 2 fix) */
 .kb-body { white-space: pre-wrap; line-height: 1.55; }

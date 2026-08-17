@@ -59,7 +59,8 @@
   function fmtDate(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
-    return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const showYear = d.getFullYear() !== new Date().getFullYear();
+    return d.toLocaleString([], { month: "short", day: "numeric", year: showYear ? "numeric" : undefined, hour: "2-digit", minute: "2-digit" });
   }
   function ago(iso) {
     if (!iso) return "";
@@ -155,7 +156,7 @@
             a.status !== "published"
               ? el("button", { class: "btn secondary sm", onclick: async () => { await API.publishKb(a.id); toast("Published.", "info"); viewKbManage(); } }, "Publish")
               : null,
-            el("button", { class: "btn ghost sm", onclick: async () => { if (confirm("Delete this article?")) { await API.deleteKb(a.id); toast("Deleted.", "info"); viewKbManage(); } } }, "Delete"))))));
+            el("button", { class: "btn ghost sm", onclick: () => doDeleteKb(a.id) }, "Delete"))))));
     } catch (e) { toast(e.message, "error"); }
   }
 
@@ -270,7 +271,7 @@
     // Only the requester who owns a resolved/closed ticket can rate (once).
     if (!isOwner || (t.status !== "resolved" && t.status !== "closed")) return null;
     const stars = [1, 2, 3, 4, 5].map((n) => el("button", {
-      class: "btn ghost sm", style: "font-size:18px", onclick: async () => {
+      class: "btn ghost sm", style: "font-size:18px", "aria-label": n + " star" + (n === 1 ? "" : "s"), onclick: async () => {
         try { await API.rateTicket(t.id, n); toast("Thanks for rating!", "info"); viewTicket(t.id); }
         catch (e) { toast(e.message, "error"); }
       }
@@ -373,8 +374,7 @@
       navItems.push(["/queue", "Queue", "🗂️"]);
       if (state.user.role === "requester") navItems.push(["/my", "My Requests", "📥"]);
     }
-    navItems.push(["/new", "New Request", "➕"]);
-    // Knowledge Base: Help Center for everyone; Manage KB for staff.
+// Knowledge Base: Help Center for everyone; Manage KB for staff.
     navItems.push(["/kb", "Help Center", "📚"]);
     if (state.user.role !== "requester") navItems.push(["/kb/manage", "Manage KB", "✍️"]);
     if (state.user.role === "manager" || state.user.role === "admin") navItems.push(["/reports", "Reports", "📈"]);
@@ -382,12 +382,13 @@
     navItems.push(["/settings", "Settings", "🔑"]);
 
     const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
-      ...navItems.map(([href, label, icon]) =>
-        el("div", { class: "nav-item" + (location.hash.includes(href) ? " active" : ""),
-                    onclick: () => navigate(href),
-                    role: "link", tabindex: "0",
-                    onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(href); } } },
-          el("span", { "aria-hidden": "true" }, icon), el("span", {}, label))));
+      ...navItems.map(([href, label, icon]) => {
+          const active = location.hash.includes(href);
+          return el("a", { href: "#" + href, class: "nav-item" + (active ? " active" : ""),
+                           "aria-current": active ? "page" : undefined,
+                           onclick: (e) => { e.preventDefault(); navigate(href); } },
+            el("span", { "aria-hidden": "true" }, icon), el("span", {}, label));
+        }));
 
     const root = $("#app");
     root.innerHTML = "";
@@ -458,13 +459,12 @@
       }
       listEl.replaceChildren(el("div", { class: "notif-list" },
         ...notifications.map((n) => {
-          const item = el("div", { class: "notif" + (n.read ? "" : " unread"),
-            role: "link", tabindex: "0",
-            onclick: async () => {
+          const item = el("a", { href: n.ticket_id ? `#/ticket/${n.ticket_id}` : "#", class: "notif" + (n.read ? "" : " unread"),
+            onclick: async (e) => {
+              e.preventDefault();
               if (!n.read) { try { await API.markNotifRead(n.id); } catch (_) {} refreshBell(); }
               if (n.ticket_id) navigate(`/ticket/${n.ticket_id}`);
-            },
-            onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } } },
+            } },
             el("div", { class: "notif-msg" }, n.message),
             el("div", { class: "notif-meta muted" }, n.ticket_ref ? `${n.ticket_ref} · ` : "", ago(n.created_at)));
           return item;
@@ -896,7 +896,14 @@
   }
 
   async function doReopen(id) {
+    if (!confirm("Reopen this ticket? It will go back to the queue.")) return;
     try { await API.reopen(id); viewTicket(id); toast("Reopened."); }
+    catch (e) { toast(e.message, "error"); }
+  }
+
+  async function doDeleteKb(id) {
+    if (!confirm("Delete this article? This cannot be undone.")) return;
+    try { await API.deleteKb(id); toast("Deleted.", "info"); viewKbManage(); }
     catch (e) { toast(e.message, "error"); }
   }
 
@@ -972,7 +979,7 @@
           const key = $("#ai-key").value.trim();
           const mdl = $("#ai-model").value;
           const r = await API.saveAiSettings({ api_key: key, model: mdl });
-          if (r.ok) { toast("Settings saved", "ok"); hasKey = r.has_key; model = r.model; }
+          if (r.ok) { toast("Settings saved", "info"); hasKey = r.has_key; model = r.model; }
         }}, "Save"),
         hasKey ? el("button", { class: "btn danger sm", onclick: async () => {
           const r = await API.saveAiSettings({ api_key: "", model: model });
