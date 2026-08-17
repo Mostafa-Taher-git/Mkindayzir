@@ -1145,3 +1145,83 @@ def test_manager_can_change_priority_on_any_ticket(client):
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     assert r.get_json()["ticket"]["priority"] == "urgent"
+
+
+# ---------------------------------------------------------------------------
+# List-ticket assignee filter (me / unassigned / specific user)
+# ---------------------------------------------------------------------------
+def test_list_tickets_assignee_filter_me(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t1 = client.post("/api/tickets", json={"subject": "A1", "description": "x", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    # agent claims it
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t1['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    # create another unassigned ticket
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    client.post("/api/tickets", json={"subject": "A2", "description": "x", "category_id": 1},
+                headers={"X-CSRF-Token": csrf})
+    # agent views queue filtered to me
+    _login(client, "agent@opsdesk.local")
+    r = client.get("/api/tickets?assignee_id=me")
+    assert r.status_code == 200
+    tickets = r.get_json()["tickets"]
+    assert all(t["assignee_id"] == 3 for t in tickets)
+    assert any(t["id"] == t1["id"] for t in tickets)
+
+
+def test_list_tickets_assignee_filter_unassigned(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    client.post("/api/tickets", json={"subject": "U1", "description": "x", "category_id": 1},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "agent@opsdesk.local")
+    r = client.get("/api/tickets?assignee_id=unassigned")
+    assert r.status_code == 200
+    tickets = r.get_json()["tickets"]
+    assert all(t["assignee_id"] is None for t in tickets)
+
+
+def test_list_tickets_assignee_filter_specific_user(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t1 = client.post("/api/tickets", json={"subject": "S1", "description": "x", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t1['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    r = client.get(f"/api/tickets?assignee_id=3")
+    assert r.status_code == 200
+    tickets = r.get_json()["tickets"]
+    assert all(t["assignee_id"] == 3 for t in tickets)
+
+
+# ---------------------------------------------------------------------------
+# CSAT serialization in list/detail
+# ---------------------------------------------------------------------------
+def test_csat_serialized_in_ticket_list(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Rate list", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/rate", json={"score": 4},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "agent@opsdesk.local")
+    data = client.get("/api/tickets").get_json()
+    row = next(x for x in data["tickets"] if x["id"] == t["id"])
+    assert row["csat"] == 4

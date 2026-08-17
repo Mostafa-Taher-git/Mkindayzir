@@ -114,7 +114,7 @@
         el("a", { href: "#/kb", onclick: () => navigate("/kb") }, "Back to Help Center"),
         el("h1", { class: "h2 mt-3" }, article.title),
         el("div", { class: "muted mb-4" }, categoryName(article.category_id) + (article.author_name ? " . by " + article.author_name : "")),
-        el("div", { class: "kb-body" }, el("p", {}, article.body)),
+        el("div", { class: "kb-body" }, el("p", {}, esc(article.body))),
         el("div", { class: "mt-6 card", style: "padding:16px" },
           el("div", { class: "label mb-2" }, "Was this helpful?"),
           el("div", { id: "kb-feedback-btns" },
@@ -359,6 +359,7 @@
     if (path === "kb") {
       const nested = "/" + parts.join("/");
       if (routes[nested]) render = routes[nested];
+      else if (parts.length >= 2) render = viewKbArticle;
     }
     try {
       render(param);

@@ -98,8 +98,9 @@ def me():
     u = request.current_user
     has_key = bool(decrypt_secret(u.get("ai_key")) or
                    _os.environ.get("OPERADESK_OPENROUTER_KEY"))
+    ai_enabled = _cfg.AI_ENABLED and has_key
     return jsonify(user=row_to_public(u),
-                   ai_enabled=has_key,
+                   ai_enabled=ai_enabled,
                    ai_model=u.get("ai_model") or _cfg.AI_MODEL_DEFAULT,
                    ai_free_models=_cfg.AI_FREE_MODELS)
 
