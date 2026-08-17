@@ -146,6 +146,26 @@ CREATE TABLE IF NOT EXISTS password_resets (
     expires_at TEXT NOT NULL,        -- UTC ISO
     used       INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS kb_articles (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    title        TEXT NOT NULL,
+    body         TEXT NOT NULL,
+    category_id  INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    author_id    INTEGER REFERENCES users(id),
+    status       TEXT NOT NULL DEFAULT 'draft',   -- draft|published
+    views        INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kb_feedback (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+    helpful    INTEGER NOT NULL,      -- 1 = yes, 0 = no
+    comment    TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 

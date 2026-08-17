@@ -284,3 +284,36 @@ def test_password_reset_flow(client, app):
     # New password actually works.
     _login(client, "sam@opsdesk.local", password="brandnew1")
     assert client.get("/api/auth/me").status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Knowledge Base
+# ---------------------------------------------------------------------------
+def test_kb_authoring_and_visibility(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/kb", json={"title": "VPN setup", "body": "Use the client.", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    aid = r.get_json()["article"]["id"]
+    # Draft is hidden from requesters.
+    _login(client, "sam@opsdesk.local")
+    assert client.get("/api/kb").get_json()["articles"] == []
+    # Agent publishes.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": csrf}).status_code == 200
+    # Now visible to requester.
+    _login(client, "sam@opsdesk.local")
+    arts = client.get("/api/kb").get_json()["articles"]
+    assert len(arts) == 1 and arts[0]["id"] == aid
+    # Search works.
+    found = client.get("/api/kb?q=vpn").get_json()["articles"]
+    assert len(found) == 1
+    # Requester cannot publish.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": csrf}).status_code == 403
+    # Feedback accepted.
+    assert client.post(f"/api/kb/{aid}/feedback", json={"helpful": True},
+                       headers={"X-CSRF-Token": _csrf(client)}).status_code == 200

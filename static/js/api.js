@@ -90,6 +90,15 @@ const API = (() => {
     forgotPassword: (email) => req("POST", "/api/auth/forgot-password", { email }),
     resetPassword: (token, password) => req("POST", "/api/auth/reset-password", { token, password }),
 
+    // Phase 2 — Knowledge Base
+    listKb:   (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/kb" + (q ? "?" + q : "")); },
+    getKb:    (id) => req("GET", `/api/kb/${id}`),
+    createKb: (payload) => req("POST", "/api/kb", payload),
+    updateKb: (id, payload) => req("PATCH", `/api/kb/${id}`, payload),
+    publishKb:(id) => req("POST", `/api/kb/${id}/publish`),
+    deleteKb: (id) => req("DELETE", `/api/kb/${id}`),
+    kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
+
     // Admin
     adminTeams:    () => req("GET", "/api/admin/teams"),
     adminCreateTeam: (name) => req("POST", "/api/admin/teams", { name }),

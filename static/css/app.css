@@ -242,3 +242,11 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .notif.unread { background: var(--surface-lowest); border-left-color: var(--primary); }
 .notif-msg { font-size: var(--fs-sm); }
 .notif-meta { font-size: var(--fs-xs); }
+
+/* ---------- Knowledge Base (Phase 2) ---------- */
+.kb-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+.kb-card { padding: var(--sp-4); }
+.kb-title { font-weight: 600; font-size: var(--fs-md); }
+.kb-body { line-height: 1.6; }
+.pill.ok { background: var(--ok, #1a7f37); color: #fff; }
+.pill.warn { background: var(--warn, #b58105); color: #fff; }

@@ -63,6 +63,140 @@
   const isAgent = () => ["agent", "manager", "admin"].includes(state.user.role);
   const isAdmin = () => state.user.role === "admin";
 
+  /* ----------------------------- Knowledge Base (Phase 2) ----------------------------- */
+  async function viewKb() {
+    const main = el("div", {},
+      el("div", { class: "page-head" },
+        el("h1", { class: "h2" }, "Help Center"),
+        el("div", { class: "spacer" })),
+      el("div", { class: "filters" },
+        el("label", { class: "search field" },
+          el("span", { class: "ic", "aria-hidden": "true" }, "S"),
+          el("input", { type: "text", id: "kb-q", placeholder: "Search articles...", "aria-label": "Search knowledge base", oninput: debounce(reloadKb, 300) }))),
+      el("div", { class: "mt-4", id: "kb-list" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
+    shell(main);
+    await reloadKb();
+  }
+
+  async function reloadKb() {
+    const list = $("#kb-list"); if (!list) return;
+    try {
+      const q = $("#kb-q")?.value || "";
+      const { articles } = await API.listKb(q ? { q } : {});
+      if (!articles.length) { list.replaceChildren(el("div", { class: "empty" }, "No articles yet.")); return; }
+      list.replaceChildren(el("div", { class: "kb-list" },
+        ...articles.map((a) => el("div", { class: "card kb-card", role: "link", tabindex: "0",
+          onclick: () => navigate(`/kb/${a.id}`),
+          onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/kb/${a.id}`); } } },
+          el("div", { class: "kb-title" }, a.title),
+          el("div", { class: "muted", style: "font-size:13px" }, categoryName(a.category_id) + (a.views ? " . " + a.views + " views" : ""))))));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  async function viewKbArticle() {
+    const id = parseInt(location.hash.split("/")[2], 10);
+    const main = el("div", {}, el("div", { class: "mt-4", id: "kb-article" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
+    shell(main);
+    try {
+      const { article } = await API.getKb(id);
+      const wrap = $("#kb-article");
+      wrap.replaceChildren(
+        el("a", { href: "#/kb", onclick: () => navigate("/kb") }, "Back to Help Center"),
+        el("h1", { class: "h2 mt-3" }, article.title),
+        el("div", { class: "muted mb-4" }, categoryName(article.category_id) + (article.author_name ? " . by " + article.author_name : "")),
+        el("div", { class: "kb-body" }, el("p", {}, article.body)),
+        el("div", { class: "mt-6 card", style: "padding:16px" },
+          el("div", { class: "label mb-2" }, "Was this helpful?"),
+          el("div", {},
+            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, true) }, "Yes"),
+            " ",
+            el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, false) }, "No"))));
+    } catch (e) { toast(e.message, "error"); navigate("/kb"); }
+  }
+
+  async function sendKbFeedback(id, helpful) {
+    try { await API.kbFeedback(id, helpful); toast(helpful ? "Thanks for the feedback!" : "Thanks - we will improve this.", "info"); }
+    catch (e) { toast(e.message, "error"); }
+  }
+
+  async function viewKbManage() {
+    if (state.user.role === "requester") { navigate("/kb"); return; }
+    const main = el("div", {},
+      el("div", { class: "page-head" },
+        el("h1", { class: "h2" }, "Manage Knowledge Base"),
+        el("div", { class: "spacer" }),
+        el("button", { class: "btn primary sm", onclick: () => navigate("/kb/new") }, "New Article")),
+      el("div", { class: "mt-4", id: "kb-admin-list" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
+    shell(main);
+    try {
+      const { articles } = await API.listKb();
+      const list = $("#kb-admin-list");
+      if (!articles.length) { list.replaceChildren(el("div", { class: "empty" }, "No articles. Create one.")); return; }
+      list.replaceChildren(el("div", { class: "kb-list" },
+        ...articles.map((a) => el("div", { class: "card kb-card" },
+          el("div", { class: "kb-title" }, a.title, " ", el("span", { class: "pill " + (a.status === "published" ? "ok" : "warn") }, a.status)),
+          el("div", { class: "muted", style: "font-size:13px" }, categoryName(a.category_id) + (a.views ? " . " + a.views + " views" : "")),
+          el("div", { class: "mt-2" },
+            el("button", { class: "btn ghost sm", onclick: () => navigate("/kb/new?id=" + a.id) }, "Edit"),
+            a.status !== "published"
+              ? el("button", { class: "btn secondary sm", onclick: async () => { await API.publishKb(a.id); toast("Published.", "info"); viewKbManage(); } }, "Publish")
+              : null,
+            el("button", { class: "btn ghost sm", onclick: async () => { if (confirm("Delete this article?")) { await API.deleteKb(a.id); toast("Deleted.", "info"); viewKbManage(); } } }, "Delete"))))));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  async function viewKbEdit() {
+    if (state.user.role === "requester") { navigate("/kb"); return; }
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    const editId = params.get("id");
+    let article = null;
+    if (editId) { try { article = (await API.getKb(editId)).article; } catch (_) {} }
+    const main = el("div", {},
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, editId ? "Edit Article" : "New Article")),
+      el("form", { id: "kbForm", class: "card mt-4", style: "padding:20px", onsubmit: onKbSubmit },
+        field("Title", el("input", { type: "text", name: "title", required: "", value: article ? article.title : "", maxlength: "100" })),
+        field("Category", catSelect(article ? article.category_id : "")),
+        field("Body", el("textarea", { name: "body", required: "", rows: "10", maxlength: "20000" }, article ? article.body : "")),
+        el("div", { class: "mt-3" },
+          el("button", { type: "submit", class: "btn primary" }, editId ? "Save changes" : "Create draft"))));
+    shell(main);
+
+    async function onKbSubmit(e) {
+      e.preventDefault();
+      const f = e.target;
+      const payload = { title: f.title.value.trim(), body: f.body.value.trim(), category_id: f.category_id.value || null };
+      try {
+        if (editId) await API.updateKb(editId, payload);
+        else await API.createKb(payload);
+        toast("Saved.", "info");
+        navigate("/kb/manage");
+      } catch (err) { toast(err.message, "error"); }
+    }
+  }
+
+
+  function catSelect(selected) {
+    const sel = el("select", { name: "category_id", id: "category_id" },
+      el("option", { value: "" }, "Uncategorized"));
+    (state.meta ? state.meta.categories : []).forEach((cat) => {
+      const o = el("option", { value: cat.id }, cat.name);
+      if (String(cat.id) === String(selected)) o.selected = true;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  function debounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
+
+  function categoryName(id) {
+    if (id == null) return "Uncategorized";
+    const c = state.meta && state.meta.categories.find((x) => x.id === id);
+    return c ? c.name : "Uncategorized";
+  }
+
   /* ----------------------------- router ----------------------------- */
   const routes = {
     "/login": viewLogin,
@@ -75,6 +209,10 @@
     "/new": viewCreate,
     "/ticket": viewTicket,
     "/admin": viewAdmin,
+    "/kb": viewKb,
+    "/kb/manage": viewKbManage,
+    "/kb/new": viewKbEdit,
+    "/kb/:id": viewKbArticle,
   };
 
   function navigate(hash) {
