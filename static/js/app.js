@@ -303,7 +303,7 @@
 
   function helpers_isStaff(role) { return role === "agent" || role === "manager" || role === "admin"; }
 
-
+  function categoryName(id) {
     if (id == null) return "Uncategorized";
     const c = state.meta && state.meta.categories.find((x) => x.id === id);
     return c ? c.name : "Uncategorized";
