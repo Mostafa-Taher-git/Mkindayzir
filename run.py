@@ -7,11 +7,15 @@ Run OpsDesk locally.
 No external services required. The first run creates data/opsdesk.db
 and seeds starter teams, categories and users.
 """
+import os
+
 from app import create_app
 
 app = create_app()
 
 if __name__ == "__main__":
-    # 0.0.0.0 = listen on all interfaces, so it's reachable whether Chrome
-    # uses 127.0.0.1 or localhost. debug=True enables auto-reload on edits.
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Local dev server. Use the OPSDESK_DEBUG env var to enable/disable
+    # auto-reload instead of editing source. Defaults to False so a fresh
+    # clone is safer if the env var is missing.
+    debug_mode = os.environ.get("OPSDESK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
