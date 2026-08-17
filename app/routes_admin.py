@@ -7,7 +7,7 @@ readable so it is easy to extend (e.g. add permissions later).
 from flask import Blueprint, request, jsonify
 
 from . import db, config, helpers
-from .helpers import login_required, role_required
+from .helpers import login_required, role_required, csrf_protect, get_csrf_token
 
 admin = Blueprint("admin", __name__)
 
@@ -21,6 +21,7 @@ def list_teams():
 
 @admin.route("/api/admin/teams", methods=["POST"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def create_team():
     name = (request.get_json(silent=True) or {}).get("name", "").strip()
     if not name:
@@ -37,9 +38,15 @@ def create_team():
 
 @admin.route("/api/admin/teams/<int:tid>", methods=["DELETE"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def delete_team(tid):
-    db.get_db().execute("DELETE FROM teams WHERE id=?", (tid,))
-    db.get_db().commit()
+    dbc = db.get_db()
+    # Don't orphan tickets/users: null their team_id (FK is ON DELETE SET NULL,
+    # but only when the column itself is nullable — be explicit and safe).
+    dbc.execute("UPDATE tickets SET team_id = NULL WHERE team_id = ?", (tid,))
+    dbc.execute("UPDATE users SET team_id = NULL WHERE team_id = ?", (tid,))
+    dbc.execute("DELETE FROM teams WHERE id = ?", (tid,))
+    dbc.commit()
     return jsonify(ok=True)
 
 
@@ -53,6 +60,7 @@ def list_categories():
 
 @admin.route("/api/admin/categories", methods=["POST"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def create_category():
     d = request.get_json(silent=True) or {}
     name = (d.get("name") or "").strip()
@@ -67,6 +75,7 @@ def create_category():
 
 @admin.route("/api/admin/categories/<int:cid>", methods=["DELETE"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def delete_category(cid):
     db.get_db().execute("UPDATE categories SET active=0 WHERE id=?", (cid,))
     db.get_db().commit()
@@ -83,6 +92,7 @@ def list_users():
 
 @admin.route("/api/admin/users", methods=["POST"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def create_user():
     d = request.get_json(silent=True) or {}
     name = (d.get("name") or "").strip()
@@ -92,6 +102,8 @@ def create_user():
     password = d.get("password") or "password"
     if not name or not email:
         return jsonify(error="Name and email are required"), 400
+    if len(password) < config.PASSWORD_MIN_LENGTH:
+        return jsonify(error=f"Password must be at least {config.PASSWORD_MIN_LENGTH} characters"), 400
     if role not in config.ROLES:
         return jsonify(error="Invalid role"), 400
     from werkzeug.security import generate_password_hash
@@ -108,8 +120,11 @@ def create_user():
 
 @admin.route("/api/admin/users/<int:uid>", methods=["PATCH"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def update_user(uid):
     d = request.get_json(silent=True) or {}
+    if d.get("password") and len(d["password"]) < config.PASSWORD_MIN_LENGTH:
+        return jsonify(error=f"Password must be at least {config.PASSWORD_MIN_LENGTH} characters"), 400
     sets, params = [], []
     for col in ("name", "email", "role", "team_id"):
         if col in d:
@@ -129,6 +144,7 @@ def update_user(uid):
 
 @admin.route("/api/admin/users/<int:uid>", methods=["DELETE"])
 @role_required(config.ROLE_ADMIN)
+@csrf_protect
 def delete_user(uid):
     db.get_db().execute("DELETE FROM users WHERE id=?", (uid,))
     db.get_db().commit()

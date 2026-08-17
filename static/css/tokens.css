@@ -64,8 +64,8 @@
   --neutral-container:  #e9edff;
 
   /* semantic mapping used by badges */
-  --status-new:         var(--muted);
-  --status-new-bg:      var(--muted-container);
+  --status-new:         var(--primary);
+  --status-new-bg:      var(--primary-container);
   --status-assigned:    var(--info);
   --status-assigned-bg: var(--info-container);
   --status-in_progress: var(--info);
@@ -113,4 +113,71 @@
   /* ---- Layout ---- */
   --sidebar-w: 232px;
   --topbar-h: 56px;
+
+  /* ---- Scrim / backdrop (replaces hardcoded rgba) ---- */
+  --backdrop: rgba(5, 26, 62, 0.35);
+  --scrim-soft: rgba(5, 26, 62, 0.12);
+}
+
+/* ==========================================================================
+   Dark theme — opt-in via [data-theme="dark"] on <html>.
+   Every value below maps a :root token to a dark-surface equivalent, so the
+   whole app re-skins from these two blocks alone.
+   ========================================================================== */
+[data-theme="dark"] {
+  --surface:            #0d1220;
+  --surface-dim:        #161d33;
+  --surface-bright:     #161d33;
+  --surface-lowest:     #131a2b;
+  --surface-low:        #1a2238;
+  --surface-container:  #212b45;
+  --surface-high:       #2a3654;
+  --surface-highest:    #36456b;
+
+  --on-surface:         #e7ecf7;
+  --on-surface-variant: #9aa6c2;
+  --inverse-surface:    #e7ecf7;
+  --inverse-on-surface: #0d1220;
+
+  --outline:            #5b688a;
+  --outline-variant:    #36425f;
+  --surface-tint:       #7aa2ff;
+
+  --primary:            #7aa2ff;
+  --on-primary:         #061229;
+  --primary-container:  #1c3a7a;
+  --on-primary-container:#c4d2ff;
+  --inverse-primary:    #b2c5ff;
+
+  --secondary:          #aab8d0;
+  --on-secondary:       #0d1220;
+  --secondary-container:#2a3654;
+  --on-secondary-container:#cdd7ec;
+
+  --tertiary:           #ffae8a;
+  --on-tertiary:        #2a0d00;
+  --tertiary-container: #5a2410;
+  --on-tertiary-container:#ffc6b2;
+
+  --error:              #ff8e8e;
+  --on-error:           #2a0000;
+  --error-container:    #4a1414;
+  --on-error-container: #ffdad6;
+
+  --ok:                 #7ee59a;
+  --ok-container:       #103a22;
+  --warn:               #ffcf7a;
+  --warn-container:     #3d2e10;
+  --info:               #8ab4ff;
+  --info-container:     #16294d;
+  --urgent:             #ff8e8e;
+  --urgent-container:   #4a1414;
+  --muted:              #9aa6c2;
+  --muted-container:    #212b45;
+  --neutral-container:  #212b45;
+
+  --border-card:        1px solid #2a3654;
+  --shadow-ambient:     0 2px 6px rgba(0, 0, 0, 0.45);
+  --backdrop:           rgba(0, 0, 0, 0.55);
+  --scrim-soft:         rgba(0, 0, 0, 0.3);
 }

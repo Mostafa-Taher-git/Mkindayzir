@@ -7,7 +7,9 @@ These keep the route modules small and the security rules in one place:
 * agent_or_manager - can handle tickets / see queues
 """
 from functools import wraps
-from flask import session, jsonify, request, redirect, url_for
+import time
+
+from flask import session, jsonify, request, redirect, url_for, g
 
 from . import db
 from . import config
@@ -23,15 +25,53 @@ def get_current_user():
     ).fetchone()
 
 
+def get_csrf_token():
+    """Return a per-session CSRF token, minting one on first use.
+
+    The token is stored in the session and sent to the client via
+    /api/auth/csrf. Mutating requests must echo it back in the
+    X-CSRF-Token header. Because that header makes the request
+    non-simple, browsers block cross-site forgeries automatically.
+    """
+    if "csrf_token" not in session:
+        import secrets
+        session["csrf_token"] = secrets.token_hex(32)
+    return session["csrf_token"]
+
+
+def csrf_protect(f):
+    """Reject unsafe requests that don't carry a valid X-CSRF-Token header."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if request.method not in ("GET", "HEAD", "OPTIONS", "TRACE"):
+            expected = session.get("csrf_token")
+            if not expected or request.headers.get("X-CSRF-Token") != expected:
+                return jsonify(error="CSRF validation failed"), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def _session_expired():
+    """True if the session has been idle longer than SESSION_IDLE_MINUTES."""
+    last = session.get("last_active")
+    if not last:
+        return False
+    return (time.time() - last) > config.SESSION_IDLE_MINUTES * 60
+
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
+        if _session_expired():
+            session.clear()
         user = get_current_user()
         if not user:
-            # API call -> 401 JSON, browser call -> redirect to login
-            if request.path.startswith("/api/"):
-                return jsonify(error="Authentication required"), 401
-            return redirect(url_for("auth.login"))
+            # Always return a JSON 401. The SPA's boot() catches this and shows
+            # the login view; a redirect here would point the browser at a
+            # non-existent /auth/login route and loop. The login PAGE is a
+            # client-side view, not a server route.
+            return jsonify(error="Authentication required"), 401
+        session["last_active"] = time.time()
         request.current_user = user
         return f(*args, **kwargs)
     return wrapper
@@ -44,9 +84,8 @@ def role_required(*roles):
         def wrapper(*args, **kwargs):
             user = get_current_user()
             if not user or user["role"] not in roles:
-                if request.path.startswith("/api/"):
-                    return jsonify(error="Forbidden"), 403
-                return redirect(url_for("auth.login"))
+                # Same as login_required: JSON only, no redirect (see above).
+                return jsonify(error="Forbidden"), 403
             request.current_user = user
             return f(*args, **kwargs)
         return wrapper

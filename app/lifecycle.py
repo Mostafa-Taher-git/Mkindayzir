@@ -20,6 +20,7 @@ from . import config
 ALLOWED = {
     config.STATUS_NEW: {
         config.STATUS_ASSIGNED: False,   # someone claims/assigns it
+        config.STATUS_CLOSED: False,     # manager/admin close spam/dupe w/o work
     },
     config.STATUS_ASSIGNED: {
         config.STATUS_IN_PROGRESS: False,

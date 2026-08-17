@@ -12,20 +12,38 @@ the code stays readable and easy to edit.
 import sqlite3
 from datetime import datetime, timezone
 
+from flask import g
+
 from . import config
 
-# A module-level connection is fine for a single-process dev server.
-_conn = None
+# Connections are created PER REQUEST and stored on Flask's `g` (request
+# context). This fixes the old module-level single connection, which was a
+# latent threading bug even in dev (check_same_thread=False masked it) and
+# would not survive a multi-worker deploy. SQLite runs in WAL mode as a
+# single-writer process — that is the supported deploy model (see PLAN.md).
 
 
 def get_db():
-    """Return the shared SQLite connection, opening it on first use."""
-    global _conn
-    if _conn is None:
-        _conn = sqlite3.connect(config.DB_PATH, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row  # rows behave like dicts
-        _conn.execute("PRAGMA foreign_keys = ON")
-    return _conn
+    """Return a SQLite connection for the current request/app context.
+
+    Uses Flask `g` so each request gets its own connection; the teardown
+    (close_db) closes it. Outside a request context this raises, which is
+    intentional — callers should run inside an app context.
+    """
+    if "db" not in g:
+        conn = sqlite3.connect(config.DB_PATH, check_same_thread=False)
+        conn.row_factory = sqlite3.Row  # rows behave like dicts
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")  # single-writer safe
+        g.db = conn
+    return g.db
+
+
+def close_db(e=None):
+    """Close the per-request connection (registered as teardown)."""
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 
 def now_iso():

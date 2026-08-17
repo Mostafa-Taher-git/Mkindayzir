@@ -106,11 +106,13 @@
     navItems.push(["/new", "New Request", "➕"]);
     if (isAdmin()) navItems.push(["/admin", "Admin", "⚙️"]);
 
-    const sidebar = el("nav", { class: "sidebar" },
+    const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
       ...navItems.map(([href, label, icon]) =>
         el("div", { class: "nav-item" + (location.hash.includes(href) ? " active" : ""),
-                    onclick: () => navigate(href) },
-          el("span", {}, icon), el("span", {}, label))));
+                    onclick: () => navigate(href),
+                    role: "link", tabindex: "0",
+                    onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(href); } } },
+          el("span", { "aria-hidden": "true" }, icon), el("span", {}, label))));
 
     const root = $("#app");
     root.innerHTML = "";
@@ -119,8 +121,20 @@
       el("div", { class: "spacer" }),
       el("div", { class: "who" }, "Signed in as ", el("b", {}, state.user.name),
         " · ", el("span", { class: "label" }, state.user.role)),
+      el("button", { class: "btn ghost sm", id: "theme-toggle", "aria-label": "Toggle dark mode", onclick: toggleTheme },
+        document.documentElement.getAttribute("data-theme") === "dark" ? "☀ Light" : "🌙 Dark"),
       el("button", { class: "btn ghost sm", onclick: doLogout }, "Log out")));
     root.appendChild(el("div", { class: "layout" }, sidebar, el("main", { class: "main" }, inner)));
+  }
+
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("opsdesk-theme", next); } catch (_) {}
+    // update toggle label without a full re-render
+    const btn = $("#theme-toggle");
+    if (btn) btn.textContent = next === "dark" ? "☀ Light" : "🌙 Dark";
   }
 
   async function doLogout() {
@@ -138,8 +152,8 @@
         el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
         el("p", { class: "muted", style: "text-align:center" }, "Internal Service Request Platform"),
         el("form", { id: "loginForm", onsubmit: onLogin },
-          field("Email", el("input", { type: "email", name: "email", required: "", value: "agent@opsdesk.local" })),
-          field("Password", el("input", { type: "password", name: "password", required: "", value: "password" })),
+          field("Email", el("input", { type: "email", name: "email", required: "", autocomplete: "username", placeholder: "you@opsdesk.local" })),
+          field("Password", el("input", { type: "password", name: "password", required: "", autocomplete: "current-password", placeholder: "••••••••" })),
           el("button", { type: "submit", class: "btn primary block" }, "Sign in")),
         el("p", { class: "hint" }, "Demo accounts (password: password): admin@, manager@, agent@, hragent@, sam@opsdesk.local")));
 
@@ -190,20 +204,20 @@
       const d = await API.dashboard();
       const c = d.counts;
       const tiles = el("div", { class: "grid cols-4" },
-        statTile(c.new, "New", ""),
-        statTile(d.unassigned, "Unassigned", "urgent"),
-        statTile(d.blocked, "Blocked", "blocked"),
-        statTile(d.urgent, "Urgent", "urgent"),
+        statTile(c.new, "New", "primary"),
+        statTile(d.unassigned, "Unassigned", "primary"),
+        statTile(d.blocked, "Blocked", "primary blocked"),
+        statTile(d.urgent, "Urgent", "primary urgent"),
         statTile(c.in_progress, "In Progress", "info"),
         statTile(c.resolved, "Resolved", "ok"),
         statTile(c.closed, "Closed", ""),
         statTile(d.avg_resolution_hours != null ? d.avg_resolution_hours + "h" : "—", "Avg Res (7d)", "info"));
       const agedSection = el("div", { class: "card mt-6" },
-        el("div", { class: "h3 mb-4" }, "Aged / Needs Attention"),
+        el("h3", { class: "h3 mb-4" }, "Aged / Needs Attention"),
         d.aged.length ? ticketTable(d.aged, { showAged: true })
                       : el("div", { class: "empty" }, "No aged tickets. 🎉"));
       const inner = el("div", {},
-        el("div", { class: "page-head" }, el("div", { class: "h2" }, "Manager Dashboard"),
+        el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Manager Dashboard"),
           el("div", { class: "spacer" }),
           el("button", { class: "btn secondary sm", onclick: () => navigate("/queue") }, "Open Queue")),
         tiles, agedSection);
@@ -230,35 +244,38 @@
       ...m.categories.map((c) => el("option", { value: c.id }, c.name)));
     const fTeam = el("select", { id: "f-team" }, el("option", { value: "" }, "All teams"),
       ...m.teams.map((t) => el("option", { value: t.id }, t.name)));
+    // Each control is wrapped in a <label> so the visible caption is its
+    // programmatic label (screen-reader association), not just decorative text.
+    const labelled = (caption, control) =>
+      el("label", { class: "field" }, el("span", { class: "label" }, caption), control);
     return el("div", { class: "filters" },
-      el("div", { class: "search field" },
-        el("span", { class: "ic" }, "🔍"),
-        el("input", { type: "text", id: "f-q", placeholder: "Search subject, ID, description…" })),
-      el("div", { class: "field" }, el("span", { class: "label" }, "Status"), fStatus),
-      el("div", { class: "field" }, el("span", { class: "label" }, "Priority"), fPriority),
-      el("div", { class: "field" }, el("span", { class: "label" }, "Category"), fCat),
-      ...(role !== "requester" ? [el("div", { class: "field" }, el("span", { class: "label" }, "Team"), fTeam)] : []),
+      el("label", { class: "search field" },
+        el("span", { class: "ic", "aria-hidden": "true" }, "🔍"),
+        el("input", { type: "text", id: "f-q", placeholder: "Search subject, ID, description…", "aria-label": "Search tickets" })),
+      labelled("Status", fStatus),
+      labelled("Priority", fPriority),
+      labelled("Category", fCat),
+      ...(role !== "requester" ? [labelled("Team", fTeam)] : []),
       el("button", { class: "btn primary sm", onclick: reload }, "Apply"));
   }
 
   async function viewQueue() {
     if (!isAgent()) { navigate("/my"); return; }
-    shell(el("div", {}, el("div", { class: "page-head" }, el("div", { class: "h2" }, "Ticket Queue")),
+    shell(el("div", {},
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Ticket Queue")),
       queueFilters(),
       el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…"))));
     await reload();
   }
 
   async function viewMyRequests() {
-    if (state.user.role === "requester") shell(el("div", {}));
-    else shell(el("div", {}));
     const head = el("div", { class: "page-head" },
-      el("div", { class: "h2" }, state.user.role === "requester" ? "My Requests" : "My Requests"),
+      el("h1", { class: "h2" }, "My Requests"),
       el("div", { class: "spacer" }),
       state.user.role === "requester" ? el("button", { class: "btn primary sm", onclick: () => navigate("/new") }, "New Request") : null);
     const wrap = el("div", {}, head, queueFilters(),
       el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")));
-    $("#app .main").replaceChildren(wrap);
+    shell(wrap);
     await reload();
   }
 
@@ -303,10 +320,11 @@
       }
       return el("tr", { class: urgentCls, onclick: () => navigate(`/ticket/${t.id}`) }, ...cells);
     });
-    return el("table", { class: "tbl" },
-      el("thead", {}, el("tr", {}, ...["Ref", "Subject", "Category", "Status", "Priority", "Assignee", "Team", "Updated",
-        ...(opts.showAged ? ["Flag"] : [])].map((h) => el("th", {}, h)))),
-      el("tbody", {}, ...rows));
+    return el("div", { class: "table-wrap" },
+      el("table", { class: "tbl" },
+        el("thead", {}, el("tr", {}, ...["Ref", "Subject", "Category", "Status", "Priority", "Assignee", "Team", "Updated",
+          ...(opts.showAged ? ["Flag"] : [])].map((h) => el("th", { scope: "col" }, h)))),
+        el("tbody", {}, ...rows)));
   }
 
   /* ----------------------------- ticket detail ----------------------------- */
@@ -322,7 +340,7 @@
       const header = el("div", { class: "page-head" },
         el("div", {},
           el("div", { class: "ref mono" }, t.ticket_ref),
-          el("div", { class: "h2" }, t.subject)),
+          el("h2", { class: "h2" }, t.subject)),
         el("div", { class: "spacer" }),
         statusBadge(t.status), priorityPill(t.priority));
 
@@ -340,7 +358,7 @@
           el("div", { class: "comment internal", style: "margin-top:4px" }, t.blocked_reason)) : null);
 
       const commentThread = el("div", { class: "mt-6" },
-        el("div", { class: "h3 mb-4" }, "Conversation"),
+        el("h3", { class: "h3 mb-4" }, "Conversation"),
         ...(t.comments.length ? t.comments.map(renderComment) : [el("div", { class: "muted" }, "No messages yet.")]),
         el("div", { class: "mt-4" },
           el("textarea", { id: "comment-body", placeholder: "Add a reply or note…" }),
@@ -352,14 +370,14 @@
             el("button", { class: "btn primary sm", onclick: () => postComment(t.id) }, "Send"))));
 
       const attachSection = el("div", { class: "mt-6" },
-        el("div", { class: "h3 mb-4" }, "Attachments"),
+        el("h3", { class: "h3 mb-4" }, "Attachments"),
         el("div", { class: "row" },
           el("input", { type: "file", id: "att-file", accept: ".pdf,.png,.jpg,.jpeg" }),
           el("button", { class: "btn secondary sm", onclick: () => uploadAtt(t.id) }, "Upload")),
         el("div", { class: "mt-2", id: "att-list" },
           ...(t.attachments.length
             ? t.attachments.map((a) => el("div", { class: "row mt-2" },
-                el("a", { href: API.attachmentUrl(t.id, a.id), target: "_blank", class: "btn ghost sm" }, "📎 " + a.filename),
+                el("a", { href: API.attachmentUrl(t.id, a.id), target: "_blank", class: "btn ghost sm" }, el("span", {"aria-hidden":"true"}, "📎 "), a.filename),
                 el("span", { class: "muted" }, (a.file_size / 1024).toFixed(0) + " KB")))
             : [el("span", { class: "muted" }, "None")])));
 
@@ -398,7 +416,7 @@
     if (!t.allowed_transitions.length) return null;
     return el("span", { class: "row wrap" },
       ...t.allowed_transitions.map((to) =>
-        el("button", { class: "btn primary sm", onclick: () => changeStatus(t.id, to) }, "→ " + (STATUS_LABELS[to] || to))));
+        el("button", { class: "btn primary sm", onclick: () => changeStatus(t.id, to) }, (STATUS_LABELS[to] || to))));
   }
 
   function renderComment(c) {
@@ -417,7 +435,7 @@
     if (a.from_status && a.to_status) text = `${a.from_status} → ${a.to_status}`;
     if (a.note) text += `: ${a.note}`;
     return el("li", {},
-      el("span", { class: "ic" }, icon),
+      el("span", { class: "ic", "aria-hidden": "true" }, icon),
       el("div", {}, el("div", { class: "body" }, text), el("div", { class: "time" }, ago(a.created_at))));
   }
 
@@ -465,16 +483,23 @@
   }
 
   async function changeStatus(id, to) {
-    let note = "";
-    if (["blocked", "reopened"].includes(to) || (to === "reopened")) {
-      note = prompt("Reason / note (required for this transition):");
-      if (note === null) return;
-    }
-    try {
+    const needsNote = ["blocked", "reopened"].includes(to);
+    const body = el("div", {},
+      el("p", { class: "muted" }, `Move ticket to "${STATUS_LABELS[to] || to}".`),
+      needsNote
+        ? el("label", { class: "field" },
+            el("span", { class: "label" }, "Reason / note (required)"),
+            el("textarea", { id: "status-note", required: "" }))
+        : null);
+    openModal("Change status", body, async () => {
+      const note = needsNote ? $("#status-note").value.trim() : "";
+      if (needsNote && !note) { toast("A reason is required for this status.", "error"); return false; }
       await API.setStatus(id, { status: to, note });
+      closeModal();
       viewTicket(id);
       toast("Status updated.");
-    } catch (e) { toast(e.message, "error"); }
+      return true;
+    });
   }
 
   async function doReopen(id) {
@@ -486,7 +511,7 @@
   function viewCreate() {
     const m = state.meta;
     shell(el("div", {},
-      el("div", { class: "page-head" }, el("div", { class: "h2" }, "New Request")),
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, "New Request")),
       el("div", { class: "card", style: "max-width:640px" },
         el("form", { id: "new-form", onsubmit: onSubmit },
           field("Subject", el("input", { type: "text", name: "subject", maxlength: "100", required: "" }), "Up to 100 characters"),
@@ -531,22 +556,22 @@
   async function viewAdmin() {
     if (!isAdmin()) { navigate("/dashboard"); return; }
     shell(el("div", {},
-      el("div", { class: "page-head" }, el("div", { class: "h2" }, "Admin")),
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Admin")),
       el("div", { class: "grid cols-2", style: "align-items:start" },
         el("div", { class: "card" },
-          el("div", { class: "h3 mb-4" }, "Teams"),
+          el("h3", { class: "h3 mb-4" }, "Teams"),
           el("div", { id: "teams-list" }, el("span", { class: "spinner" })),
           el("div", { class: "row mt-4" },
             el("input", { type: "text", id: "new-team", placeholder: "New team name" }),
             el("button", { class: "btn primary sm", onclick: addTeam }, "+ Add"))),
         el("div", { class: "card" },
-          el("div", { class: "h3 mb-4" }, "Categories"),
+          el("h3", { class: "h3 mb-4" }, "Categories"),
           el("div", { id: "cats-list" }, el("span", { class: "spinner" })),
           el("div", { class: "row mt-4" },
             el("input", { type: "text", id: "new-cat", placeholder: "New category" }),
             el("button", { class: "btn primary sm", onclick: addCat }, "+ Add")))),
       el("div", { class: "card mt-6" },
-        el("div", { class: "h3 mb-4" }, "Users"),
+        el("h3", { class: "h3 mb-4" }, "Users"),
         el("div", { id: "users-list" }, el("span", { class: "spinner" })),
         el("button", { class: "btn secondary sm mt-4", onclick: () => openUserModal() }, "+ New User"))));
     await refreshAdmin();
@@ -619,17 +644,55 @@
   }
 
   /* ----------------------------- modal ----------------------------- */
-  function openModal(title, body) {
+  let _modalKeyHandler = null;
+  function openModal(title, body, onSave) {
     closeModal();
-    const back = el("div", { class: "modal-backdrop", id: "modal-back" },
-      el("div", { class: "modal" }, el("h3", {}, title), body));
+    const modal = el("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": title, tabindex: "-1" },
+      el("h3", {}, title), body);
+    // Footer with Cancel/Save only when a save handler is supplied.
+    if (typeof onSave === "function") {
+      modal.appendChild(el("div", { class: "row mt-6" },
+        el("div", { class: "spacer" }),
+        el("button", { class: "btn ghost sm", onclick: () => closeModal() }, "Cancel"),
+        el("button", { class: "btn primary sm", onclick: async (e) => {
+          const ok = await onSave();
+          if (ok === false) return; // validation failed; keep open
+          closeModal();
+        } }, "Save")));
+    }
+    const back = el("div", { class: "modal-backdrop", id: "modal-back" }, modal);
     back.addEventListener("click", (e) => { if (e.target === back) closeModal(); });
     document.body.appendChild(back);
+
+    // Focus management + Esc + simple focus trap.
+    const focusables = () => modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const first = focusables()[0];
+    if (first) first.focus();
+    _modalKeyHandler = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+      if (e.key === "Tab") {
+        const f = focusables();
+        if (!f.length) return;
+        const idx = Array.prototype.indexOf.call(f, document.activeElement);
+        if (e.shiftKey && (idx <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && (idx === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+      }
+    };
+    document.addEventListener("keydown", _modalKeyHandler);
   }
-  function closeModal() { const m = $("#modal-back"); if (m) m.remove(); }
+  function closeModal() {
+    const m = $("#modal-back");
+    if (m) m.remove();
+    if (_modalKeyHandler) { document.removeEventListener("keydown", _modalKeyHandler); _modalKeyHandler = null; }
+  }
 
   /* ----------------------------- boot ----------------------------- */
   function boot() {
+    // Apply saved theme before first paint to avoid a flash.
+    try {
+      const saved = localStorage.getItem("opsdesk-theme");
+      if (saved === "dark" || saved === "light") document.documentElement.setAttribute("data-theme", saved);
+    } catch (_) {}
     // Surface any uncaught error on-screen (instead of a silent white page).
     window.addEventListener("error", (e) => {
       const root = document.getElementById("app");

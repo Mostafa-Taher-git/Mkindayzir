@@ -17,11 +17,19 @@ body {
 
 /* ---------- Typography helpers ---------- */
 .display { font-size: var(--fs-display); font-weight: var(--fw-display); line-height: var(--lh-display); letter-spacing: -0.02em; }
+.h1 { font-size: var(--fs-display); font-weight: var(--fw-display); line-height: var(--lh-display); }
 .h2 { font-size: var(--fs-h2); font-weight: var(--fw-h2); line-height: var(--lh-h2); }
 .h3 { font-size: var(--fs-h3); font-weight: var(--fw-h3); line-height: var(--lh-h3); }
 .label { font-size: var(--fs-label); font-weight: var(--fw-label); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--on-surface-variant); }
 .mono { font-family: var(--font-mono); }
 .muted { color: var(--muted); }
+
+/* ---------- Keyboard focus (visible only for keyboard users) ---------- */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--r); }
+/* keep click focus subtle; mouse users don't need the ring */
+.btn:focus:not(:focus-visible),
+.nav-item:focus:not(:focus-visible),
+.card:focus:not(:focus-visible) { outline: none; }
 
 /* ---------- App shell ---------- */
 #app { min-height: 100vh; }
@@ -87,6 +95,9 @@ body {
 .stat.blocked .num { color: var(--warn); }
 .stat.ok .num { color: var(--ok); }
 .stat.info .num { color: var(--info); }
+/* Emphasised tiles (New / Unassigned / Blocked / Urgent) pull the eye */
+.stat.primary { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.stat.primary .num { color: var(--primary); }
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -172,9 +183,11 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .comment .tag.internal { background: var(--tertiary); color: var(--on-tertiary); }
 
 /* ---------- Modal ---------- */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(5,26,62,0.35); display:flex; align-items:center; justify-content:center; z-index: 50; padding: var(--sp-4); }
+.modal-backdrop { position: fixed; inset: 0; background: var(--backdrop); display:flex; align-items:center; justify-content:center; z-index: 50; padding: var(--sp-4); }
 .modal { background: var(--surface-lowest); border-radius: var(--r-lg); box-shadow: var(--shadow-ambient); width: 100%; max-width: 520px; padding: var(--sp-6); max-height: 90vh; overflow:auto; }
 .modal h3 { margin-top: 0; }
+/* Modal is a dialog: visible outline removed (focus is trapped inside) */
+.modal:focus { outline: none; }
 
 /* ---------- Login ---------- */
 .login-wrap { min-height: 100vh; display:flex; align-items:center; justify-content:center; background: var(--surface-container); padding: var(--sp-4); }
@@ -199,3 +212,12 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .search { position: relative; }
 .search input { padding-left: var(--sp-8); }
 .search .ic { position:absolute; left: var(--sp-3); top: 50%; transform: translateY(-50%); color: var(--muted); }
+
+/* ---------- Horizontal scroll for wide tables on small screens ---------- */
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- Respect users who prefer reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .spinner { animation: none; border-top-color: var(--primary); }
+}

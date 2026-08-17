@@ -13,8 +13,8 @@
 <body>
   <div id="app"></div>
 
-  <!-- Toast container -->
-  <div id="toast-root"></div>
+  <!-- Toast container: polite live region so screen readers announce messages -->
+  <div id="toast-root" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="/static/js/api.js"></script>
   <script src="/static/js/app.js"></script>

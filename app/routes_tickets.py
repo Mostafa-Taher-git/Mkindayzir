@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, send_file, abort
 
 from . import db, config, helpers
-from .helpers import login_required, is_agent_or_manager, can_view_ticket
+from .helpers import login_required, is_agent_or_manager, can_view_ticket, csrf_protect
 from . import lifecycle
 
 tickets = Blueprint("tickets", __name__)
@@ -88,6 +88,7 @@ def get_ticket(tid):
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets", methods=["POST"])
 @login_required
+@csrf_protect
 def create_ticket():
     data = request.get_json(silent=True) or {}
     subject = (data.get("subject") or "").strip()
@@ -98,13 +99,19 @@ def create_ticket():
 
     if not subject:
         return jsonify(error="Subject is required"), 400
-    if len(subject) > 100:
-        return jsonify(error="Subject must be 100 characters or fewer"), 400
+    if len(subject) > config.MAX_SUBJECT:
+        return jsonify(error=f"Subject must be {config.MAX_SUBJECT} characters or fewer"), 400
+    if len(description) > config.MAX_DESCRIPTION:
+        return jsonify(error=f"Description must be {config.MAX_DESCRIPTION} characters or fewer"), 400
     if priority not in config.PRIORITIES:
         return jsonify(error="Invalid priority"), 400
 
-    # Requester is whoever is logged in, unless an agent creates on behalf.
-    requester_id = data.get("requester_id") or request.current_user["id"]
+    # Requester is whoever is logged in, UNLESS an agent/manager creates on
+    # behalf of someone else. A plain requester can never set requester_id.
+    if helpers.is_agent_or_manager(request.current_user) and data.get("requester_id"):
+        requester_id = data.get("requester_id")
+    else:
+        requester_id = request.current_user["id"]
 
     ref = _next_ref()
     now = db.now_iso()
@@ -129,6 +136,7 @@ def create_ticket():
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/assign", methods=["POST"])
 @login_required
+@csrf_protect
 def assign(tid):
     t = _fetch(tid)
     if not t or not can_view_ticket(request.current_user, t):
@@ -172,6 +180,7 @@ def assign(tid):
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/status", methods=["POST"])
 @login_required
+@csrf_protect
 def change_status(tid):
     t = _fetch(tid)
     if not t or not can_view_ticket(request.current_user, t):
@@ -193,14 +202,18 @@ def change_status(tid):
     # Reopen handling
     reopened = False
     if to == config.STATUS_REOPENED:
-        # only requester (within window) or manager/admin
+        # Only requester (within window) or manager/admin may reopen; the /reopen
+        # route already enforces requester ownership + window, so here we only
+        # need the window check for requesters.
         if user["role"] == config.ROLE_REQUESTER:
             if not _within_reopen_window(t):
                 return jsonify(error="Reopen window has passed"), 400
         reopened = True
 
     now = db.now_iso()
-    # Set timestamp fields on terminal transitions.
+    # Carry forward existing timestamps; only overwrite the one this transition
+    # sets. Previously EVERY non-blocked transition cleared blocked_reason,
+    # erasing why a ticket had been blocked.
     resolved_at = t["resolved_at"]
     closed_at = t["closed_at"]
     blocked_reason = t["blocked_reason"]
@@ -210,19 +223,19 @@ def change_status(tid):
         closed_at = now
     if to == config.STATUS_BLOCKED:
         blocked_reason = note
-    else:
-        blocked_reason = None
-    if to == config.STATUS_ASSIGNED and t["status"] == config.STATUS_REOPENED:
-        # reopening routes to assigned; bump reopen count
-        db.get_db().execute(
-            "UPDATE tickets SET reopen_count = reopen_count + 1 WHERE id=?", (tid,))
+    # Note: on all other transitions blocked_reason is preserved, not nulled.
+
+    # reopen_count: bump for ANY newly-reopened ticket (requester path already
+    # bumps in /reopen, so don't double-count there). This keeps the reopen
+    # SLA metric accurate for manager/admin reopened tickets too.
+    reopen_bump = 1 if (reopened and t["status"] != config.STATUS_REOPENED) else 0
 
     final_status = config.STATUS_ASSIGNED if reopened else to
 
     db.get_db().execute(
         """UPDATE tickets SET status=?, blocked_reason=?, resolved_at=?,
-           closed_at=?, updated_at=? WHERE id=?""",
-        (final_status, blocked_reason, resolved_at, closed_at, now, tid),
+           closed_at=?, reopen_count = reopen_count + ?, updated_at=? WHERE id=?""",
+        (final_status, blocked_reason, resolved_at, closed_at, reopen_bump, now, tid),
     )
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "status_change",
@@ -235,6 +248,7 @@ def change_status(tid):
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/reopen", methods=["POST"])
 @login_required
+@csrf_protect
 def reopen(tid):
     t = _fetch(tid)
     if not t:
@@ -265,6 +279,7 @@ def reopen(tid):
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/comments", methods=["POST"])
 @login_required
+@csrf_protect
 def add_comment(tid):
     t = _fetch(tid)
     if not t or not can_view_ticket(request.current_user, t):
@@ -275,6 +290,8 @@ def add_comment(tid):
     visibility = data.get("visibility") or config.VIS_PUBLIC
     if not body:
         return jsonify(error="Comment body is required"), 400
+    if len(body) > config.MAX_COMMENT:
+        return jsonify(error=f"Comment must be {config.MAX_COMMENT} characters or fewer"), 400
     # Only agents/managers may create internal notes.
     if visibility == config.VIS_INTERNAL and not is_agent_or_manager(user):
         return jsonify(error="Forbidden"), 403
@@ -297,6 +314,7 @@ def add_comment(tid):
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/attachments", methods=["POST"])
 @login_required
+@csrf_protect
 def upload_attachment(tid):
     t = _fetch(tid)
     if not t or not can_view_ticket(request.current_user, t):
@@ -305,19 +323,34 @@ def upload_attachment(tid):
     file = request.files.get("file")
     if not file:
         return jsonify(error="No file provided"), 400
-    filename = file.filename or "upload"
-    ext = os.path.splitext(filename)[1].lower()
+    # (E) Path-traversal fix: the client-supplied filename is untrusted. Strip
+    # any directory components and reject names that escape the upload root,
+    # then force the extension to one of the allowed ones so a crafted
+    # "..%2fevil.sh" or "x.php" can never be written outside UPLOAD_DIR/<tid>.
+    raw_name = file.filename or "upload"
+    base = os.path.basename(raw_name).strip()
+    if not base or base in (".", ".."):
+        return jsonify(error="Invalid filename"), 400
+    ext = os.path.splitext(base)[1].lower()
     if ext not in config.ALLOWED_EXTENSIONS:
         return jsonify(error="File type not allowed"), 400
-    if file.content_length and file.content_length > config.MAX_ATTACHMENT_BYTES:
+    # Read the real size from the stream (content_length is client-supplied and
+    # can be missing/forged). Rewind after measuring.
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > config.MAX_ATTACHMENT_BYTES:
         return jsonify(error="File exceeds 10MB limit"), 400
 
     os.makedirs(config.UPLOAD_DIR, exist_ok=True)
     # store under ticket folder to avoid collisions
     folder = os.path.join(config.UPLOAD_DIR, str(tid))
     os.makedirs(folder, exist_ok=True)
-    safe_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{filename}"
-    path = os.path.join(folder, safe_name)
+    # Keep the original basename but re-assert it stays inside `folder`.
+    safe_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{base}"
+    path = os.path.normpath(os.path.join(folder, safe_name))
+    if not path.startswith(os.path.normpath(folder) + os.sep):
+        return jsonify(error="Invalid filename"), 400
     file.save(path)
 
     cur = db.get_db().execute(
@@ -346,6 +379,9 @@ def download_attachment(tid, att_id):
     ).fetchone()
     if not a:
         return jsonify(error="Not found"), 404
+    # The file may have been removed from disk (e.g. manual cleanup). Don't 500.
+    if not os.path.exists(a["storage_path"]):
+        return jsonify(error="Attachment file is missing on the server"), 410
     return send_file(a["storage_path"], download_name=a["filename"])
 
 
@@ -398,7 +434,7 @@ def dashboard():
               (julianday(resolved_at) - julianday(created_at)) * 24.0) av
             FROM tickets t {where}
             {'AND' if where else 'WHERE'} t.resolved_at IS NOT NULL
-            AND t.resolved_at >= datetime('now','-7 days')""",
+            AND t.resolved_at >= datetime('now','-7 days','utc')""",
         wparams,
     ).fetchone()["av"]
     avg_resolution_hours = round(avg, 1) if avg is not None else None
@@ -423,8 +459,13 @@ def meta():
     teams = [dict(r) for r in dbc.execute("SELECT * FROM teams ORDER BY name")]
     cats = [dict(r) for r in dbc.execute(
         "SELECT * FROM categories WHERE active=1 ORDER BY name")]
-    users = [dict(r) for r in dbc.execute(
-        "SELECT id, name, email, role, team_id FROM users ORDER BY name")]
+    # SECURITY: a requester must NOT receive the full staff directory.
+    # Only agents/managers (who assign tickets) need the user list.
+    if helpers.is_agent_or_manager(request.current_user):
+        users = [dict(r) for r in dbc.execute(
+            "SELECT id, name, email, role, team_id FROM users ORDER BY name")]
+    else:
+        users = []
     return jsonify(
         teams=teams,
         categories=cats,
@@ -468,10 +509,10 @@ def _aged_tickets(where, wparams):
         f"""SELECT * FROM tickets t {where}
             {'AND' if where else 'WHERE'} (
               (t.status = 'new' AND t.assignee_id IS NULL
-               AND t.created_at <= datetime('now','-{config.AGED_NEW_HOURS} hours'))
+               AND t.created_at <= datetime('now','-{config.AGED_NEW_HOURS} hours','utc'))
               OR
               (t.status = 'in_progress'
-               AND t.updated_at <= datetime('now','-{config.AGED_PROGRESS_HOURS} hours'))
+               AND t.updated_at <= datetime('now','-{config.AGED_PROGRESS_HOURS} hours','utc'))
             )
             ORDER BY t.updated_at ASC""",
         wparams,

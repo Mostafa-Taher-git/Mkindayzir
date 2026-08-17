@@ -3,9 +3,22 @@
    Thin wrapper around fetch. Every backend call goes through here so the
    rest of the app never touches URLs directly. Session cookie is sent
    automatically by the browser.
+
+   CSRF: the backend requires a per-session token on every mutating request,
+   sent in the X-CSRF-Token header. We fetch it once after login (and on
+   demand) and cache it here. Our own same-site fetch calls include it;
+   cross-site forgeries cannot, so they are rejected.
    ========================================================================== */
 const API = (() => {
   const base = "";
+  let csrfToken = null;
+
+  async function ensureCsrf() {
+    if (csrfToken) return csrfToken;
+    const data = await req("GET", "/api/auth/csrf");
+    csrfToken = data.csrf_token;
+    return csrfToken;
+  }
 
   async function req(method, path, body, isForm) {
     const opts = { method, credentials: "same-origin" };
@@ -16,6 +29,13 @@ const API = (() => {
         opts.headers = { "Content-Type": "application/json" };
         opts.body = JSON.stringify(body);
       }
+    }
+    // Mutating requests need the CSRF token in a custom header. This makes the
+    // request "non-simple" so the browser blocks cross-site forgeries.
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+      const token = await ensureCsrf();
+      opts.headers = opts.headers || {};
+      opts.headers["X-CSRF-Token"] = token;
     }
     const res = await fetch(base + path, opts);
     let data = null;
@@ -29,9 +49,17 @@ const API = (() => {
   }
 
   return {
-    login:    (email, password) => req("POST", "/api/auth/login", { email, password }),
-    logout:   () => req("POST", "/api/auth/logout"),
+    // Call once after a successful login so later mutations have a token.
+    initCsrf: () => ensureCsrf(),
+
+    login:    async (email, password) => {
+      const data = await req("POST", "/api/auth/login", { email, password });
+      try { csrfToken = (await req("GET", "/api/auth/csrf")).csrf_token; } catch (_) {}
+      return data;
+    },
+    logout:   () => { csrfToken = null; return req("POST", "/api/auth/logout"); },
     me:       () => req("GET", "/api/auth/me"),
+    csrf:     () => req("GET", "/api/auth/csrf"),
 
     listTickets: (params = {}) => {
       const q = new URLSearchParams(params).toString();
