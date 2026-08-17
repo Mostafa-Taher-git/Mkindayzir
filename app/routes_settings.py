@@ -62,3 +62,34 @@ def save_ai_settings():
     )
     db.get_db().commit()
     return jsonify(ok=True, has_key=bool(enc), model=chosen)
+
+
+@settingsbp.route("/api/settings/password", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def change_password():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+    current = (data.get("current_password") or "").strip()
+    new = (data.get("new_password") or "").strip()
+
+    if not current or not new:
+        return jsonify(error="Current password and new password are required"), 400
+
+    user_row = db.get_db().execute("SELECT password FROM users WHERE id=?", (user["id"],)).fetchone()
+    if not user_row:
+        return jsonify(error="User not found"), 404
+
+    from werkzeug.security import check_password_hash, generate_password_hash
+    if not check_password_hash(user_row["password"], current):
+        return jsonify(error="Current password is incorrect"), 401
+
+    if len(new) < config.PASSWORD_MIN_LENGTH:
+        return jsonify(error=f"New password must be at least {config.PASSWORD_MIN_LENGTH} characters"), 400
+
+    db.get_db().execute(
+        "UPDATE users SET password=? WHERE id=?",
+        (generate_password_hash(new), user["id"]),
+    )
+    db.get_db().commit()
+    return jsonify(ok=True)

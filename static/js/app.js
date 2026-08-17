@@ -414,8 +414,33 @@
         document.documentElement.getAttribute("data-theme") === "dark" ? "☀ Light" : "🌙 Dark"),
       el("button", { class: "btn ghost sm", id: "notif-bell", "aria-label": "Notifications", onclick: openNotifications },
         "🔔", el("span", { class: "badge-count", id: "notif-count", style: "display:none" }, "0")),
+      el("button", { class: "btn ghost sm", id: "menu-toggle", "aria-label": "Open menu", onclick: openMobileDrawer }, "☰"),
       el("button", { class: "btn ghost sm", onclick: doLogout }, "Log out")));
     root.appendChild(el("div", { class: "layout" }, sidebar, el("main", { class: "main" }, inner)));
+  }
+
+  function openMobileDrawer() {
+    const drawer = el("nav", { class: "sidebar mobile-drawer", "aria-label": "Mobile" },
+      ...navItems.map(([href, label, icon]) => {
+        const active = location.hash.includes(href);
+        return el("a", { href: "#" + href, class: "nav-item" + (active ? " active" : ""),
+                         "aria-current": active ? "page" : undefined,
+                         onclick: (e) => { e.preventDefault(); navigate(href); closeMobileDrawer(); } },
+          el("span", { "aria-hidden": "true" }, icon), el("span", {}, label));
+      }),
+      el("button", { class: "btn ghost sm mt-4", onclick: closeMobileDrawer }, "Close"));
+    const root = $("#app");
+    const backdrop = el("div", { class: "drawer-backdrop", onclick: closeMobileDrawer });
+    root.appendChild(backdrop);
+    root.appendChild(drawer);
+  }
+
+  function closeMobileDrawer() {
+    const root = $("#app");
+    const drawer = root.querySelector(".mobile-drawer");
+    const backdrop = root.querySelector(".drawer-backdrop");
+    if (drawer) drawer.remove();
+    if (backdrop) backdrop.remove();
   }
 
   function toggleTheme() {
@@ -1072,6 +1097,33 @@
           if (r.ok) { toast("API key cleared", "ok"); hasKey = false; $("#ai-key").value = ""; }
         }}, "Clear key") : null));
     main.appendChild(card);
+
+    const pwCard = el("div", { class: "card compact mt-4" },
+      el("div", { class: "label mb-2" }, "Change my password"),
+      el("form", { onsubmit: async (e) => {
+        e.preventDefault();
+        const current = $("#pw-current").value;
+        const next = $("#pw-new").value;
+        const confirm = $("#pw-confirm").value;
+        if (!current || !next) { toast("Current and new password are required.", "error"); return; }
+        if (next !== confirm) { toast("New password and confirmation do not match.", "error"); return; }
+        try {
+          await API.changePassword({ current_password: current, new_password: next });
+          toast("Password updated.", "ok");
+          $("#pw-current").value = "";
+          $("#pw-new").value = "";
+          $("#pw-confirm").value = "";
+        } catch (err) { toast(err.message, "error"); }
+      } },
+        el("label", { class: "field" }, el("span", { class: "label" }, "Current password"),
+          el("input", { type: "password", id: "pw-current", required: "", autocomplete: "current-password", placeholder: "••••••••" })),
+        el("label", { class: "field mt-2" }, el("span", { class: "label" }, "New password"),
+          el("input", { type: "password", id: "pw-new", required: "", autocomplete: "new-password", placeholder: "At least 8 characters" })),
+        el("label", { class: "field mt-2" }, el("span", { class: "label" }, "Confirm new password"),
+          el("input", { type: "password", id: "pw-confirm", required: "", autocomplete: "new-password", placeholder: "Repeat new password" })),
+        el("div", { class: "row mt-3" }, el("div", { class: "spacer" }),
+          el("button", { type: "submit", class: "btn primary sm" }, "Update password"))));
+    main.appendChild(pwCard);
   }
 
   async function viewAdmin() {
@@ -1164,7 +1216,7 @@
           el("option", { value: "" }, "— none —"),
           ...m.teams.map((t) => el("option", { value: t.id, ...(user?.team_id === t.id ? { selected: "" } : {}) }, t.name)))),
       !isEdit ? el("label", { class: "field" }, el("span", { class: "label" }, "Password (default if blank: password)"),
-        el("input", { type: "text", id: "u-pass" })) : null,
+        el("input", { type: "password", id: "u-pass", autocomplete: "new-password", placeholder: "••••••••" })) : null,
       el("div", { class: "row" }, el("div", { class: "spacer" }),
         el("button", { class: "btn primary sm", onclick: saveUser }, "Save"))));
 

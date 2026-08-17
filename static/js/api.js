@@ -133,7 +133,8 @@ const API = (() => {
 
     // Settings — user AI key + model (per-user OpenRouter key)
     getAiSettings: () => req("GET", "/api/settings/ai"),
-    saveAiSettings: (data) => req("POST", "/api/settings/ai", data),
+      saveAiSettings: (data) => req("POST", "/api/settings/ai", data),
+      changePassword: (data) => req("POST", "/api/settings/password", data),
 
     // v2 — AI assistance (draft-only; server returns 503 when disabled)
     aiSuggestReply: (id) => req("GET", `/api/ai/suggest-reply/${id}`),
