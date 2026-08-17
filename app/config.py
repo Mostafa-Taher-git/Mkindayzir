@@ -44,6 +44,19 @@ PASSWORD_MIN_LENGTH = 8
 # OPERADESK_SECRET var (reuse is fine) or its own OPERADESK_CSRF_SECRET.
 CSRF_SECRET = os.environ.get("OPERADESK_CSRF_SECRET", SECRET_KEY)
 
+# Outbound email (Phase 1). Optional: if SMTP_HOST is unset the app still
+# works — password-reset tokens and notifications fall back to in-app only.
+# No third-party mail libs: we use smtplib from the standard library.
+SMTP_HOST = os.environ.get("OPERADESK_SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("OPERADESK_SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("OPERADESK_SMTP_USER", "")
+SMTP_PASS = os.environ.get("OPERADESK_SMTP_PASS", "")
+SMTP_FROM = os.environ.get("OPERADESK_SMTP_FROM", "noreply@opsdesk.local")
+APP_BASE_URL = os.environ.get("OPERADESK_APP_URL", "http://localhost:5000")
+
+# Password reset token lifetime (minutes).
+RESET_TOKEN_MINUTES = 30
+
 # Input length caps (only subject was capped before; now applied everywhere).
 MAX_SUBJECT = 100
 MAX_DESCRIPTION = 5000

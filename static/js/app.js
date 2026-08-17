@@ -66,6 +66,9 @@
   /* ----------------------------- router ----------------------------- */
   const routes = {
     "/login": viewLogin,
+    "/forgot": viewForgotPassword,
+    "/reset": viewResetPassword,
+    "/notifications": openNotifications,
     "/dashboard": viewDashboard,
     "/queue": viewQueue,
     "/my": viewMyRequests,
@@ -123,6 +126,8 @@
         " · ", el("span", { class: "label" }, state.user.role)),
       el("button", { class: "btn ghost sm", id: "theme-toggle", "aria-label": "Toggle dark mode", onclick: toggleTheme },
         document.documentElement.getAttribute("data-theme") === "dark" ? "☀ Light" : "🌙 Dark"),
+      el("button", { class: "btn ghost sm", id: "notif-bell", "aria-label": "Notifications", onclick: openNotifications },
+        "🔔", el("span", { class: "badge-count", id: "notif-count", style: "display:none" }, "0")),
       el("button", { class: "btn ghost sm", onclick: doLogout }, "Log out")));
     root.appendChild(el("div", { class: "layout" }, sidebar, el("main", { class: "main" }, inner)));
   }
@@ -143,6 +148,64 @@
     navigate("/login");
   }
 
+  /* ----------------------------- notifications (Phase 1) ----------------------------- */
+  let _notifTimer = null;
+
+  async function refreshBell() {
+    const bell = $("#notif-bell");
+    const count = $("#notif-count");
+    if (!bell || !count) return;
+    try {
+      const { unread_count } = await API.notifications();
+      count.textContent = unread_count;
+      count.style.display = unread_count > 0 ? "inline-block" : "none";
+    } catch (_) { /* non-critical */ }
+  }
+
+  function startNotifPolling() {
+    refreshBell();
+    clearInterval(_notifTimer);
+    _notifTimer = setInterval(refreshBell, 30000); // refresh every 30s
+  }
+
+  async function openNotifications() {
+    const main = el("div", {},
+      el("div", { class: "page-head" },
+        el("h1", { class: "h2" }, "Notifications"),
+        el("div", { class: "spacer" }),
+        el("button", { class: "btn ghost sm", onclick: () => markAllAndRefresh() }, "Mark all read")),
+      el("div", { class: "mt-4", id: "notif-list" },
+        el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")));
+    shell(main);
+    const listEl = $("#notif-list");
+    try {
+      const { notifications } = await API.notifications();
+      if (!notifications.length) {
+        listEl.replaceChildren(el("div", { class: "empty" }, "You're all caught up. 🎉"));
+        return;
+      }
+      listEl.replaceChildren(el("div", { class: "notif-list" },
+        ...notifications.map((n) => {
+          const item = el("div", { class: "notif" + (n.read ? "" : " unread"),
+            role: "link", tabindex: "0",
+            onclick: async () => {
+              if (!n.read) { try { await API.markNotifRead(n.id); } catch (_) {} refreshBell(); }
+              if (n.ticket_id) navigate(`/ticket/${n.ticket_id}`);
+            },
+            onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } } },
+            el("div", { class: "notif-msg" }, n.message),
+            el("div", { class: "notif-meta muted" }, n.ticket_ref ? `${n.ticket_ref} · ` : "", ago(n.created_at)));
+          return item;
+        })));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  async function markAllAndRefresh() {
+    try { await API.markAllNotifRead(); } catch (_) {}
+    refreshBell();
+    openNotifications();
+  }
+
   /* ----------------------------- login ----------------------------- */
   function viewLogin() {
     const root = $("#app");
@@ -155,11 +218,8 @@
           field("Email", el("input", { type: "email", name: "email", required: "", autocomplete: "username", placeholder: "you@opsdesk.local" })),
           field("Password", el("input", { type: "password", name: "password", required: "", autocomplete: "current-password", placeholder: "••••••••" })),
           el("button", { type: "submit", class: "btn primary block" }, "Sign in")),
+        el("p", { class: "hint" }, el("a", { href: "#/forgot", onclick: () => navigate("/forgot") }, "Forgot your password?")),
         el("p", { class: "hint" }, "Demo accounts (password: password): admin@, manager@, agent@, hragent@, sam@opsdesk.local")));
-
-    function field(label, input) {
-      return el("label", { class: "field" }, el("span", { class: "label" }, label), input);
-    }
     root.appendChild(card);
 
     async function onLogin(e) {
@@ -169,11 +229,68 @@
         const u = await API.login(f.email.value, f.password.value);
         state.user = u.user;
         await loadMeta();
+        startNotifPolling();
         navigate("/dashboard");
       } catch (err) {
         toast(err.message, "error");
       }
     }
+  }
+
+  /* ----------------------------- password reset (Phase 1) ----------------------------- */
+  function viewForgotPassword() {
+    const root = $("#app");
+    root.innerHTML = "";
+    const card = el("div", { class: "login-wrap" },
+      el("div", { class: "card login-card" },
+        el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+        el("h2", { class: "h3 mb-4" }, "Reset your password"),
+        el("p", { class: "muted" }, "Enter your account email and we'll send a reset link."),
+        el("form", { id: "forgotForm", onsubmit: onForgot },
+          field("Email", el("input", { type: "email", name: "email", required: "", autocomplete: "username", placeholder: "you@opsdesk.local" })),
+          el("button", { type: "submit", class: "btn primary block" }, "Send reset link")),
+        el("p", { class: "hint" }, el("a", { href: "#/login", onclick: () => navigate("/login") }, "Back to sign in"))));
+    root.appendChild(card);
+
+    async function onForgot(e) {
+      e.preventDefault();
+      try {
+        const r = await API.forgotPassword(e.target.email.value);
+        toast(r.message || "If that account exists, a reset link is on its way.", "info");
+        navigate("/login");
+      } catch (err) { toast(err.message, "error"); }
+    }
+  }
+
+  function viewResetPassword() {
+    const root = $("#app");
+    root.innerHTML = "";
+    // Token arrives as #/reset?token=XXXX
+    const token = new URLSearchParams(location.hash.split("?")[1] || "").get("token") || "";
+    const card = el("div", { class: "login-wrap" },
+      el("div", { class: "card login-card" },
+        el("div", { class: "brand" }, el("span", { class: "dot" }), "OpsDesk"),
+        el("h2", { class: "h3 mb-4" }, "Choose a new password"),
+        el("form", { id: "resetForm", onsubmit: onReset },
+          el("input", { type: "hidden", name: "token", value: token }),
+          field("New password", el("input", { type: "password", name: "password", required: "", autocomplete: "new-password", placeholder: "At least 8 characters" })),
+          el("button", { type: "submit", class: "btn primary block" }, "Update password"))));
+    root.appendChild(card);
+    if (!token) toast("Missing or invalid reset token.", "error");
+
+    async function onReset(e) {
+      e.preventDefault();
+      const f = e.target;
+      try {
+        const r = await API.resetPassword(f.token.value, f.password.value);
+        toast(r.message || "Password updated.", "info");
+        navigate("/login");
+      } catch (err) { toast(err.message, "error"); }
+    }
+  }
+
+  function field(label, input) {
+    return el("label", { class: "field" }, el("span", { class: "label" }, label), input);
   }
 
   async function loadMeta() {

@@ -16,6 +16,7 @@ from . import helpers
 from .routes_auth import auth as auth_bp
 from .routes_tickets import tickets as tickets_bp
 from .routes_admin import admin as admin_bp
+from .routes_notif import notif as notif_bp
 
 
 def create_app():
@@ -48,6 +49,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(tickets_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(notif_bp)
 
     # ---- Serve the single-page frontend ----
     # The shell is just static markup, so it does NOT require login. Client-side

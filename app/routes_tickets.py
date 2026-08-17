@@ -22,6 +22,7 @@ from flask import Blueprint, request, jsonify, send_file, abort
 from . import db, config, helpers
 from .helpers import login_required, is_agent_or_manager, can_view_ticket, csrf_protect
 from . import lifecycle
+from . import notifications
 
 tickets = Blueprint("tickets", __name__)
 
@@ -172,6 +173,16 @@ def assign(tid):
     who = "self" if data.get("self") else f"user {assignee_id}"
     helpers.log_activity(tid, user["id"], "assigned", t["status"],
                          new_status, note=f"Assigned to {who}")
+    # Phase 1: tell the requester their ticket was picked up.
+    if assignee_id and t["requester_id"] != user["id"]:
+        assignee_name = db.get_db().execute(
+            "SELECT name FROM users WHERE id=?", (assignee_id,)).fetchone()
+        an = assignee_name["name"] if assignee_name else "an agent"
+        notifications.notify(
+            t["requester_id"], tid, "assigned",
+            f"Your ticket “{t['subject']}” was assigned to {an}.",
+            email_subject=f"OpsDesk: ticket {t['ticket_ref']} assigned",
+            email_body=f"Hi,\n\nYour ticket '{t['subject']}' ({t['ticket_ref']}) was assigned to {an}.\nView it here: {config.APP_BASE_URL}/#/ticket/{tid}\n")
     return jsonify(ticket=_serialize(_fetch(tid)))
 
 
@@ -240,6 +251,13 @@ def change_status(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "status_change",
                          t["status"], final_status, note=note or None)
+    # Phase 1: notify the requester when their ticket is resolved.
+    if to == config.STATUS_RESOLVED and t["requester_id"] != user["id"]:
+        notifications.notify(
+            t["requester_id"], tid, "resolved",
+            f"Your ticket “{t['subject']}” was marked resolved. Reply if it’s not fixed.",
+            email_subject=f"OpsDesk: ticket {t['ticket_ref']} resolved",
+            email_body=f"Hi,\n\nYour ticket '{t['subject']}' ({t['ticket_ref']}) was marked resolved.\nIf the issue isn't actually fixed, just reply in the ticket: {config.APP_BASE_URL}/#/ticket/{tid}\n")
     return jsonify(ticket=_serialize(_fetch(tid)))
 
 
@@ -306,6 +324,12 @@ def add_comment(tid):
     c = db.get_db().execute(
         "SELECT * FROM ticket_comments WHERE id=?", (cur.lastrowid,)
     ).fetchone()
+    # Phase 1: an internal note is hidden from the requester, but we still alert
+    # them that the team is actively working the ticket (without leaking content).
+    if visibility == config.VIS_INTERNAL and t["requester_id"] != user["id"]:
+        notifications.notify(
+            t["requester_id"], tid, "internal_note",
+            f"A private note was added to your ticket “{t['subject']}”.")
     return jsonify(comment=_serialize_comment(c)), 201
 
 

@@ -101,3 +101,85 @@ def row_to_public(u):
         "role": u["role"],
         "team_id": u["team_id"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Password reset (Phase 1). Two-step, token-by-email.
+#   /api/auth/forgot-password  POST {email}            -> mints+emails a token
+#   /api/auth/reset-password   POST {token,password}   -> sets new password
+# If SMTP is not configured the token is not emailed, but we still return a
+# generic success (we never confirm whether the address exists) and the admin
+# can surface it in-app. For local/dev convenience the token is printed to the
+# server console so you are not blocked without mail.
+# ---------------------------------------------------------------------------
+import secrets as _secrets
+from datetime import datetime as _dt, timezone as _tz, timedelta
+
+
+@auth.route("/api/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    # Always return the same generic response to avoid account enumeration.
+    generic = jsonify(ok=True,
+                      message="If that account exists, a reset link is on its way.")
+
+    row = db.get_db().execute(
+        "SELECT id, email, name FROM users WHERE email = ?", (email,)
+    ).fetchone()
+    if not row:
+        return generic, 200
+
+    token = _secrets.token_urlsafe(32)
+    expires = _dt.now(_tz.utc) + timedelta(minutes=config.RESET_TOKEN_MINUTES)
+    db.get_db().execute(
+        "INSERT OR REPLACE INTO password_resets (token, email, expires_at, used) "
+        "VALUES (?,?,?,0)",
+        (token, row["email"], expires.isoformat()),
+    )
+    db.get_db().commit()
+
+    link = f"{config.APP_BASE_URL}/#/reset?token={token}"
+    # Best-effort email; if no SMTP, print the link so devs aren't blocked.
+    if config.SMTP_HOST:
+        try:
+            from .notifications import _send_email
+            _send_email(row["id"], "OpsDesk password reset",
+                        f"Hi {row['name']},\n\nReset your password here (valid "
+                        f"{config.RESET_TOKEN_MINUTES} min): {link}\n")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[forgot-password] email failed: {exc}; dev link: {link}")
+    else:
+        print(f"[forgot-password] SMTP not configured — dev reset link: {link}")
+
+    return generic, 200
+
+
+@auth.route("/api/auth/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+    new_pw = data.get("password") or ""
+
+    if len(new_pw) < config.PASSWORD_MIN_LENGTH:
+        return jsonify(error=f"Password must be at least "
+                             f"{config.PASSWORD_MIN_LENGTH} characters"), 400
+
+    row = db.get_db().execute(
+        "SELECT token, email, expires_at, used FROM password_resets WHERE token = ?",
+        (token,),
+    ).fetchone()
+    if not row or row["used"]:
+        return jsonify(error="Invalid or expired reset token"), 400
+    if _dt.fromisoformat(row["expires_at"]) < _dt.now(_tz.utc):
+        return jsonify(error="Invalid or expired reset token"), 400
+
+    from werkzeug.security import generate_password_hash
+    db.get_db().execute(
+        "UPDATE users SET password = ? WHERE email = ?",
+        (generate_password_hash(new_pw), row["email"]),
+    )
+    db.get_db().execute(
+        "UPDATE password_resets SET used = 1 WHERE token = ?", (token,))
+    db.get_db().commit()
+    return jsonify(ok=True, message="Password updated. You can sign in now.")

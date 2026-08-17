@@ -50,20 +50,27 @@ def client(app):
     return app.test_client()
 
 
-def _login(client, email, password="password"):
-    return client.post("/api/auth/login",
-                        json={"email": email, "password": password})
-
-
 def _csrf(client):
-    # Session must exist to mint a token; login first in tests that need it.
+    # Any anonymous request mints a per-session token (the endpoint is not
+    # login-protected). The SPA fetches this before POSTing /api/auth/login.
     r = client.get("/api/auth/csrf")
     return r.get_json()["csrf_token"]
 
 
+def _login(client, email, password="password"):
+    # Login is a CSRF-protected mutation, so fetch the token first (the
+    # browser does the same in app.js before calling API.login).
+    token = _csrf(client)
+    return client.post("/api/auth/login",
+                        json={"email": email, "password": password},
+                        headers={"X-CSRF-Token": token})
+
+
 def _create_ticket(client, csrf, subject="Broken laptop", desc="Won't turn on",
                    as_user="sam@opsdesk.local"):
+    # Self-contained: log in as the requested user and use a matching token.
     _login(client, as_user)
+    csrf = _csrf(client)
     return client.post("/api/tickets", json={"subject": subject, "description": desc},
                        headers={"X-CSRF-Token": csrf})
 
@@ -213,3 +220,67 @@ def test_oversized_comment_rejected(client):
     r = client.post(f"/api/tickets/{t['id']}/comments", json={"body": big},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — notifications + password reset
+# ---------------------------------------------------------------------------
+def test_assignment_notifies_requester(client):
+    # sam creates, agent claims it -> sam gets an in-app notification.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    # sam reads her notifications
+    _login(client, "sam@opsdesk.local")
+    d = client.get("/api/notifications").get_json()
+    assert d["unread_count"] == 1
+    assert d["notifications"][0]["kind"] == "assigned"
+
+
+def test_mark_notification_read(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    nid = client.get("/api/notifications").get_json()["notifications"][0]["id"]
+    r = client.post(f"/api/notifications/{nid}/read",
+                    headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 200
+    d = client.get("/api/notifications").get_json()
+    assert d["unread_count"] == 0
+
+
+def test_password_reset_flow(client, app):
+    # No SMTP configured -> token is minted and we can read it from the DB.
+    r = client.post("/api/auth/forgot-password", json={"email": "sam@opsdesk.local"})
+    assert r.status_code == 200
+    with app.app_context():
+        from app import db as dbmod
+        token = dbmod.get_db().execute(
+            "SELECT token FROM password_resets WHERE email=? ORDER BY rowid DESC LIMIT 1",
+            ("sam@opsdesk.local",)).fetchone()["token"]
+    assert token
+    # Short password rejected.
+    bad = client.post("/api/auth/reset-password",
+                      json={"token": token, "password": "x"})
+    assert bad.status_code == 400
+    # Valid password updates and logs in.
+    ok = client.post("/api/auth/reset-password",
+                     json={"token": token, "password": "brandnew1"})
+    assert ok.status_code == 200
+    # Token is now single-use.
+    reuse = client.post("/api/auth/reset-password",
+                        json={"token": token, "password": "another1"})
+    assert reuse.status_code == 400
+    # New password actually works.
+    _login(client, "sam@opsdesk.local", password="brandnew1")
+    assert client.get("/api/auth/me").status_code == 200

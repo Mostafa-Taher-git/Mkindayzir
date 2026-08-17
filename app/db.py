@@ -129,6 +129,23 @@ CREATE TABLE IF NOT EXISTS ticket_activity (
     note        TEXT,
     created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ticket_id  INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,        -- assigned|resolved|internal_note|etc.
+    message    TEXT NOT NULL,
+    read       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    token      TEXT PRIMARY KEY,
+    email      TEXT NOT NULL,
+    expires_at TEXT NOT NULL,        -- UTC ISO
+    used       INTEGER NOT NULL DEFAULT 0
+);
 """
 
 

@@ -221,3 +221,24 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
   .spinner { animation: none; border-top-color: var(--primary); }
 }
+
+/* ---------- Notifications (Phase 1) ---------- */
+#notif-bell { position: relative; }
+.badge-count {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--error); color: #fff;
+  font-size: 11px; line-height: 1; border-radius: 999px;
+  font-weight: 700;
+}
+.notif-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.notif {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-low); border-radius: var(--r);
+  border-left: 3px solid transparent; cursor: pointer;
+}
+.notif.unread { background: var(--surface-lowest); border-left-color: var(--primary); }
+.notif-msg { font-size: var(--fs-sm); }
+.notif-meta { font-size: var(--fs-xs); }

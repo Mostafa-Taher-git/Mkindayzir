@@ -81,6 +81,15 @@ const API = (() => {
     dashboard: () => req("GET", "/api/dashboard"),
     meta:      () => req("GET", "/api/meta"),
 
+    // Phase 1 — notifications
+    notifications: () => req("GET", "/api/notifications"),
+    markNotifRead: (id) => req("POST", `/api/notifications/${id}/read`),
+    markAllNotifRead: () => req("POST", "/api/notifications/read-all"),
+
+    // Phase 1 — password reset
+    forgotPassword: (email) => req("POST", "/api/auth/forgot-password", { email }),
+    resetPassword: (token, password) => req("POST", "/api/auth/reset-password", { token, password }),
+
     // Admin
     adminTeams:    () => req("GET", "/api/admin/teams"),
     adminCreateTeam: (name) => req("POST", "/api/admin/teams", { name }),
