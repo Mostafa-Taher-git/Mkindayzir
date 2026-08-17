@@ -43,19 +43,19 @@ def save_ai_settings():
     raw_key = (data.get("api_key") or "").strip()
     model = (data.get("model") or "").strip()
 
-    # Allow clearing the key by sending an empty string.
-    if raw_key:
-        # Basic shape check: OpenRouter keys look like "sk-or-...". We don't
-        # validate it works here (that happens on first AI call); we just reject
-        # obvious garbage so a typo doesn't get stored.
+    # Preserve existing key unless caller explicitly sends a new key or an
+    # explicit empty string to clear it.
+    if "api_key" not in data:
+        enc = user.get("ai_key")
+    elif raw_key:
         if not re.match(r"^sk-[A-Za-z0-9\-]{10,}$", raw_key) and \
            not raw_key.startswith("sk-or-"):
             return jsonify(error="That doesn't look like a valid API key"), 400
         enc = encrypt_secret(raw_key)
     else:
-        enc = None  # clear it
+        enc = None
 
-    chosen = model or config.AI_MODEL_DEFAULT
+    chosen = model or user.get("ai_model") or config.AI_MODEL_DEFAULT
     db.get_db().execute(
         "UPDATE users SET ai_key=?, ai_model=? WHERE id=?",
         (enc, chosen, user["id"]),

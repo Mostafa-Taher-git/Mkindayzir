@@ -1103,18 +1103,38 @@
     $("#teams-list").replaceChildren(...teams.teams.map((t) =>
       el("div", { class: "row between", style: "padding:6px 0;border-bottom:1px solid var(--surface-low)" },
         el("span", {}, t.name),
-        el("button", { class: "btn ghost sm", onclick: () => API.adminDeleteTeam(t.id).then(refreshAdmin) }, "Delete"))));
+        el("button", { class: "btn ghost sm", onclick: async () => {
+          if (!await confirmModal("Delete this team? Related tickets/users will be unassigned from it.", "Delete", "btn danger sm")) return;
+          await API.adminDeleteTeam(t.id);
+          await refreshAdmin();
+        } }, "Delete"))));
     $("#cats-list").replaceChildren(...cats.categories.map((c) =>
       el("div", { class: "row between", style: "padding:6px 0;border-bottom:1px solid var(--surface-low)" },
         el("span", {}, c.name),
-        el("button", { class: "btn ghost sm", onclick: () => API.adminDeleteCategory(c.id).then(refreshAdmin) }, "Deactivate"))));
+        el("button", { class: "btn ghost sm", onclick: async () => {
+          if (!await confirmModal("Deactivate this category? It will no longer be available for new requests.", "Deactivate", "btn danger sm")) return;
+          await API.adminDeleteCategory(c.id);
+          await refreshAdmin();
+        } }, "Deactivate"))));
     $("#users-list").replaceChildren(el("table", { class: "tbl" },
       el("thead", {}, el("tr", {}, ...["Name", "Email", "Role", "Team", ""].map((h) => el("th", {}, h)))),
       el("tbody", {}, ...users.users.map((u) =>
         el("tr", {},
-          el("td", {}, u.name), el("td", {}, u.email),
-          el("td", {}, u.role), el("td", {}, teamName(u.team_id)),
-          el("td", {}, el("button", { class: "btn ghost sm", onclick: () => openUserModal(u) }, "Edit")))))));
+          el("td", {}, u.name),
+          el("td", {}, u.email),
+          el("td", {}, u.role),
+          el("td", {}, teamName(u.team_id)),
+          el("td", {}, el("div", { class: "row wrap" },
+            el("button", { class: "btn ghost sm", onclick: () => openUserModal(u) }, "Edit"),
+            el("button", { class: "btn danger sm", onclick: async () => {
+              if (!await confirmModal("Delete this user? Users with ticket history cannot be deleted.", "Delete", "btn danger sm")) return;
+              await API.adminDeleteUser(u.id);
+              await refreshAdmin();
+            } }, "Delete")
+          ))
+        ))
+      ))
+    );
   }
 
   async function addTeam() {

@@ -9,6 +9,7 @@ A single SQLite file is used. This module owns:
 All other modules import `get_db()` to talk to SQLite. No ORM is used so
 the code stays readable and easy to edit.
 """
+import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -31,6 +32,8 @@ def get_db():
     intentional — callers should run inside an app context.
     """
     if "db" not in g:
+        os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
+        os.makedirs(config.UPLOAD_DIR, exist_ok=True)
         conn = sqlite3.connect(config.DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row  # rows behave like dicts
         conn.execute("PRAGMA foreign_keys = ON")

@@ -105,6 +105,17 @@ def create_app():
         # Non-API paths keep Flask's default handling.
         return err
 
+    if app.debug:
+        @app.after_request
+        def _debug_html_to_json(resp):
+            # In debug mode, Werkzeug may still return interactive debugger HTML
+            # for unhandled exceptions. Convert API responses to JSON so the SPA
+            # never receives an executable HTML debug page.
+            from flask import request
+            if request.path.startswith("/api/") and resp.content_type and "text/html" in resp.content_type:
+                return jsonify(error="Internal server error"), 500
+            return resp
+
     _start_autoclose_thread(app)
     return app
 

@@ -61,10 +61,12 @@ def _send_email(user_id, subject, body):
     msg["To"] = row["email"]
     msg.set_content(body)
 
-    with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as s:
-        if config.SMTP_PORT == 465:
-            s.starttls(context=ssl.create_default_context())
-        else:
+    if config.SMTP_PORT == 465:
+        client = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=ssl.create_default_context(), timeout=10)
+    else:
+        client = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10)
+    with client as s:
+        if config.SMTP_PORT != 465:
             s.starttls()
         if config.SMTP_USER:
             s.login(config.SMTP_USER, config.SMTP_PASS)
