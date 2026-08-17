@@ -287,7 +287,17 @@
     const out = el("div", { class: "card compact mt-4" },
       el("div", { class: "label mb-2" }, "AI assist (draft only)"),
       el("p", { class: "muted", style: "font-size:12px;margin:0 0 8px 0" },
-        "Generates draft text from ticket content. Does not send anything to the requester."));
+        "Generates draft text from ticket content. Does not send anything to the requester, update tickets, or share your API key."),
+      el("details", { class: "mt-2 mb-2", style: "font-size:12px" },
+        el("summary", { style: "cursor:pointer;color:var(--primary)" }, "What do these buttons do?"),
+        el("ul", { style: "margin:8px 0 0 18px;line-height:1.6" },
+          el("li", {}, el("strong", {}, "Summarize"), " — writes a concise summary of the ticket and conversation."),
+          el("li", {}, el("strong", {}, "Suggest reply"), " — drafts a public response for the requester based on the thread."),
+          el("li", {}, el("strong", {}, "Suggest priority"), " — recommends Normal or Urgent based on ticket content."))),
+      el("p", { class: "muted", style: "font-size:11px;margin:4px 0 0 0" },
+        "All output is a draft. You review, edit, and send it yourself. Requires your OpenRouter API key in Settings."),
+      el("p", { class: "muted", style: "font-size:11px;margin:2px 0 0 0" },
+        "If the AI fails, check your key at ", el("a", { href: "/#/settings", onclick: () => navigate("/settings") }, "Settings"), " or try again later."));
     const result = el("div", { class: "muted mt-2", style: "white-space:pre-wrap" }, "");
     const btn = (label, fn) => el("button", { class: "btn ghost sm mr-2 mb-2", onclick: async () => {
       result.textContent = "Thinking…";
@@ -790,6 +800,7 @@
         el("div", { class: "row wrap" },
           canHandle ? el("button", { class: "btn secondary sm", onclick: () => claim(t) }, t.assignee_id ? "Reassign" : "Claim") : null,
           canHandle ? statusButtons(t) : null,
+          canHandle ? el("button", { class: "btn secondary sm", onclick: () => changePriority(t) }, "Change Priority") : null,
           isRequesterOwner && ["resolved", "closed"].includes(t.status)
             ? el("button", { class: "btn danger sm", onclick: () => doReopen(t.id) }, "Reopen") : null));
       const activity = el("div", { class: "card compact" },
@@ -862,19 +873,42 @@
   }
 
   async function claim(t) {
-    // Simple: open a prompt-like modal to pick a user, or self-claim for agents.
+    const users = state.meta.users || [];
+    const ticketTeamId = t.team_id;
+
+    // Filter users by team if ticket has a team; otherwise show all agents/managers
+    const assignableUsers = users.filter(u =>
+      ["agent", "manager", "admin"].includes(u.role) &&
+      (ticketTeamId == null || u.team_id == ticketTeamId)
+    );
+
+    // For agents: show dropdown with "Claim for me" + team members
     if (state.user.role === "agent") {
-      try { await API.assign(t.id, { self: true }); viewTicket(t.id); toast("Claimed."); }
-      catch (e) { toast(e.message, "error"); }
+      const agentOptions = [
+        { value: "me", label: "Claim for me" },
+        ...assignableUsers.filter(u => u.id !== state.user.id).map(u => ({ value: u.id, label: `${u.name} (${teamName(u.team_id)})` }))
+      ];
+      openModal("Assign ticket", el("div", {},
+        el("label", { class: "field" }, el("span", { class: "label" }, "Assign to"),
+          el("select", { id: "assign-pick" },
+            ...agentOptions.map(o => el("option", { value: o.value }, o.label)))),
+        el("div", { class: "row" }, el("div", { class: "spacer" }),
+          el("button", { class: "btn primary sm", onclick: async () => {
+            const val = $("#assign-pick").value;
+            if (!val) return;
+            const payload = val === "me" ? { self: true } : { assignee_id: val };
+            await API.assign(t.id, payload);
+            closeModal(); viewTicket(t.id); toast(val === "me" ? "Claimed." : "Assigned.");
+          } }, "Save"))));
       return;
     }
-    // manager/admin: pick anyone
-    const users = state.meta.users;
+
+    // Manager/Admin: pick anyone (filtered by team if ticket has one)
     openModal("Assign ticket", el("div", {},
       el("label", { class: "field" }, el("span", { class: "label" }, "Assign to"),
         el("select", { id: "assign-pick" },
           el("option", { value: "" }, "— Unassigned —"),
-          ...users.map((u) => el("option", { value: u.id }, `${u.name} (${u.role})`)))),
+          ...assignableUsers.map(u => el("option", { value: u.id }, `${u.name} (${teamName(u.team_id)})`)))),
       el("div", { class: "row" }, el("div", { class: "spacer" }),
         el("button", { class: "btn primary sm", onclick: async () => {
           const uid = $("#assign-pick").value || null;
@@ -904,13 +938,44 @@
   }
 
   async function doReopen(id) {
-    if (!confirm("Reopen this ticket? It will go back to the queue.")) return;
+    const confirmed = await confirmModal(
+      "Reopen this ticket? It will go back to the queue and the requester will be notified.",
+      "Reopen",
+      "btn danger sm"
+    );
+    if (!confirmed) return;
     try { await API.reopen(id); viewTicket(id); toast("Reopened."); }
     catch (e) { toast(e.message, "error"); }
   }
 
+  async function changePriority(t) {
+    const current = t.priority;
+    const options = ["normal", "urgent"].filter(p => p !== current);
+    if (!options.length) return;
+    const body = el("div", {},
+      el("p", { class: "muted" }, `Current priority: ${current === "urgent" ? "Urgent" : "Normal"}.`),
+      el("label", { class: "field" },
+        el("span", { class: "label" }, "New priority"),
+        el("select", { id: "priority-pick" },
+          ...options.map(p => el("option", { value: p }, p === "urgent" ? "Urgent" : "Normal")))));
+    openModal("Change Priority", body, async () => {
+      const newPriority = $("#priority-pick").value;
+      if (!newPriority) { toast("Select a priority.", "error"); return false; }
+      await API.setPriority(t.id, newPriority);
+      closeModal();
+      viewTicket(t.id);
+      toast("Priority updated.");
+      return true;
+    });
+  }
+
   async function doDeleteKb(id) {
-    if (!confirm("Delete this article? This cannot be undone.")) return;
+    const confirmed = await confirmModal(
+      "Delete this article? This cannot be undone.",
+      "Delete",
+      "btn danger sm"
+    );
+    if (!confirmed) return;
     try { await API.deleteKb(id); toast("Deleted.", "info"); viewKbManage(); }
     catch (e) { toast(e.message, "error"); }
   }
@@ -980,10 +1045,20 @@
         el("a", { href: "https://openrouter.ai/keys", target: "_blank", rel: "noopener" }, "Get a free key")),
       el("p", { class: "muted mb-2", style: "font-size:12px" },
         "AI assist generates draft text only. It never sends messages to requesters, updates tickets, or shares your key externally."),
+      el("details", { class: "mb-3", style: "font-size:12px" },
+        el("summary", { style: "cursor:pointer;color:var(--primary)" }, "How to get started"),
+        el("ul", { style: "margin:8px 0 0 18px;line-height:1.6" },
+          el("li", {}, "Create a free account at ", el("a", { href: "https://openrouter.ai", target: "_blank", rel: "noopener" }, "openrouter.ai"), "."),
+          el("li", {}, "Go to ", el("a", { href: "https://openrouter.ai/keys", target: "_blank", rel: "noopener" }, "API Keys"), " and create a new key."),
+          el("li", {}, "Paste the key below (it starts with ", el("code", {}, "sk-or-"), ")."),
+          el("li", {}, "Choose a model from the dropdown — free models are marked."),
+          el("li", {}, "Click Save. The AI buttons will appear in ticket detail for agents and managers."))),
       el("input", { id: "ai-key", type: "password", placeholder: hasKey ? "•••••••• (already set)" : "sk-or-...", class: "mb-2" }),
       el("div", { class: "label mb-2" }, "Model"),
       el("select", { id: "ai-model", class: "mb-2" },
         ...models.map(m => el("option", { value: m.id, selected: m.id === model }, m.label))),
+      el("p", { class: "muted", style: "font-size:11px;margin-bottom:8px" },
+        "Free models may have rate limits. If you hit errors, wait a moment or try a different model."),
       el("div", { class: "row wrap" },
         el("button", { class: "btn sm", onclick: async () => {
           const key = $("#ai-key").value.trim();
@@ -1125,10 +1200,46 @@
     };
     document.addEventListener("keydown", _modalKeyHandler);
   }
-  function closeModal() {
+function closeModal() {
     const m = $("#modal-back");
-    if (m) m.remove();
+    if (m) { m.remove(); }
     if (_modalKeyHandler) { document.removeEventListener("keydown", _modalKeyHandler); _modalKeyHandler = null; }
+  }
+
+  /* Confirmation modal for destructive actions.
+   * Shows a message with Cancel/Confirm buttons. Returns a Promise that
+   * resolves to true if confirmed, false if cancelled.
+   */
+  function confirmModal(message, confirmLabel = "Confirm", confirmClass = "btn danger sm") {
+    return new Promise((resolve) => {
+      closeModal();
+      const modal = el("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": "Confirm", tabindex: "-1" },
+        el("h3", {}, "Confirm action"),
+        el("p", { class: "muted", style: "margin-bottom: 16px" }, message));
+      modal.appendChild(el("div", { class: "row mt-6" },
+        el("div", { class: "spacer" }),
+        el("button", { class: "btn ghost sm", onclick: () => { closeModal(); resolve(false); } }, "Cancel"),
+        el("button", { class: confirmClass, onclick: () => { closeModal(); resolve(true); } }, confirmLabel)));
+      const back = el("div", { class: "modal-backdrop", id: "modal-back" }, modal);
+      back.addEventListener("click", (e) => { if (e.target === back) { closeModal(); resolve(false); } });
+      document.body.appendChild(back);
+
+      // Focus management + Esc
+      const focusables = () => modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const first = focusables()[0];
+      if (first) first.focus();
+      _modalKeyHandler = (e) => {
+        if (e.key === "Escape") { e.preventDefault(); closeModal(); resolve(false); return; }
+        if (e.key === "Tab") {
+          const f = focusables();
+          if (!f.length) return;
+          const idx = Array.prototype.indexOf.call(f, document.activeElement);
+          if (e.shiftKey && (idx <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+          else if (!e.shiftKey && (idx === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+        }
+      };
+      document.addEventListener("keydown", _modalKeyHandler);
+    });
   }
 
   /* ----------------------------- boot ----------------------------- */

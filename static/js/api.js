@@ -69,6 +69,7 @@ const API = (() => {
     createTicket: (payload) => req("POST", "/api/tickets", payload),
     assign:     (id, payload) => req("POST", `/api/tickets/${id}/assign`, payload),
     setStatus:  (id, payload) => req("POST", `/api/tickets/${id}/status`, payload),
+    setPriority: (id, priority) => req("POST", `/api/tickets/${id}/priority`, { priority }),
     reopen:     (id) => req("POST", `/api/tickets/${id}/reopen`),
     comment:    (id, payload) => req("POST", `/api/tickets/${id}/comments`, payload),
     upload:     (id, file) => {

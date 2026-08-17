@@ -339,6 +339,42 @@ def reopen(tid):
 
 
 # ---------------------------------------------------------------------------
+# Priority change (agent/manager only)
+# ---------------------------------------------------------------------------
+@tickets.route("/api/tickets/<int:tid>/priority", methods=["POST"])
+@login_required
+@csrf_protect
+def change_priority(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    user = request.current_user
+    if not is_agent_or_manager(user):
+        return jsonify(error="Forbidden"), 403
+
+    data = request.get_json(silent=True) or {}
+    new_priority = data.get("priority")
+    if new_priority not in config.PRIORITIES:
+        return jsonify(error="Invalid priority"), 400
+    if new_priority == t["priority"]:
+        return jsonify(ticket=_serialize(_fetch(tid)))
+
+    old_priority = t["priority"]
+    now = db.now_iso()
+    db.get_db().execute(
+        "UPDATE tickets SET priority=?, updated_at=? WHERE id=?",
+        (new_priority, now, tid),
+    )
+    db.get_db().commit()
+    helpers.log_activity(tid, user["id"], "priority_change",
+                         old_priority, new_priority)
+    # Re-attach SLA if priority changed (policy may differ).
+    updated = _fetch(tid)
+    sla.attach_sla(updated)
+    return jsonify(ticket=_serialize(updated))
+
+
+# ---------------------------------------------------------------------------
 # Comments / notes
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/comments", methods=["POST"])
