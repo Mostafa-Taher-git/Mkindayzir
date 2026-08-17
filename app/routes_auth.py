@@ -89,7 +89,11 @@ def logout():
 @auth.route("/api/auth/me")
 @login_required
 def me():
-    return jsonify(user=row_to_public(request.current_user))
+    # Tell the SPA whether the AI assist panel should render. False when no
+    # provider key is configured (fail-closed default) or the flag is off.
+    from . import config as _cfg
+    return jsonify(user=row_to_public(request.current_user),
+                   ai_enabled=bool(_cfg.AI_ENABLED))
 
 
 def row_to_public(u):

@@ -621,3 +621,104 @@ def test_rating_logs_activity(client, app):
         acts = dbmod.get_db().execute(
             "SELECT action, note FROM ticket_activity WHERE ticket_id=?", (t["id"],)).fetchall()
         assert any(a["action"] == "rated" and "5/5" in (a["note"] or "") for a in acts)
+
+
+# ---------------------------------------------------------------------------
+# v2 — AI assistance (key-gated, fail-closed, draft-only)
+# ---------------------------------------------------------------------------
+def test_ai_endpoints_unavailable_without_key(client):
+    # No OPERADESK_OPENROUTER_KEY in test env -> AI_ENABLED False -> 503.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "ai", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    for ep in ("summarize", "suggest-reply", "suggest-priority"):
+        r = client.get(f"/api/ai/{ep}/{t['id']}")
+        assert r.status_code == 503, (ep, r.status_code)
+    # /api/auth/me reports ai_enabled False
+    me = client.get("/api/auth/me").get_json()
+    assert me["ai_enabled"] is False
+
+
+def test_ai_endpoints_forbidden_for_requester(client):
+    # Requesters must get 403 (not a draft) on AI endpoints, even when the
+    # feature is enabled and the provider would return real text. (BUG-1 fix)
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "ai req", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    import app.config as cfg, app.ai.client as aicl
+    old_key, old_flag, old_fn = os.environ.get("OPERADESK_OPENROUTER_KEY"), cfg.AI_ENABLED, aicl.ai_enabled
+    os.environ["OPERADESK_OPENROUTER_KEY"] = "test-key"
+    cfg.AI_ENABLED = True
+    aicl.ai_enabled = lambda: True
+    # Stub the provider so it WOULD return a draft if the route let the requester through.
+    def _fake(prompt, temperature=0.3, max_tokens=400):
+        return "LEAKED DRAFT"
+    aicl._complete = _fake
+    try:
+        for ep in ("summarize", "suggest-reply", "suggest-priority"):
+            r = client.get(f"/api/ai/{ep}/{t['id']}")
+            assert r.status_code == 403, (ep, r.status_code, r.get_data(as_text=True))
+            assert "LEAKED" not in r.get_data(as_text=True)
+    finally:
+        if old_key is None:
+            os.environ.pop("OPERADESK_OPENROUTER_KEY", None)
+        else:
+            os.environ["OPERADESK_OPENROUTER_KEY"] = old_key
+        cfg.AI_ENABLED = old_flag
+        aicl.ai_enabled = old_fn
+        aicl._complete = _complete_orig  # restore original
+
+
+# capture original _complete for safe restore
+import app.ai.client as _aiclmod
+_complete_orig = _aiclmod._complete
+
+
+def test_ai_endpoint_404_on_invisible_ticket(client):
+    _login(client, "hragent@opsdesk.local")  # HR team
+    csrf = _csrf(client)
+    # Create a ticket in IT team via an agent+manager? sam creates -> team by category.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "ai vis", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]  # category 2 -> IT
+    _login(client, "hragent@opsdesk.local")
+    csrf = _csrf(client)
+    import app.config as cfg
+    old_flag = cfg.AI_ENABLED
+    os.environ["OPERADESK_OPENROUTER_KEY"] = "test-key"
+    cfg.AI_ENABLED = True
+    try:
+        r = client.get(f"/api/ai/summarize/{t['id']}")
+        # HR agent cannot view an IT ticket -> 404 (not 502/200)
+        assert r.status_code == 404, r.status_code
+    finally:
+        os.environ.pop("OPERADESK_OPENROUTER_KEY", None)
+        cfg.AI_ENABLED = old_flag
+
+
+# ---------------------------------------------------------------------------
+# v2 AI — BUG-2 (priority inversion) and BUG-3 (fail-open on null content)
+# ---------------------------------------------------------------------------
+def test_suggest_priority_not_inverted_by_reason_text():
+    import app.ai.client as aicl
+    cases = {
+        "PRIORITY: normal - low impact, not urgent, can wait": "normal",
+        "PRIORITY: urgent - customer CEO blocked": "urgent",
+        "PRIORITY: normal": "normal",
+    }
+    for model_out, expected in cases.items():
+        aicl._complete = lambda p, **k: model_out
+        got = aicl.suggest_priority({"subject": "x", "description": "y"})
+        assert got == expected, (model_out, got)
+
+
+def test_ai_fail_closed_when_content_is_null():
+    import app.ai.client as aicl
+    # Provider returns content: null -> must return None (route turns into 502),
+    # never raise (which would have been a 500 before the fix).
+    aicl._complete = lambda p, **k: None
+    assert aicl.suggest_reply({"subject": "x", "description": "y"}) is None
+    assert aicl.summarize_ticket({"subject": "x", "description": "y"}) is None

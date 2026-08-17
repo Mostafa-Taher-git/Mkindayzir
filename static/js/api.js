@@ -130,6 +130,11 @@ const API = (() => {
     },
     rateTicket: (id, score) => req("POST", `/api/tickets/${id}/rate`, { score }),
 
+    // v2 — AI assistance (draft-only; server returns 503 when disabled)
+    aiSuggestReply: (id) => req("GET", `/api/ai/suggest-reply/${id}`),
+    aiSummarize: (id) => req("GET", `/api/ai/summarize/${id}`),
+    aiSuggestPriority: (id) => req("GET", `/api/ai/suggest-priority/${id}`),
+
     // Admin
     adminTeams:    () => req("GET", "/api/admin/teams"),
     adminCreateTeam: (name) => req("POST", "/api/admin/teams", { name }),

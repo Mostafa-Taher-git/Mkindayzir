@@ -11,7 +11,7 @@
 (() => {
   "use strict";
 
-  const state = { user: null, meta: null };
+  const state = { user: null, meta: null, aiEnabled: false };
 
   /* ----------------------------- helpers ----------------------------- */
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -279,8 +279,31 @@
       el("span", { class: "label" }, "Rate your experience"),
       el("div", { style: "display:flex;gap:4px;margin-top:4px" }, ...stars));
   }
+  // v2 — AI assist panel (draft-only suggestions; agent/manager only, when enabled)
+  function aiPanel(t) {
+    if (!state.aiEnabled) return null;
+    if (!helpers_isStaff(state.user.role)) return null;
+    const out = el("div", { class: "card compact mt-4" },
+      el("div", { class: "label mb-2" }, "AI assist (draft only)"));
+    const result = el("div", { class: "muted mt-2", style: "white-space:pre-wrap" }, "");
+    const btn = (label, fn) => el("button", { class: "btn ghost sm mr-2 mb-2", onclick: async () => {
+      result.textContent = "Thinking…";
+      try {
+        const r = await fn();
+        result.textContent = r.text;
+      } catch (e) { result.textContent = "AI unavailable: " + e.message; }
+    } }, label);
+    out.appendChild(el("div", {},
+      btn("Summarize", () => API.aiSummarize(t.id).then(d => ({ text: d.summary }))),
+      btn("Suggest reply", () => API.aiSuggestReply(t.id).then(d => ({ text: d.draft }))),
+      btn("Suggest priority", () => API.aiSuggestPriority(t.id).then(d => ({ text: d.priority })))));
+    out.appendChild(result);
+    return out;
+  }
 
-  function categoryName(id) {
+  function helpers_isStaff(role) { return role === "agent" || role === "manager" || role === "admin"; }
+
+
     if (id == null) return "Uncategorized";
     const c = state.meta && state.meta.categories.find((x) => x.id === id);
     return c ? c.name : "Uncategorized";
@@ -468,6 +491,7 @@
       try {
         const u = await API.login(f.email.value, f.password.value);
         state.user = u.user;
+        state.aiEnabled = !!u.ai_enabled;
         await loadMeta();
         startNotifPolling();
         navigate("/dashboard");
@@ -760,7 +784,7 @@
           el("button", { class: "btn ghost sm", onclick: () => navigate(state.user.role === "requester" ? "/my" : "/queue") }, "← Back")),
         header,
         el("div", { class: "grid cols-2", style: "align-items:start" }, left,
-          el("div", {}, actions, activity)));
+          el("div", {}, actions, activity, aiPanel(t))));
       shell(inner);
     } catch (e) {
       shell(el("div", { class: "empty" }, "Ticket not found or you do not have access. ", el("a", { href: "#/queue" }, "Back to queue")));
@@ -1083,8 +1107,9 @@
       return;
     }
     window.addEventListener("hashchange", router);
-    API.me().then(({ user }) => {
+    API.me().then(({ user, ai_enabled }) => {
       state.user = user;
+      state.aiEnabled = !!ai_enabled;
       return loadMeta();
     }).then(() => router())
       .catch(() => { state.user = null; navigate("/login"); });

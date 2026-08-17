@@ -44,6 +44,16 @@ PASSWORD_MIN_LENGTH = 8
 # OPERADESK_SECRET var (reuse is fine) or its own OPERADESK_CSRF_SECRET.
 CSRF_SECRET = os.environ.get("OPERADESK_CSRF_SECRET", SECRET_KEY)
 
+# --- AI assistance (v2) ---
+# Key-gated + fail-closed. The feature is available ONLY when a provider key is
+# set AND not explicitly disabled. Explicitly disable with OPERADESK_AI_ENABLED=0
+# (e.g. to force-off even with a key present). When no key is set, AI_ENABLED is
+# always False, regardless of the flag — the feature can never turn on without a
+# provider key (matches the route-level ai.ai_enabled() double check).
+_AI_KEY = os.environ.get("OPERADESK_OPENROUTER_KEY", "")
+_AI_ENV = os.environ.get("OPERADESK_AI_ENABLED", "")
+AI_ENABLED = bool(_AI_KEY) and (_AI_ENV not in ("0", "false", "False"))
+
 # Outbound email (Phase 1). Optional: if SMTP_HOST is unset the app still
 # works — password-reset tokens and notifications fall back to in-app only.
 # No third-party mail libs: we use smtplib from the standard library.
