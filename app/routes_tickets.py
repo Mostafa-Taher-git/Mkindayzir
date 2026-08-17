@@ -189,29 +189,34 @@ def assign(tid):
     assignee_id = data.get("assignee_id")
     team_id = data.get("team_id")
 
-    # Self-assign shortcut: agent clicks "claim" with no body.
-    if not assignee_id and data.get("self"):
-        assignee_id = user["id"]
-        team_id = team_id or user["team_id"]
+    if data.get("unassign"):
+        assignee_id = None
+        team_id = None
+        to_status = config.STATUS_NEW
+    else:
+        # Self-assign shortcut: agent clicks "claim" with no body.
+        if not assignee_id and data.get("self"):
+            assignee_id = user["id"]
+            team_id = team_id or user["team_id"]
 
-    if assignee_id:
-        a = db.get_db().execute(
-            "SELECT id, team_id FROM users WHERE id = ?", (assignee_id,)
-        ).fetchone()
-        if not a:
-            return jsonify(error="Unknown assignee"), 400
-        team_id = team_id or a["team_id"]
+        if assignee_id:
+            a = db.get_db().execute(
+                "SELECT id, team_id FROM users WHERE id = ?", (assignee_id,)
+            ).fetchone()
+            if not a:
+                return jsonify(error="Unknown assignee"), 400
+            team_id = team_id or a["team_id"]
+        to_status = config.STATUS_ASSIGNED if assignee_id else t["status"]
 
-    new_status = config.STATUS_ASSIGNED if assignee_id else t["status"]
     db.get_db().execute(
         "UPDATE tickets SET assignee_id=?, team_id=?, status=?,\
          updated_at=? WHERE id=?",
-        (assignee_id, team_id, new_status, db.now_iso(), tid),
+        (assignee_id, team_id, to_status, db.now_iso(), tid),
     )
     db.get_db().commit()
-    who = "self" if data.get("self") else f"user {assignee_id}"
+    who = "self" if data.get("self") else (f"user {assignee_id}" if assignee_id else "unassigned")
     helpers.log_activity(tid, user["id"], "assigned", t["status"],
-                         new_status, note=f"Assigned to {who}")
+                         to_status, note=f"Assigned to {who}")
     # Phase 3: an agent acting on the ticket counts as the first response.
     if assignee_id and t["requester_id"] != user["id"]:
         sla.record_first_response(tid)
@@ -688,6 +693,11 @@ def _activity_for(tid):
 
 
 def _serialize(t, sla_row=None):
+    name_row = lambda uid: db.get_db().execute(
+        "SELECT name FROM users WHERE id=?", (uid,)
+    ).fetchone()
+    requester_name = name_row(t["requester_id"])["name"] if t["requester_id"] else None
+    assignee_name = name_row(t["assignee_id"])["name"] if t["assignee_id"] else None
     return {
         "id": t["id"],
         "ticket_ref": t["ticket_ref"],
@@ -695,7 +705,9 @@ def _serialize(t, sla_row=None):
         "description": t["description"],
         "category_id": t["category_id"],
         "requester_id": t["requester_id"],
+        "requester_name": requester_name,
         "assignee_id": t["assignee_id"],
+        "assignee_name": assignee_name,
         "team_id": t["team_id"],
         "priority": t["priority"],
         "status": t["status"],
@@ -722,9 +734,13 @@ def _sla_summary(tid, sla_row=None):
 
 
 def _serialize_comment(c):
+    author_name = None
+    if c["author_id"]:
+        row = db.get_db().execute("SELECT name FROM users WHERE id=?", (c["author_id"],)).fetchone()
+        author_name = row["name"] if row else None
     return {
         "id": c["id"], "ticket_id": c["ticket_id"], "author_id": c["author_id"],
-        "body": c["body"], "visibility": c["visibility"],
+        "author_name": author_name, "body": c["body"], "visibility": c["visibility"],
         "created_at": c["created_at"],
     }
 
