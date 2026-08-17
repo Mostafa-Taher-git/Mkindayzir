@@ -98,14 +98,36 @@ const API = (() => {
     publishKb:(id) => req("POST", `/api/kb/${id}/publish`),
     deleteKb: (id) => req("DELETE", `/api/kb/${id}`),
     kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
-    kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
 
     // Phase 4 — Reports & CSAT
     reportsSummary: () => req("GET", "/api/reports/summary"),
     reportsWorkload: () => req("GET", "/api/reports/workload"),
     reportsSla: () => req("GET", "/api/reports/sla"),
     reportsTrend: (days) => req("GET", "/api/reports/trend?days=" + (days || 30)),
-    exportCsv: () => { window.open("/api/reports/export.csv", "_blank"); return Promise.resolve(); },
+    exportCsv: async () => {
+      const token = await API.initCsrf();
+      const res = await fetch("/api/reports/export.csv", {
+        method: "GET", credentials: "same-origin",
+        headers: { "X-CSRF-Token": token },
+      });
+      if (!res.ok) {
+        let msg = "Export failed (" + res.status + ")";
+        try { msg = (await res.json()).error || msg; } catch (_) {}
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // preserve the server-sent filename when available
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename=([^;]+)/);
+      a.download = m ? m[1].replace(/"/g, "") : "opsdesk-tickets.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
     rateTicket: (id, score) => req("POST", `/api/tickets/${id}/rate`, { score }),
 
     // Admin

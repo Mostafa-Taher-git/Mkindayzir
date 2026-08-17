@@ -13,6 +13,7 @@ Requester satisfaction:
 """
 import csv
 import io
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, request, jsonify, Response
 
@@ -107,12 +108,14 @@ def workload():
         ).fetchall()
         if rows:
             tot = 0
+            n = 0
             for r in rows:
                 c = helpers._parse_iso(r["created_at"])
                 rv = helpers._parse_iso(r["resolved_at"])
                 if c and rv:
                     tot += (rv - c).total_seconds()
-            avg = round(tot / len(rows) / 3600, 1)
+                    n += 1
+            avg = round(tot / n / 3600, 1) if n else None
         out.append({
             "id": a["id"], "name": a["name"],
             "open": open_n, "resolved": resolved,
@@ -161,7 +164,6 @@ def trend():
     ).fetchall()
     created_map = {r["d"]: r["c"] for r in created}
     resolved_map = {r["d"]: r["c"] for r in resolved}
-    from datetime import datetime, timedelta, timezone
     today = datetime.now(timezone.utc).date()
     series = []
     for i in range(days - 1, -1, -1):
@@ -210,7 +212,7 @@ def export_csv():
 def rate_ticket(tid):
     user = request.current_user
     t = db.get_db().execute(
-        "SELECT id, requester_id, status, csat, resolved_at FROM tickets WHERE id=?", (tid,)
+        "SELECT id, requester_id, status, csat FROM tickets WHERE id=?", (tid,)
     ).fetchone()
     if not t:
         return jsonify(error="Not found"), 404
@@ -226,4 +228,5 @@ def rate_ticket(tid):
         return jsonify(error="score must be 1-5"), 400
     db.get_db().execute("UPDATE tickets SET csat=? WHERE id=?", (score, tid))
     db.get_db().commit()
+    helpers.log_activity(tid, user["id"], "rated", note=f"CSAT {score}/5")
     return jsonify(ok=True, csat=score)

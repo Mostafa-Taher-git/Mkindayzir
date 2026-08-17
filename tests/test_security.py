@@ -590,3 +590,34 @@ def test_requester_cannot_override_team_routing(client):
                                           "category_id": 2, "team_id": 2},
                     headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
     assert t["team_id"] == 1  # routed by category, not the client value
+
+
+def test_ticket_list_includes_sla_without_extra_queries(client, app):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "list sla", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    data = client.get("/api/tickets").get_json()
+    row = next(x for x in data["tickets"] if x["id"] == t["id"])
+    assert row["sla"] is not None  # SLA attached/serialized via the joined row
+    assert "policy_name" in row["sla"]
+
+
+def test_rating_logs_activity(client, app):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "rate log", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/rate", json={"score": 5}, headers={"X-CSRF-Token": csrf})
+    with app.app_context():
+        from app import db as dbmod
+        acts = dbmod.get_db().execute(
+            "SELECT action, note FROM ticket_activity WHERE ticket_id=?", (t["id"],)).fetchall()
+        assert any(a["action"] == "rated" and "5/5" in (a["note"] or "") for a in acts)

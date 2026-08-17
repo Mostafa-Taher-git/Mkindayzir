@@ -204,10 +204,10 @@
         reportCard("Avg resolution", (s.avg_resolution_hours != null ? s.avg_resolution_hours + "h" : "n/a")),
         reportCard("Avg CSAT", (s.avg_csat != null ? s.avg_csat + " / 5" : "n/a"), s.csat_responses ? "(" + s.csat_responses + " ratings)" : ""));
       const workloadTable = el("div", { class: "card mt-4" },
-        el("h3", { class: "h3 mt-2" }, "Workload by agent"),
+        el("h3", { class: "h3 mt-2" }, "Workload by staff"),
         el("table", { class: "table" },
           el("thead", {}, el("tr", {},
-            el("th", {}, "Agent"), el("th", {}, "Open"), el("th", {}, "Resolved"), el("th", {}, "Avg res. (h)"))),
+            el("th", {}, "Staff"), el("th", {}, "Open"), el("th", {}, "Resolved"), el("th", {}, "Avg res. (h)"))),
           el("tbody", {}, ...w.agents.map((a) => el("tr", {},
             el("td", {}, a.name), el("td", {}, String(a.open)), el("td", {}, String(a.resolved)),
             el("td", {}, a.avg_resolution_hours != null ? String(a.avg_resolution_hours) : "—"))))));
@@ -217,15 +217,23 @@
           (sl.attainment_pct != null ? " (" + sl.attainment_pct + "%)" : "")));
       const trendList = el("div", { class: "card mt-4" },
         el("h3", { class: "h3 mt-2" }, "Last " + tr.days + " days (created / resolved)"),
-        el("div", { class: "trend" }, ...tr.series.slice(-14).map((d) =>
+        el("div", { class: "trend" }, ...tr.series.map((d) =>
           el("div", { class: "trend-row" },
             el("span", { class: "muted", style: "font-size:12px" }, d.date.slice(5)),
             el("span", {}, "▲" + d.created + " ▼" + d.resolved)))));
-      const exportBtn = el("button", { class: "btn primary mt-4", onclick: () => API.exportCsv() }, "Export CSV");
+      const exportBtn = el("button", { class: "btn primary mt-4", onclick: async () => {
+          try { await API.exportCsv(); } catch (e) { toast(e.message, "error"); }
+        } }, "Export CSV");
       main.replaceChildren(
         el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }), exportBtn),
         cards, workloadTable, slaBox, trendList);
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) {
+      main.replaceChildren(
+        el("div", { class: "empty" },
+          el("span", { class: "label" }, "Couldn't load reports"),
+          el("div", { class: "muted mt-2" }, e.message || "Unknown error"),
+          el("button", { class: "btn ghost mt-4", onclick: () => viewReports() }, "Retry")));
+    }
   }
 
   function reportCard(label, value, sub) {

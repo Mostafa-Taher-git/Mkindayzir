@@ -35,7 +35,14 @@ tickets = Blueprint("tickets", __name__)
 @login_required
 def list_tickets():
     user = request.current_user
-    q = ["SELECT t.* FROM tickets t"]
+    # Select ticket columns plus the SLA/policy columns via the LEFT JOIN so the
+    # list serializes SLA state without a per-row extra SELECT (no N+1).
+    # NOTE: SQLite requires JOINs before the WHERE clause.
+    q = ["SELECT t.*, ts.first_response_at, ts.breach_at, ts.breached, "
+         "ts.response_met, ts.resolution_met, sp.name AS policy_name "
+         "FROM tickets t "
+         "LEFT JOIN ticket_sla ts ON ts.ticket_id = t.id "
+         "LEFT JOIN sla_policies sp ON sp.id = ts.policy_id"]
     where, params = [], []
 
     # RBAC scoping (FR-21)
@@ -63,11 +70,12 @@ def list_tickets():
         like = f"%{search}%"
         params += [like, like, like]
 
+    base = " ".join(q)
     if where:
-        q.append("WHERE " + " AND ".join(where))
-    q.append("ORDER BY t.updated_at DESC")
-    rows = db.get_db().execute(" ".join(q), params).fetchall()
-    return jsonify(tickets=[_serialize(t) for t in rows])
+        base += " WHERE " + " AND ".join(where)
+    base += " ORDER BY t.updated_at DESC"
+    rows = db.get_db().execute(base, params).fetchall()
+    return jsonify(tickets=[_serialize(t, sla_row=t) for t in rows])
 
 
 @tickets.route("/api/tickets/<int:tid>")
@@ -608,7 +616,7 @@ def _activity_for(tid):
     return [dict(r) for r in rows]
 
 
-def _serialize(t):
+def _serialize(t, sla_row=None):
     return {
         "id": t["id"],
         "ticket_ref": t["ticket_ref"],
@@ -627,17 +635,19 @@ def _serialize(t):
         "resolved_at": t["resolved_at"],
         "closed_at": t["closed_at"],
         "csat": t["csat"],
-        "sla": _sla_summary(t["id"]),
+        "sla": _sla_summary(t["id"], sla_row),
     }
 
-def _sla_summary(tid):
+def _sla_summary(tid, sla_row=None):
     """Lightweight SLA readout for ticket serialization.
 
     Delegates to routes_sla.summarize, which computes breach LIVE (overdue open
     tickets are reported as breached) so the badge is accurate without a sweep.
+    If the list query already JOINed the SLA row (sla_row), pass it through to
+    avoid a per-row extra SELECT (N+1).
     The caller has already authorized the ticket.
     """
-    return sla.summarize(tid)
+    return sla.summarize(tid, sla_row)
 
 
 def _serialize_comment(c):

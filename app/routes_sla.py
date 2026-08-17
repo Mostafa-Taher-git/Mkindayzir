@@ -75,18 +75,25 @@ def record_first_response(ticket_id):
     conn.commit()
 
 
-def summarize(ticket_id):
+def summarize(ticket_id, sla_row=None):
     """Single source of truth for a ticket's SLA state.
 
     Computes `breached` LIVE (now > breach_at) so overdue open tickets show as
     breached in the UI instead of always "on track". For resolved/closed tickets
     the stored response_met / resolution_met are authoritative.
+
+    `sla_row` (optional) is a pre-fetched LEFT JOIN row from the list query that
+    already contains `policy_name`, `breach_at`, etc. — when provided it avoids a
+    per-row extra SELECT (N+1) for the ticket list.
     """
     conn = db.get_db()
-    row = conn.execute(
-        "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
-        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
-        (ticket_id,)).fetchone()
+    if sla_row is not None and "breach_at" in sla_row and "policy_name" in sla_row:
+        row = sla_row
+    else:
+        row = conn.execute(
+            "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
+            "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
+            (ticket_id,)).fetchone()
     if not row:
         return None
     now = datetime.now(timezone.utc)
