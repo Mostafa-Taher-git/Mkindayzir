@@ -189,6 +189,52 @@
   }
 
 
+  async function viewReports() {
+    if (state.user.role !== "manager" && state.user.role !== "admin") { navigate("/dashboard"); return; }
+    const main = el("div", {}, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading reports…"));
+    shell(main);
+    try {
+      const [sum, work, sla, trend] = await Promise.all([
+        API.reportsSummary(), API.reportsWorkload(), API.reportsSla(), API.reportsTrend(30)]);
+      const s = sum, w = work, sl = sla, tr = trend;
+      const cards = el("div", { class: "report-cards" },
+        reportCard("Total tickets", s.total),
+        reportCard("Open", s.open),
+        reportCard("SLA attainment", (s.sla_attainment_pct != null ? s.sla_attainment_pct + "%" : "n/a")),
+        reportCard("Avg resolution", (s.avg_resolution_hours != null ? s.avg_resolution_hours + "h" : "n/a")),
+        reportCard("Avg CSAT", (s.avg_csat != null ? s.avg_csat + " / 5" : "n/a"), s.csat_responses ? "(" + s.csat_responses + " ratings)" : ""));
+      const workloadTable = el("div", { class: "card mt-4" },
+        el("h3", { class: "h3 mt-2" }, "Workload by agent"),
+        el("table", { class: "table" },
+          el("thead", {}, el("tr", {},
+            el("th", {}, "Agent"), el("th", {}, "Open"), el("th", {}, "Resolved"), el("th", {}, "Avg res. (h)"))),
+          el("tbody", {}, ...w.agents.map((a) => el("tr", {},
+            el("td", {}, a.name), el("td", {}, String(a.open)), el("td", {}, String(a.resolved)),
+            el("td", {}, a.avg_resolution_hours != null ? String(a.avg_resolution_hours) : "—"))))));
+      const slaBox = el("div", { class: "card mt-4" },
+        el("h3", { class: "h3 mt-2" }, "SLA attainment"),
+        el("div", {}, "Met: " + sl.met + " · Missed: " + sl.missed + " · Pending: " + sl.pending +
+          (sl.attainment_pct != null ? " (" + sl.attainment_pct + "%)" : "")));
+      const trendList = el("div", { class: "card mt-4" },
+        el("h3", { class: "h3 mt-2" }, "Last " + tr.days + " days (created / resolved)"),
+        el("div", { class: "trend" }, ...tr.series.slice(-14).map((d) =>
+          el("div", { class: "trend-row" },
+            el("span", { class: "muted", style: "font-size:12px" }, d.date.slice(5)),
+            el("span", {}, "▲" + d.created + " ▼" + d.resolved)))));
+      const exportBtn = el("button", { class: "btn primary mt-4", onclick: () => API.exportCsv() }, "Export CSV");
+      main.replaceChildren(
+        el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }), exportBtn),
+        cards, workloadTable, slaBox, trendList);
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  function reportCard(label, value, sub) {
+    return el("div", { class: "card report-card" },
+      el("div", { class: "report-value" }, String(value)),
+      el("div", { class: "report-label" }, label),
+      sub ? el("div", { class: "muted", style: "font-size:12px" }, sub) : null);
+  }
+
   function catSelect(selected) {
     const sel = el("select", { name: "category_id", id: "category_id" },
       el("option", { value: "" }, "Uncategorized"));
@@ -204,6 +250,27 @@
     let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
   }
 
+
+  function csatWidget(t, isOwner) {
+    // If a rating exists, show it to everyone who can see the ticket.
+    if (t.csat != null) {
+      const label = (isOwner && (t.status === "resolved" || t.status === "closed")) ? "Your rating" : "Satisfaction";
+      return el("div", { class: "mt-4" },
+        el("span", { class: "label" }, label),
+        el("div", { class: "muted" }, "★".repeat(t.csat) + "☆".repeat(5 - t.csat) + "  (" + t.csat + "/5)"));
+    }
+    // Only the requester who owns a resolved/closed ticket can rate (once).
+    if (!isOwner || (t.status !== "resolved" && t.status !== "closed")) return null;
+    const stars = [1, 2, 3, 4, 5].map((n) => el("button", {
+      class: "btn ghost sm", style: "font-size:18px", onclick: async () => {
+        try { await API.rateTicket(t.id, n); toast("Thanks for rating!", "info"); viewTicket(t.id); }
+        catch (e) { toast(e.message, "error"); }
+      }
+    }, "★".repeat(n) + "☆".repeat(5 - n)));
+    return el("div", { class: "mt-4" },
+      el("span", { class: "label" }, "Rate your experience"),
+      el("div", { style: "display:flex;gap:4px;margin-top:4px" }, ...stars));
+  }
 
   function categoryName(id) {
     if (id == null) return "Uncategorized";
@@ -227,6 +294,7 @@
     "/kb/manage": viewKbManage,
     "/kb/new": viewKbEdit,
     "/kb/:id": viewKbArticle,
+    "/reports": viewReports,
   };
 
   function navigate(hash) {
@@ -270,6 +338,7 @@
     // Knowledge Base: Help Center for everyone; Manage KB for staff.
     navItems.push(["/kb", "Help Center", "📚"]);
     if (state.user.role !== "requester") navItems.push(["/kb/manage", "Manage KB", "✍️"]);
+    if (state.user.role === "manager" || state.user.role === "admin") navItems.push(["/reports", "Reports", "📈"]);
     if (isAdmin()) navItems.push(["/admin", "Admin", "⚙️"]);
 
     const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
@@ -637,7 +706,8 @@
         t.sla ? kvRow("SLA", (t.sla.breached ? "Breached" : (t.sla.resolution_met === 0 ? "At risk" : "On track")) + (t.sla.policy_name ? " (" + t.sla.policy_name + ")" : "") + (t.sla.breach_at ? " . due " + fmtDate(t.sla.breach_at) : "")) : null,
         t.blocked_reason ? el("div", { class: "mt-4" },
           el("span", { class: "label" }, "Blocked reason"),
-          el("div", { class: "comment internal", style: "margin-top:4px" }, t.blocked_reason)) : null);
+          el("div", { class: "comment internal", style: "margin-top:4px" }, t.blocked_reason)) : null,
+        csatWidget(t, isRequesterOwner));
 
       const commentThread = el("div", { class: "mt-6" },
         el("h3", { class: "h3 mb-4" }, "Conversation"),

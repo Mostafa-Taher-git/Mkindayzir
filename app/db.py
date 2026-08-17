@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     status          TEXT NOT NULL DEFAULT 'new',
     blocked_reason  TEXT,
     reopen_count    INTEGER NOT NULL DEFAULT 0,
+    csat            INTEGER,               -- requester satisfaction 1-5
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
     resolved_at     TEXT,
@@ -271,6 +272,9 @@ def _migrate(db):
     fb_cols = [r[1] for r in db.execute("PRAGMA table_info(kb_feedback)").fetchall()]
     if "user_id" not in fb_cols:
         db.execute("ALTER TABLE kb_feedback ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+    t_cols = [r[1] for r in db.execute("PRAGMA table_info(tickets)").fetchall()]
+    if "csat" not in t_cols:
+        db.execute("ALTER TABLE tickets ADD COLUMN csat INTEGER")
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}

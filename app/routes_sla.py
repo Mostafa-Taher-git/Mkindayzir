@@ -19,15 +19,6 @@ from . import db, config, helpers
 sla = Blueprint("sla", __name__)
 
 
-def _parse_iso(s):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s)
-    except ValueError:
-        return None
-
-
 def pick_policy(category_id, priority):
     """Choose the best SLA policy for a ticket.
 
@@ -59,7 +50,7 @@ def attach_sla(ticket):
     if exists:
         return
     policy = pick_policy(ticket.get("category_id"), ticket.get("priority", "normal"))
-    created = _parse_iso(ticket["created_at"]) or datetime.now(timezone.utc)
+    created = helpers._parse_iso(ticket["created_at"]) or datetime.now(timezone.utc)
     if policy:
         breach_at = created + timedelta(hours=policy["resolution_hours"])
     else:
@@ -91,14 +82,14 @@ def evaluate_on_resolve(ticket_id):
     if not row:
         return
     now = datetime.now(timezone.utc)
-    breach = _parse_iso(row["breach_at"]) or now
+    breach = helpers._parse_iso(row["breach_at"]) or now
     breached = 1 if now > breach else 0
     policy = conn.execute("SELECT * FROM sla_policies WHERE id=?",
                           (row["policy_id"],)).fetchone() if row["policy_id"] else None
     response_met = None
     if row["first_response_at"] and policy:
-        resp_target = _parse_iso(row["first_response_at"]) + timedelta(hours=policy["response_hours"])
-        response_met = 1 if _parse_iso(row["first_response_at"]) <= resp_target else 0
+        resp_target = helpers._parse_iso(row["first_response_at"]) + timedelta(hours=policy["response_hours"])
+        response_met = 1 if helpers._parse_iso(row["first_response_at"]) <= resp_target else 0
     conn.execute(
         "UPDATE ticket_sla SET breached=?, response_met=?, resolution_met=? WHERE ticket_id=?",
         (breached, response_met, 0 if breached else 1, ticket_id))

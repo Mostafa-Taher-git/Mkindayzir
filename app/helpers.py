@@ -13,6 +13,21 @@ from flask import session, jsonify, request, redirect, url_for, g
 
 from . import db
 from . import config
+from datetime import datetime, timezone
+
+
+def _parse_iso(s):
+    """Parse an ISO timestamp (with optional 'Z' or offset) to a tz-aware datetime."""
+    if not s:
+        return None
+    s = s.strip().replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        try:
+            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
 
 
 def get_current_user():

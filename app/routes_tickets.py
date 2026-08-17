@@ -610,6 +610,7 @@ def _serialize(t):
         "updated_at": t["updated_at"],
         "resolved_at": t["resolved_at"],
         "closed_at": t["closed_at"],
+        "csat": t["csat"],
         "sla": _sla_summary(t["id"]),
     }
 

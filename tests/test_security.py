@@ -434,3 +434,76 @@ def test_kb_views_counter_not_lagging(client):
     _login(client, "sam@opsdesk.local")
     art = client.get(f"/api/kb/{aid}").get_json()["article"]
     assert art["views"] >= 1  # reflects the increment, not stale 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Reporting & CSAT
+# ---------------------------------------------------------------------------
+def test_csat_requester_rates_resolved_ticket(client, app):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Rate me", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post(f"/api/tickets/{t['id']}/rate", json={"score": 5},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    # the rating must round-trip through GET /api/tickets/<id> (serialized csat)
+    detail = client.get(f"/api/tickets/{t['id']}").get_json()["ticket"]
+    assert detail["csat"] == 5
+    # second rating rejected
+    assert client.post(f"/api/tickets/{t['id']}/rate", json={"score": 3},
+                       headers={"X-CSRF-Token": csrf}).status_code == 400
+
+
+def test_csat_forbidden_for_non_owner(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "x", "description": "y", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    # another requester cannot rate
+    _login(client, "manager@opsdesk.local")  # manager, not owner/requester
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/rate", json={"score": 4},
+                       headers={"X-CSRF-Token": csrf}).status_code == 403
+
+
+def test_reports_summary_forbidden_for_agent(client):
+    _login(client, "agent@opsdesk.local")
+    assert client.get("/api/reports/summary").status_code == 403
+
+
+def test_reports_summary_ok_for_manager(client):
+    _login(client, "manager@opsdesk.local")
+    r = client.get("/api/reports/summary")
+    assert r.status_code == 200
+    assert "total" in r.get_json()
+
+
+def test_reports_csv_export_forbidden_for_requester(client):
+    _login(client, "sam@opsdesk.local")
+    assert client.get("/api/reports/export.csv").status_code == 403
+
+
+def test_reports_trend_days_validation(client):
+    _login(client, "manager@opsdesk.local")
+    r = client.get("/api/reports/trend?days=abc")
+    assert r.status_code == 200
+    assert r.get_json()["days"] == 30  # coerced to default
