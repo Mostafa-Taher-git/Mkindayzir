@@ -134,8 +134,10 @@ a.nav-item { text-decoration: none; color: inherit; }
 .badge.reopened { color: var(--status-reopened); background: var(--status-reopened-bg); }
 
 .pill { display:inline-flex; align-items:center; padding: 2px 10px; border-radius: var(--r-full); font-size: var(--fs-sm); font-weight:600; }
+.pill.low { color: var(--muted); background: var(--muted-container); }
+.pill.normal { color: #fff; background: var(--primary-container); }
+.pill.high { color: var(--warn); background: var(--warn-container); }
 .pill.urgent { color: var(--urgent); background: var(--urgent-container); }
-.pill.normal { color: var(--muted); background: var(--muted-container); }
 .pill.aged { color: var(--warn); background: var(--warn-container); }
 
 /* ---------- Forms ---------- */

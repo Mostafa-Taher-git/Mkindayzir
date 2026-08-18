@@ -255,7 +255,9 @@ def _seed(db):
         db.executemany(
             "INSERT INTO sla_policies (name, priority, category_id, response_hours, resolution_hours) VALUES (?,?,?,?,?)",
             [
+                ("Low", "low", None, 24, 168),
                 ("Standard", "normal", None, 8, 72),
+                ("High", "high", None, 2, 24),
                 ("Urgent", "urgent", None, 1, 8),
                 ("HR - normal", "normal", _cat_id(db, "HR Request"), 4, 48),
                 ("Finance - normal", "normal", _cat_id(db, "Finance"), 4, 48),
@@ -353,11 +355,21 @@ def _migrate(db):
         db.executemany(
             "INSERT INTO sla_policies (name, priority, category_id, response_hours, resolution_hours) VALUES (?,?,?,?,?)",
             [
+                ("Low", "low", None, 24, 168),
                 ("Standard", "normal", None, 8, 72),
+                ("High", "high", None, 2, 24),
                 ("Urgent", "urgent", None, 1, 8),
                 ("HR - normal", "normal", _cat_id(db, "HR Request"), 4, 48),
                 ("Finance - normal", "normal", _cat_id(db, "Finance"), 4, 48),
             ])
+    # Existing DBs from before the 4-level priority scale: backfill the
+    # low/high policies so pick_policy has a priority match for them.
+    for name, prio, resp, res in (("Low", "low", 24, 168), ("High", "high", 2, 24)):
+        missing = db.execute("SELECT COUNT(*) AS c FROM sla_policies WHERE priority=?", (prio,)).fetchone()["c"]
+        if missing == 0:
+            db.execute(
+                "INSERT INTO sla_policies (name, priority, category_id, response_hours, resolution_hours) VALUES (?,?,?,?,?)",
+                (name, prio, None, resp, res))
     db.commit()
 
 

@@ -712,11 +712,39 @@ def test_suggest_priority_not_inverted_by_reason_text():
         "PRIORITY: normal - low impact, not urgent, can wait": "normal",
         "PRIORITY: urgent - customer CEO blocked": "urgent",
         "PRIORITY: normal": "normal",
+        "PRIORITY: high - many users affected": "high",
+        "PRIORITY: low - cosmetic, no impact": "low",
+        "PRIORITY: high - this is urgent": "high",
     }
     for model_out, expected in cases.items():
         aicl._complete = lambda p, **k: model_out
         got = aicl.suggest_priority({"subject": "x", "description": "y"})
         assert got == expected, (model_out, got)
+
+
+def test_all_four_priorities_accepted_and_listed(client):
+    from app.config import PRIORITIES
+    assert PRIORITIES == ["low", "normal", "high", "urgent"]
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    for p in PRIORITIES:
+        r = client.post("/api/tickets", json={"subject": "Prio " + p, "description": "x",
+                                              "category_id": 2, "priority": p},
+                        headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 201, (p, r.status_code)
+        assert r.get_json()["ticket"]["priority"] == p
+    # meta advertises all four
+    _login(client, "agent@opsdesk.local")
+    assert client.get("/api/meta").get_json()["priorities"] == PRIORITIES
+    # change-priority accepts every level (agent owns the IT-team ticket)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    tid = client.get("/api/tickets?status=open").get_json()["tickets"][0]["id"]
+    for p in PRIORITIES:
+        r = client.post(f"/api/tickets/{tid}/priority", json={"priority": p},
+                        headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 200, (p, r.status_code)
+        assert r.get_json()["ticket"]["priority"] == p
 
 
 def test_ai_fail_closed_when_content_is_null():

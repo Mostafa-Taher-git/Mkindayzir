@@ -47,7 +47,9 @@
   };
 
   const statusBadge = (s) => el("span", { class: `badge ${s}` }, el("span", { class: "dot" }), STATUS_LABELS[s] || s);
-  const priorityPill = (p) => el("span", { class: `pill ${p}` }, p === "urgent" ? "Urgent" : "Normal");
+  const PRIORITY_LABELS = { low: "Low", normal: "Normal", high: "High", urgent: "Urgent" };
+  const priorityLabel = (p) => PRIORITY_LABELS[p] || "Normal";
+  const priorityPill = (p) => el("span", { class: `pill ${p}` }, priorityLabel(p));
 
   function toast(msg, kind = "info") {
     const t = el("div", { class: "toast" }, msg);
@@ -536,7 +538,7 @@
         el("ul", { style: "margin:8px 0 0 18px;line-height:1.6" },
           el("li", {}, el("strong", {}, "Summarize"), " — writes a concise summary of the ticket and conversation."),
           el("li", {}, el("strong", {}, "Suggest reply"), " — drafts a public response for the requester based on the thread."),
-          el("li", {}, el("strong", {}, "Suggest priority"), " — recommends Normal or Urgent based on ticket content."))),
+          el("li", {}, el("strong", {}, "Suggest priority"), " — recommends Low, Normal, High or Urgent based on ticket content."))),
       el("p", { class: "muted", style: "font-size:11px;margin:4px 0 0 0" },
         "All output is a draft. You review, edit, and send it yourself. Requires your OpenRouter API key in Settings."),
       el("p", { class: "muted", style: "font-size:11px;margin:2px 0 0 0" },
@@ -985,9 +987,9 @@
     const role = state.user.role;
     const fStatus = el("select", { id: "f-status" }, el("option", { value: "" }, "All statuses"),
       ...Object.keys(STATUS_LABELS).map((s) => el("option", { value: s }, STATUS_LABELS[s])));
-    const fPriority = el("select", { id: "f-priority" },
-      el("option", { value: "" }, "All priorities"),
-      el("option", { value: "urgent" }, "Urgent"), el("option", { value: "normal" }, "Normal"));
+const fPriority = el("select", { id: "f-priority" },
+      el("option", { value: "" }, "Any priority"),
+      ...["low", "normal", "high", "urgent"].map((p) => el("option", { value: p }, priorityLabel(p))));
     const fCat = el("select", { id: "f-cat" }, el("option", { value: "" }, "All categories"),
       ...m.categories.map((c) => el("option", { value: c.id }, c.name)));
     const fTeam = el("select", { id: "f-team" }, el("option", { value: "" }, "All teams"),
@@ -1126,7 +1128,7 @@
         kvRow("Assignee", nameOf(t.assignee_id, "Unassigned")),
         kvRow("Team", teamName(t.team_id)),
         kvRow("Category", catName(t.category_id)),
-        kvRow("Priority", t.priority === "urgent" ? "Urgent" : "Normal"),
+        kvRow("Priority", priorityLabel(t.priority)),
         kvRow("Created", fmtDate(t.created_at)),
         kvRow("Updated", fmtDate(t.updated_at)),
         t.sla ? kvRow("SLA", (t.sla.breached ? "Breached" : (t.sla.resolution_met === 0 ? "At risk" : "On track")) + (t.sla.policy_name ? " (" + t.sla.policy_name + ")" : "") + (t.sla.breach_at ? " . due " + fmtDate(t.sla.breach_at) : "")) : null,
@@ -1385,14 +1387,14 @@
 
   async function changePriority(t) {
     const current = t.priority;
-    const options = ["normal", "urgent"].filter(p => p !== current);
+    const options = ["low", "normal", "high", "urgent"].filter(p => p !== current);
     if (!options.length) return;
     const body = el("div", {},
-      el("p", { class: "muted" }, `Current priority: ${current === "urgent" ? "Urgent" : "Normal"}.`),
+      el("p", { class: "muted" }, `Current priority: ${priorityLabel(current)}.`),
       el("label", { class: "field" },
         el("span", { class: "label" }, "New priority"),
         el("select", { id: "priority-pick" },
-          ...options.map(p => el("option", { value: p }, p === "urgent" ? "Urgent" : "Normal")))));
+          ...options.map(p => el("option", { value: p }, priorityLabel(p))))));
     openModal("Change Priority", body, async () => {
       const newPriority = $("#priority-pick").value;
       if (!newPriority) { toast("Select a priority.", "error"); return false; }
@@ -1427,8 +1429,11 @@
             el("option", { value: "" }, "Select…"),
             ...m.categories.map((c) => el("option", { value: c.id }, c.name)))),
           field("Priority",
-            el("select", { name: "priority" }, el("option", { value: "normal" }, "Normal"),
-              el("option", { value: "urgent" }, "Urgent — blocks work / outage"))),
+            el("select", { name: "priority" },
+              el("option", { value: "low" }, "Low"),
+              el("option", { value: "normal", selected: "" }, "Normal"),
+              el("option", { value: "high" }, "High"),
+              el("option", { value: "urgent" }, "Urgent"))),
           field("Team", el("select", { name: "team_id" },
             el("option", { value: "" }, "Select…"),
             ...m.teams.map((t) => el("option", { value: t.id }, t.name)))),
