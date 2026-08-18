@@ -6,3 +6,4 @@ static/uploads/
 node_modules/
 package-lock.json
 .env
+cookies.txt

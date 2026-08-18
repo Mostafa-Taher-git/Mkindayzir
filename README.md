@@ -31,6 +31,22 @@ python run.py
 
 Open **http://127.0.0.1:5000**.
 
+**Important:** `.env.example` documents every configuration variable. Copying it
+to `.env` and setting `OPERADESK_SECRET` to a random value
+(`python -c "import secrets;print(secrets.token_hex(32))"`) is required before
+exposing the app beyond localhost — otherwise the app runs with the public
+`dev-secret-change-me` fallback used to sign session cookies (it prints a
+startup warning in that case).
+
+## Tests
+
+```bash
+venv/bin/python -m pytest          # backend suite (93 tests)
+npm install                        # once: jsdom for the frontend test
+python run.py &                    # server must be running
+npm run test:frontend              # headless SPA render test (9 checks)
+```
+
 ## Demo accounts
 
 | Email | Role |

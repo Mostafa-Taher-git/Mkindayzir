@@ -3,22 +3,36 @@
    preload it into jsdom, then boot the SPA. Because api.js uses relative URLs
    resolved against the page origin, we wrap window.fetch to resolve + attach
    the cookie. This drives the AUTHENTICATED render path for every screen and
-   asserts real DOM is produced, catching any runtime JS errors. */
+   asserts real DOM is produced, catching any runtime JS errors.
+
+   Run with: npm run test:frontend  (server must already be running on :5000)
+*/
 const fs = require("fs");
 const path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
 
 const BASE = "http://127.0.0.1:5000";
-const ROOT = "/media/dell/New Volume/Projects/OpsDesk";
+const ROOT = __dirname;
+
+// Login is a CSRF-protected mutation: fetch a session token first, exactly
+// like the SPA's api.js does before POSTing /api/auth/login. Node's fetch
+// does not manage cookies, so we must carry the session cookie that the
+// CSRF endpoint sets back into the login request.
+async function login(email, password) {
+  const csrfRes = await fetch(BASE + "/api/auth/csrf");
+  const csrfCookie = csrfRes.headers.get("set-cookie").split(";")[0];
+  const csrf = (await csrfRes.json()).csrf_token;
+  const loginRes = await fetch(BASE + "/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "Cookie": csrfCookie },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!loginRes.ok) { console.error("login failed", email, loginRes.status); process.exit(2); }
+  return loginRes.headers.get("set-cookie").split(";")[0];
+}
 
 (async () => {
-  // ---- obtain a real session cookie ----
-  const loginRes = await fetch(BASE + "/api/auth/login", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "admin@opsdesk.local", password: "password" }),
-  });
-  if (!loginRes.ok) { console.error("login failed", loginRes.status); process.exit(2); }
-  const cookie = loginRes.headers.get("set-cookie").split(";")[0];
+  const cookie = await login("admin@opsdesk.local", "password");
 
   const vc = new VirtualConsole();
   const errs = [];
@@ -32,11 +46,12 @@ const ROOT = "/media/dell/New Volume/Projects/OpsDesk";
   const { document } = window;
 
   const resolve = (u) => (u.startsWith("http") ? u : BASE + u);
-  window.fetch = (url, opts = {}) => {
+  const withCookie = (opts = {}, ck) => {
     const headers = Object.assign({}, opts.headers);
-    headers["Cookie"] = cookie;
-    return fetch(resolve(url), { ...opts, headers });
+    headers["Cookie"] = ck || cookie;
+    return { ...opts, headers };
   };
+  window.fetch = (url, opts = {}) => fetch(resolve(url), withCookie(opts));
 
   const inject = (rel) => {
     const s = document.createElement("script");
@@ -69,17 +84,17 @@ const ROOT = "/media/dell/New Volume/Projects/OpsDesk";
   const detail = appHTML();
   assert(/Activity/.test(detail) && /Conversation/.test(detail), "ticket detail renders conversation + activity");
   assert(/OPS-/.test(detail), "ticket detail shows ref id");
+  assert(/Knowledge Base/.test(detail), "ticket detail shows the KB bridge section");
+
+  await go("#/kb/manage");
+  assert(/Manage Knowledge Base/.test(appHTML()), "Manage KB renders");
 
   await go("#/admin");
   assert(/Teams/.test(appHTML()) && /Users/.test(appHTML()) && /Categories/.test(appHTML()), "admin renders teams/categories/users");
 
   // requester perspective: login as sam
-  const lr2 = await fetch(BASE + "/api/auth/login", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "sam@opsdesk.local", password: "password" }),
-  });
-  const cookie2 = lr2.headers.get("set-cookie").split(";")[0];
-  window.fetch = (url, opts = {}) => fetch(resolve(url), { ...opts, headers: { ...(opts.headers||{}), Cookie: cookie2 } });
+  const cookie2 = await login("sam@opsdesk.local", "password");
+  window.fetch = (url, opts = {}) => fetch(resolve(url), withCookie(opts, cookie2));
   await go("#/my");
   assert(/My Requests/.test(appHTML()), "requester My Requests renders");
 

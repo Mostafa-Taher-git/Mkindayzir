@@ -1407,3 +1407,181 @@ def test_reports_knowledge_for_manager(client):
     data = r.get_json()
     assert "articles" in data
     assert "orphan_count" in data
+
+
+# ---------------------------------------------------------------------------
+# Review round 2 regressions (B-7, B-8, N-2, N-4, M-2, 2.1, 2.6)
+# ---------------------------------------------------------------------------
+def test_unassign_resets_status_to_new(client):
+    # B-8: the dedicated unassign contract must reset status to new.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf).get_json()["ticket"]
+    tid = t["id"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{tid}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{tid}/status", json={"status": "in_progress"},
+                headers={"X-CSRF-Token": csrf})
+    r = client.post(f"/api/tickets/{tid}/assign", json={"unassign": True},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    ticket = r.get_json()["ticket"]
+    assert ticket["assignee_id"] is None
+    assert ticket["status"] == "new"
+
+
+def test_reopen_window_uses_closed_at_when_never_resolved(client):
+    # B-7: closing a ticket without resolving it must not block reopening.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, subject="Closed new").get_json()["ticket"]
+    tid = t["id"]
+    _login(client, "manager@opsdesk.local")
+    r = client.post(f"/api/tickets/{tid}/status", json={"status": "closed"},
+                    headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 200
+    _login(client, "sam@opsdesk.local")
+    r = client.post(f"/api/tickets/{tid}/reopen", headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 200
+    assert r.get_json()["ticket"]["status"] == "reopened"
+
+
+def test_kb_self_link_rejected(client):
+    # N-4: an article cannot link to itself.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    a = client.post("/api/kb", json={"title": "Self", "body": "b", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    r = client.post(f"/api/kb/{a['id']}/links", json={"target_id": a["id"]},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 400
+    assert "itself" in r.get_json()["error"]
+    links = client.get(f"/api/kb/{a['id']}/links").get_json()
+    assert not links["outbound"]
+
+
+def test_reports_summary_sla_respects_team_filter(client):
+    # N-2: summary's SLA figure must move with the active filters.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, subject="SLA filter check").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+                headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "manager@opsdesk.local")
+    all_data = client.get("/api/reports/summary").get_json()
+    assert all_data["sla_attainment_pct"] is not None
+    # A team that owns nothing must zero every figure, including SLA.
+    filtered = client.get("/api/reports/summary?team_id=999999").get_json()
+    assert filtered["total"] == 0
+    assert filtered["sla_attainment_pct"] is None
+    assert filtered["sla_met"] == 0 and filtered["sla_missed"] == 0
+
+
+def test_settings_ai_preserves_key_when_field_omitted(client):
+    # 2.1: saving only the model must NOT wipe the stored key.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    h = {"X-CSRF-Token": csrf}
+    client.post("/api/settings/ai", json={"api_key": "sk-or-keep123", "model": "x/y:free"}, headers=h)
+    # Mimic the fixed Save button: no api_key field at all when untouched.
+    r = client.post("/api/settings/ai", json={"model": "z/w:free"}, headers=h)
+    assert r.status_code == 200
+    assert r.get_json()["has_key"] is True
+    assert r.get_json()["model"] == "z/w:free"
+    # Explicit empty string still clears (the dedicated Clear button path).
+    r = client.post("/api/settings/ai", json={"api_key": "", "model": "z/w:free"}, headers=h)
+    assert r.get_json()["has_key"] is False
+
+
+def test_ai_draft_uses_ai_when_key_configured(client, monkeypatch):
+    # 2.6: with a key set, draft-from-ticket must call the AI client.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    h = {"X-CSRF-Token": csrf}
+    client.post("/api/settings/ai", json={"api_key": "sk-or-ai-draft-1", "model": "x/y:free"}, headers=h)
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    ticket = client.post("/api/tickets", json={"subject": "Printer jam", "description": "Jammed again", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    article = client.post("/api/kb", json={"title": "A", "body": "b", "category_id": 1},
+                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    calls = {}
+    def fake_chat(model, messages, **kw):
+        calls["model"] = model
+        calls["api_key_present"] = bool(kw.get("api_key"))
+        return "# Printer jam\n\nRemove the paper.\n"
+    monkeypatch.setattr("app.ai.client.chat", fake_chat)
+    r = client.post(f"/api/kb/{article['id']}/draft-from-ticket",
+                    json={"ticket_id": ticket["id"]},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    body = r.get_json()["body"]
+    assert body == "# Printer jam\n\nRemove the paper.\n"
+    assert calls["model"] == "x/y:free"
+    assert calls["api_key_present"] is True
+
+
+def test_promote_to_kb_creates_draft_and_links(client):
+    # 2.6: promoting a ticket creates a linked draft article.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, subject="Promote me", desc="Please document this").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    r = client.post(f"/api/tickets/{t['id']}/promote-kb",
+                    headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 201
+    article = r.get_json()["article"]
+    assert article["status"] == "draft"
+    assert article["title"] == "Promote me"
+    assert "Promote me" in article["body"]
+    linked = client.get(f"/api/tickets/{t['id']}/knowledge").get_json()["articles"]
+    assert any(a["id"] == article["id"] for a in linked)
+    r2 = client.post(f"/api/tickets/{t['id']}/promote-kb",
+                     headers={"X-CSRF-Token": _csrf(client)})
+    assert r2.status_code == 201  # distinct drafts each time
+    assert r2.get_json()["article"]["id"] != article["id"]
+
+
+def test_promote_to_kb_forbidden_for_requester(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf).get_json()["ticket"]
+    r = client.post(f"/api/tickets/{t['id']}/promote-kb",
+                    headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 403
+
+
+def test_admin_can_reset_existing_user_password(client):
+    # M-2: PATCH /api/admin/users/<id> with a password must let the user log in.
+    # The lockout tracker is module-level and survives between tests (the
+    # lockout test above can leave admin locked for the in-memory window);
+    # clear it so this test is order-independent.
+    from app.routes_auth import _LOGIN_ATTEMPTS
+    _LOGIN_ATTEMPTS.clear()
+    _login(client, "admin@opsdesk.local")
+    csrf = _csrf(client)
+    h = {"X-CSRF-Token": csrf}
+    u = client.post("/api/admin/users", json={"name": "Temp", "email": "temp@opsdesk.local", "role": "agent"},
+                    headers=h).get_json()
+    # default password works
+    assert _login(client, "temp@opsdesk.local").status_code == 200
+    # admin resets it
+    _login(client, "admin@opsdesk.local")
+    csrf = _csrf(client)
+    uid = client.get("/api/admin/users").get_json()["users"]
+    uid = next(x["id"] for x in uid if x["email"] == "temp@opsdesk.local")
+    r = client.patch(f"/api/admin/users/{uid}", json={"password": "newpass1234"}, headers=h)
+    assert r.status_code == 200
+    assert _login(client, "temp@opsdesk.local", "newpass1234").status_code == 200
+    r = _login(client, "temp@opsdesk.local", "password")
+    assert r.status_code == 401  # old password no longer works

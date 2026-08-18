@@ -117,6 +117,7 @@ const API = (() => {
     listTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge`),
     linkTicketKnowledge: (tid, payload) => req("POST", `/api/tickets/${tid}/knowledge`, payload),
     unlinkTicketKnowledge: (tid, aid) => req("DELETE", `/api/tickets/${tid}/knowledge/${aid}`),
+    promoteTicketToKb: (tid) => req("POST", `/api/tickets/${tid}/promote-kb`),
 
     // Phase 4 — Reports & CSAT
     reportsSummary: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/summary" + (q ? "?" + q : "")); },
@@ -124,9 +125,10 @@ const API = (() => {
     reportsSla: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/sla" + (q ? "?" + q : "")); },
     reportsTrend: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/trend" + (q ? "?" + q : "")); },
     actionCenter: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/dashboard/action-center" + (q ? "?" + q : "")); },
-    exportCsv: async () => {
+    exportCsv: async (params = {}) => {
+      const q = new URLSearchParams(params).toString();
       const token = await API.initCsrf();
-      const res = await fetch("/api/reports/export.csv", {
+      const res = await fetch("/api/reports/export.csv" + (q ? "?" + q : ""), {
         method: "GET", credentials: "same-origin",
         headers: { "X-CSRF-Token": token },
       });

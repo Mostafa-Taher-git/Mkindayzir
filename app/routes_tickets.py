@@ -649,6 +649,42 @@ def unlink_ticket_knowledge(tid, aid):
     return jsonify(ok=True)
 
 
+@tickets.route("/api/tickets/<int:tid>/promote-kb", methods=["POST"])
+@login_required
+@csrf_protect
+def promote_to_kb(tid):
+    """Create a new KB draft article from a ticket (staff only).
+
+    Uses the user's own OpenRouter key when configured (via routes_kb's
+    shared helper); falls back to a plaintext skeleton. The draft article is
+    returned so the SPA can jump straight into the editor.
+    """
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    user = request.current_user
+    if not is_agent_or_manager(user):
+        return jsonify(error="Forbidden"), 403
+
+    from .routes_kb import _draft_kb_body
+    body, _ai_used = _draft_kb_body(user, t)
+    now = db.now_iso()
+    cur = db.get_db().execute(
+        """INSERT INTO kb_articles (title, body, category_id, author_id, status, views, created_at, updated_at)
+           VALUES (?,?,?,?, 'draft', 0, ?, ?)""",
+        (t["subject"], body, t["category_id"], user["id"], now, now),
+    )
+    db.get_db().commit()
+    article = dict(db.get_db().execute(
+        "SELECT * FROM kb_articles WHERE id=?", (cur.lastrowid,)).fetchone())
+    # The new draft starts life linked to the ticket it came from.
+    db.get_db().execute(
+        "INSERT INTO ticket_kb_links (ticket_id, article_id, linked_by_id, note, created_at) VALUES (?,?,?,?,?)",
+        (tid, article["id"], user["id"], "Promoted from ticket", now))
+    db.get_db().commit()
+    return jsonify(article=article), 201
+
+
 # ---------------------------------------------------------------------------
 # Dashboard aggregates (FR-16, FR-17)
 # ---------------------------------------------------------------------------
@@ -819,9 +855,12 @@ def _next_ref():
 
 
 def _within_reopen_window(t):
-    if not t["resolved_at"]:
+    # Tickets closed without ever being resolved have no resolved_at; fall
+    # back to closed_at so the reopen window still applies from closure.
+    ref = t["resolved_at"] or t["closed_at"]
+    if not ref:
         return False
-    rt = datetime.fromisoformat(t["resolved_at"])
+    rt = datetime.fromisoformat(ref)
     return datetime.now(timezone.utc) - rt < timedelta(
         hours=config.REOPEN_WINDOW_HOURS)
 

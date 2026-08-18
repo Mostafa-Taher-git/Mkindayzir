@@ -406,6 +406,8 @@ def add_link(aid):
     target_id = data.get("target_id")
     if not target_id:
         return jsonify(error="target_id is required"), 400
+    if int(target_id) == aid:
+        return jsonify(error="An article cannot link to itself"), 400
     tgt = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (target_id,)).fetchone()
     if not tgt:
         return jsonify(error="Target not found"), 404
@@ -432,6 +434,34 @@ def remove_link(aid, target_id):
     return jsonify(ok=True)
 
 
+def _draft_kb_body(user, ticket):
+    """AI-draft a KB body from a ticket using the user's own OpenRouter key.
+
+    Returns (body, ai_used). Fails closed: no key, network failure, or any
+    exception falls back to a plaintext skeleton so drafting never blocks.
+    """
+    plain = f"# {ticket['subject']}\n\n{ticket['description'] or ''}\n\n<!-- TODO: expand from ticket {ticket['id']} -->"
+    try:
+        from app.ai import client as ai_client
+        key = helpers.decrypt_secret(user.get("ai_key"))
+        if not key or not user.get("ai_model"):
+            return plain, False
+        prompt = (
+            "You are an internal helpdesk knowledge assistant. "
+            "Write a concise internal KB article draft from this ticket thread. "
+            "Return markdown only.\n\n"
+            f"Subject: {ticket['subject']}\nDescription: {ticket['description'] or ''}"
+        )
+        body = ai_client.chat(user["ai_model"],
+                              [{"role": "user", "content": prompt}],
+                              api_key=key, max_tokens=600)
+        if body:
+            return body, True
+    except Exception:
+        pass
+    return plain + "\n\n<!-- AI draft unavailable; please edit before publishing. -->", False
+
+
 @kb.route("/api/kb/<int:aid>/draft-from-ticket", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
@@ -452,20 +482,5 @@ def draft_from_ticket(aid):
     ).fetchone()
     if not t:
         return jsonify(error="Ticket not found"), 404
-    # Use existing AI client if configured; otherwise return a plain draft.
-    try:
-        from app.ai import client as ai_client
-        if user.get("ai_key") and user.get("ai_model"):
-            prompt = (
-                "You are an internal helpdesk knowledge assistant. "
-                "Write a concise internal KB article draft from this ticket thread. "
-                "Return markdown only.\n\n"
-                f"Subject: {t['subject']}\nDescription: {t['description'] or ''}"
-            )
-            # Best-effort AI; never block drafting on AI failures.
-            body = ai_client.chat(user["ai_model"], [{"role": "user", "content": prompt}])
-        else:
-            body = f"# {t['subject']}\n\n{t['description'] or ''}\n\n<!-- TODO: expand from ticket {t['id']} -->"
-    except Exception:
-        body = f"# {t['subject']}\n\n{t['description'] or ''}\n\n<!-- AI draft unavailable; please edit before publishing. -->"
+    body, _ai_used = _draft_kb_body(user, t)
     return jsonify(title=t["subject"], body=body, category_id=t["category_id"], source_ticket_id=ticket_id), 200

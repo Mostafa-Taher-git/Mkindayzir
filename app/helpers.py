@@ -142,6 +142,7 @@ def role_required(*roles):
             user = get_current_user()
             if not user or user["role"] not in roles:
                 return jsonify(error="Forbidden"), 403
+            session["last_active"] = time.time()
             request.current_user = user
             return f(*args, **kwargs)
         return wrapper

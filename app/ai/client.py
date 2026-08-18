@@ -151,6 +151,19 @@ def _ticket_block(ticket, comments=None):
     return "\n".join(lines)
 
 
+def chat(model, messages, api_key=None, temperature=0.3, max_tokens=400):
+    """Generic chat helper: messages = [{"role": "user", "content": ...}].
+
+    Thin wrapper over _complete so callers (e.g. the KB AI-draft endpoint) can
+    pass a message list without touching the transport layer. Returns the
+    assistant text, or None on any failure (fails closed).
+    """
+    user_prompt = "\n".join(
+        m.get("content", "") for m in messages if m.get("role") == "user")
+    return _complete(user_prompt, temperature=temperature,
+                     max_tokens=max_tokens, api_key=api_key, model=model)
+
+
 def suggest_reply(ticket, comments=None, api_key=None, model=None):
     """Draft a polite, professional reply to the requester. Returns str or None."""
     prompt = (

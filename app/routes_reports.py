@@ -148,12 +148,15 @@ def summary():
     """
     backlog = conn.execute(backlog_sql, where_params).fetchone()
     ending_backlog = (backlog["opening"] or 0) + (backlog["new_tickets"] or 0) - (backlog["resolved"] or 0) + (backlog["reopened"] or 0)
+    sla_where, sla_params = _extend_where(where, where_params, "ts.ticket_id = t.id", [])
     sla = conn.execute(
-        "SELECT "
-        "SUM(CASE WHEN resolution_met = 1 THEN 1 ELSE 0 END) met, "
-        "SUM(CASE WHEN resolution_met = 0 OR breached = 1 THEN 1 ELSE 0 END) missed, "
+        f"SELECT "
+        "SUM(CASE WHEN ts.resolution_met = 1 THEN 1 ELSE 0 END) met, "
+        "SUM(CASE WHEN ts.resolution_met = 0 OR ts.breached = 1 THEN 1 ELSE 0 END) missed, "
         "COUNT(*) all_sla "
-        "FROM ticket_sla"
+        "FROM ticket_sla ts JOIN tickets t ON t.id = ts.ticket_id "
+        f"{sla_where}",
+        sla_params,
     ).fetchone()
     met = sla["met"] or 0
     missed = sla["missed"] or 0

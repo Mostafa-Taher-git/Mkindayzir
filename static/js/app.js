@@ -108,21 +108,37 @@
     const main = el("div", {}, el("div", { class: "mt-4", id: "kb-article" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
     shell(main);
     try {
-      const { article } = await API.getKb(id);
-      const linksRes = state.user.role !== "requester" ? await API.listKbLinks(id).catch(() => ({ outbound: [], inbound: [] })) : { outbound: [], inbound: [] };
+      const isStaff = state.user.role !== "requester";
+      const [{ article }, linksRes, versionsRes] = await Promise.all([
+        API.getKb(id),
+        isStaff ? API.listKbLinks(id).catch(() => ({ outbound: [], inbound: [] })) : Promise.resolve({ outbound: [], inbound: [] }),
+        isStaff ? API.listKbVersions(id).catch(() => ({ versions: [] })) : Promise.resolve({ versions: [] }),
+      ]);
       const related = linksRes.outbound || [];
       const backlinks = linksRes.inbound || [];
       const connections = related.length || backlinks.length ? el("div", { class: "mt-6 card", style: "padding:16px" },
         el("div", { class: "label mb-2" }, "Knowledge connections"),
-        related.length ? el("div", {}, el("div", { class: "muted", style: "font-size:12px" }, "Related"), el("div", { class: "mt-2" }, ...related.map((r) => el("a", { class: "card kb-card mt-2", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, el("div", { class: "kb-title" }, r.title))))) : null,
-        backlinks.length ? el("div", { class: "mt-3" }, el("div", { class: "muted", style: "font-size:12px" }, "Linked from"), el("div", { class: "mt-2" }, ...backlinks.map((r) => el("a", { class: "card kb-card mt-2", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, el("div", { class: "kb-title" }, r.title))))) : null,
+        related.length ? el("div", {}, el("div", { class: "muted", style: "font-size:12px" }, "Related"), el("div", { class: "mt-2" },
+          ...related.map((r) => el("div", { class: "card kb-card mt-2 row between", style: "padding:10px 12px" },
+            el("a", { class: "kb-title", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, r.title),
+            isStaff ? el("button", { class: "btn ghost sm", "aria-label": "Remove link", onclick: async () => {
+              try { await API.removeKbLink(id, r.id); toast("Link removed."); viewKbArticle(); }
+              catch (e) { toast(e.message, "error"); }
+            } }, "×") : null)))) : null,
+        backlinks.length ? el("div", { class: "mt-3" }, el("div", { class: "muted", style: "font-size:12px" }, "Linked from"), el("div", { class: "mt-2" },
+          ...backlinks.map((r) => el("a", { class: "card kb-card mt-2", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, el("div", { class: "kb-title" }, r.title))))) : null,
       ) : null;
+      const addLinkBox = isStaff ? await kbArticleLinkControl(id) : null;
+      const versionCard = isStaff && versionsRes.versions.length ? kbVersionsCard(versionsRes.versions) : null;
+      const wrap = $("#kb-article");
       wrap.replaceChildren(
         el("a", { href: "#/kb", onclick: () => navigate("/kb") }, "Back to Help Center"),
         el("h1", { class: "h2 mt-3" }, article.title),
         el("div", { class: "muted mb-4" }, categoryName(article.category_id) + (article.author_name ? " . by " + article.author_name : "")),
         el("div", { class: "kb-body" }, esc(article.body)),
         connections,
+        addLinkBox,
+        versionCard,
         el("div", { class: "mt-6 card", style: "padding:16px" },
           el("div", { class: "label mb-2" }, "Was this helpful?"),
           el("div", { id: "kb-feedback-btns" },
@@ -130,6 +146,39 @@
             " ",
             el("button", { class: "btn secondary sm", onclick: () => sendKbFeedback(article.id, false, this) }, "No"))));
     } catch (e) { toast(e.message, "error"); navigate("/kb"); }
+  }
+
+  // Article-to-article link picker (staff only).
+  async function kbArticleLinkControl(aid) {
+    let articles = [];
+    try { articles = (await API.listKb()).articles || []; } catch (_) {}
+    const sel = el("select", { id: "kb-link-pick" },
+      el("option", { value: "" }, "Choose an article…"),
+      ...articles.filter((a) => a.id !== aid).map((a) => el("option", { value: a.id }, a.title)));
+    return el("div", { class: "mt-6 card", style: "padding:16px" },
+      el("div", { class: "label mb-2" }, "Link another article"),
+      el("div", { class: "row" }, sel,
+        el("button", { class: "btn secondary sm", onclick: async () => {
+          const target = sel.value;
+          if (!target) { toast("Pick an article first.", "error"); return; }
+          try { await API.addKbLink(aid, { target_id: Number(target) }); toast("Linked."); viewKbArticle(); }
+          catch (e) { toast(e.message, "error"); }
+        } }, "Add link")));
+  }
+
+  // Read-only snapshot list of prior article versions (staff only).
+  function kbVersionsCard(versions) {
+    return el("div", { class: "mt-6 card", style: "padding:16px" },
+      el("div", { class: "label mb-2" }, "Version history (" + versions.length + ")"),
+      el("div", {}, ...versions.map((v, i) =>
+        el("details", { class: "version-item" },
+          el("summary", { style: "cursor:pointer;color:var(--primary)" },
+            "#" + (versions.length - i) + " · " + fmtDate(v.created_at) +
+            (v.created_by ? " · by " + nameOf(v.created_by) : "") +
+            (v.status ? " · " + v.status : "")),
+          el("div", { class: "mt-2", style: "white-space:pre-wrap;font-size:13px" },
+            el("div", { class: "muted", style: "font-size:12px" }, "Title: " + (v.title || "")),
+            v.body)))));
   }
 
   async function sendKbFeedback(id, helpful, btn) {
@@ -175,7 +224,9 @@
     let article = null;
     if (editId) { try { article = (await API.getKb(editId)).article; } catch (_) {} }
     const main = el("div", {},
-      el("div", { class: "page-head" }, el("h1", { class: "h2" }, editId ? "Edit Article" : "New Article")),
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, editId ? "Edit Article" : "New Article"),
+        el("div", { class: "spacer" }),
+        editId ? el("button", { class: "btn secondary sm", onclick: () => draftFromTicket(editId) }, "Draft from ticket") : null),
       el("form", { id: "kbForm", class: "card mt-4", style: "padding:20px", onsubmit: onKbSubmit },
         field("Title", el("input", { type: "text", name: "title", required: "", value: article ? article.title : "", maxlength: "100" })),
         field("Category", catSelect(article ? article.category_id : "")),
@@ -183,6 +234,34 @@
         el("div", { class: "mt-3" },
           el("button", { type: "submit", class: "btn primary" }, editId ? "Save changes" : "Create draft"))));
     shell(main);
+
+    // AI-assisted drafting: pull a ticket's content into this article's body
+    // (uses the user's own OpenRouter key when configured; plain fallback otherwise).
+    async function draftFromTicket(aid) {
+      let tickets = [];
+      try { tickets = ((await API.listTickets({ per_page: "100" })).tickets) || []; } catch (_) {}
+      if (!tickets.length) { toast("No tickets available.", "error"); return; }
+      const sel = el("select", { id: "draft-ticket-pick" },
+        el("option", { value: "" }, "Choose…"),
+        ...tickets.map((t) => el("option", { value: t.id }, t.ticket_ref + " — " + t.subject)));
+      openModal("Draft from ticket", el("div", {},
+        el("p", { class: "muted mb-2" }, "The ticket's subject and description become the draft body. With your OpenRouter key set, the AI writes the draft; otherwise a plain skeleton is inserted. Nothing is saved until you press Save."),
+        el("label", { class: "field" }, el("span", { class: "label" }, "Ticket"), sel)),
+        async () => {
+          const tid = sel.value;
+          if (!tid) { toast("Pick a ticket.", "error"); return false; }
+          try {
+            const d = await API.draftKbFromTicket(aid, { ticket_id: Number(tid) });
+            const form = document.getElementById("kbForm");
+            form.title.value = d.title || "";
+            form.body.value = d.body || "";
+            const catSel = form.querySelector("#category_id");
+            if (catSel && d.category_id) catSel.value = String(d.category_id);
+            toast("Draft loaded — review before publishing.", "info");
+            return true;
+          } catch (e) { toast(e.message, "error"); return false; }
+        });
+    }
 
     async function onKbSubmit(e) {
       e.preventDefault();
@@ -320,7 +399,7 @@
             el("div", { class: "bar resolved", style: "width:" + width + "%", title: score + ": " + count }, String(count)));
         })));
       const exportBtn = el("button", { class: "btn primary mt-4", onclick: async () => {
-          try { await API.exportCsv(); } catch (e) { toast(e.message, "error"); }
+          try { await API.exportCsv(p); } catch (e) { toast(e.message, "error"); }
         } }, "Export CSV");
       const kbBtn = el("button", { class: "btn secondary sm", onclick: async () => { try { await renderKnowledgeAnalytics(); } catch (e) { toast(e.message, "error"); } } }, "Knowledge Analytics");
       main.replaceChildren(
@@ -505,7 +584,6 @@
     } else {
       navItems.push(["/dashboard", "Dashboard", "📊"]);
       navItems.push(["/queue", "Queue", "🗂️"]);
-      if (state.user.role === "requester") navItems.push(["/my", "My Requests", "📥"]);
     }
 // Knowledge Base: Help Center for everyone; Manage KB and Collections for staff.
     navItems.push(["/kb", "Help Center", "📚"]);
@@ -808,7 +886,7 @@
           el("h3", { class: "h3 mt-2" }, title),
           rows.length ? el("table", { class: "table" },
             el("thead", {}, el("tr", {}, el("th", {}, "ID"), el("th", {}, "Subject"), el("th", {}, "Status"), el("th", {}, "Priority"))),
-            el("tbody", {}, ...rows.map((r) => el("tr", { style: "cursor:pointer" },
+            el("tbody", {}, ...rows.map((r) => el("tr", { style: "cursor:pointer", onclick: () => navigate('/ticket/' + r.id) },
               el("td", {}, "#" + r.id),
               el("td", {}, r.subject),
               el("td", {}, r.status),
@@ -977,10 +1055,15 @@
   async function viewTicket(id) {
     shell(el("div", {}, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading ticket…")));
     try {
-      const { ticket } = await API.getTicket(id);
+      const isStaff = isAgent();
+      const [{ ticket }, kbRes] = await Promise.all([
+        API.getTicket(id),
+        isStaff ? API.listTicketKnowledge(id).catch(() => ({ articles: [] })) : Promise.resolve({ articles: [] }),
+      ]);
       const t = ticket;
-      const canHandle = isAgent();
+      const canHandle = isStaff;
       const isRequesterOwner = state.user.role === "requester" && t.requester_id === state.user.id;
+      const linkedKb = (kbRes && kbRes.articles) || [];
 
       // Header
       const header = el("div", { class: "page-head" },
@@ -1029,7 +1112,21 @@
                 el("span", { class: "muted" }, (a.file_size / 1024).toFixed(0) + " KB")))
             : [el("span", { class: "muted" }, "None")])));
 
-      const left = el("div", { class: "flex1" }, detailCard, commentThread, attachSection);
+      // Knowledge Base bridge: linked articles on this ticket (staff can link/unlink).
+      const kbSection = el("div", { class: "mt-6" },
+        el("h3", { class: "h3 mb-4" }, "Knowledge Base"),
+        linkedKb.length
+          ? el("div", {}, ...linkedKb.map((a) => el("div", { class: "row between mt-2" },
+              el("div", {}, el("a", { class: "btn ghost sm", href: `#/kb/${a.id}`, onclick: () => navigate(`/kb/${a.id}`) }, a.title),
+                a.note ? el("span", { class: "muted" }, " — " + a.note) : null),
+              canHandle ? el("button", { class: "btn ghost sm", onclick: async () => {
+                try { await API.unlinkTicketKnowledge(t.id, a.id); viewTicket(t.id); toast("Unlinked."); }
+                catch (e) { toast(e.message, "error"); }
+              } }, "Unlink") : null)))
+            : el("div", { class: "muted" }, "No linked articles yet."),
+        canHandle ? await kbLinkControl(t, linkedKb.map((a) => a.id)) : null);
+
+      const left = el("div", { class: "flex1" }, detailCard, commentThread, attachSection, kbSection);
 
       // Right column: actions + activity
       const actions = el("div", { class: "card compact mb-4" },
@@ -1038,6 +1135,8 @@
           canHandle ? el("button", { class: "btn secondary sm", onclick: () => claim(t) }, t.assignee_id ? "Reassign" : "Claim") : null,
           canHandle ? statusButtons(t) : null,
           canHandle ? el("button", { class: "btn secondary sm", onclick: () => changePriority(t) }, "Change Priority") : null,
+          canHandle && ["resolved", "closed"].includes(t.status)
+            ? el("button", { class: "btn secondary sm", onclick: () => promoteToKb(t) }, "Promote to KB Article") : null,
           isRequesterOwner && ["resolved", "closed"].includes(t.status)
             ? el("button", { class: "btn danger sm", onclick: () => doReopen(t.id) }, "Reopen") : null));
       const activity = el("div", { class: "card compact" },
@@ -1149,8 +1248,11 @@
       el("div", { class: "row" }, el("div", { class: "spacer" }),
         el("button", { class: "btn primary sm", onclick: async () => {
           const uid = $("#assign-pick").value || null;
-          await API.assign(t.id, { assignee_id: uid });
-          closeModal(); viewTicket(t.id); toast("Assigned.");
+          // "— Unassigned —" must hit the backend's dedicated unassign path
+          // (resets status to new); sending assignee_id:null alone would
+          // leave the ticket stuck in its current status with no assignee.
+          await API.assign(t.id, uid ? { assignee_id: uid } : { unassign: true });
+          closeModal(); viewTicket(t.id); toast(uid ? "Assigned." : "Unassigned.");
         } }, "Save"))));
   }
 
@@ -1183,6 +1285,40 @@
     if (!confirmed) return;
     try { await API.reopen(id); viewTicket(id); toast("Reopened."); }
     catch (e) { toast(e.message, "error"); }
+  }
+
+  // Link-article picker used on the ticket detail page (staff only).
+  async function kbLinkControl(t, alreadyLinked) {
+    let articles = [];
+    try { articles = (await API.listKb()).articles || []; } catch (_) {}
+    const available = articles.filter((a) => !alreadyLinked.includes(a.id));
+    const sel = el("select", { id: "kb-link-pick" },
+      el("option", { value: "" }, "Choose an article…"),
+      ...available.map((a) => el("option", { value: a.id }, a.title + " (" + a.status + ")")));
+    return el("div", { class: "row mt-2" }, sel,
+      el("button", { class: "btn secondary sm", onclick: async () => {
+        const aid = sel.value;
+        if (!aid) { toast("Pick an article first.", "error"); return; }
+        try {
+          await API.linkTicketKnowledge(t.id, { article_id: Number(aid) });
+          toast("Linked."); viewTicket(t.id);
+        } catch (e) { toast(e.message, "error"); }
+      } }, "Link article"));
+  }
+
+  // Create a KB draft from a resolved ticket (staff only).
+  async function promoteToKb(t) {
+    const confirmed = await confirmModal(
+      "Create a KB draft article from this ticket? The draft will be linked to the ticket automatically — you can edit it before publishing.",
+      "Promote",
+      "btn primary sm"
+    );
+    if (!confirmed) return;
+    try {
+      const { article } = await API.promoteTicketToKb(t.id);
+      toast("Draft created from ticket.");
+      navigate("/kb/new?id=" + article.id);
+    } catch (e) { toast(e.message, "error"); }
   }
 
   async function changePriority(t) {
@@ -1298,9 +1434,14 @@
         "Free models may have rate limits. If you hit errors, wait a moment or try a different model."),
       el("div", { class: "row wrap" },
         el("button", { class: "btn sm", onclick: async () => {
-          const key = $("#ai-key").value.trim();
           const mdl = $("#ai-model").value;
-          const r = await API.saveAiSettings({ api_key: key, model: mdl });
+          // Only send api_key when the user actually typed a new one; an
+          // untouched (blank) field must NOT clear the stored key. Clearing
+          // is done explicitly via the "Clear key" button below.
+          const payload = { model: mdl };
+          const key = $("#ai-key").value.trim();
+          if (key) payload.api_key = key;
+          const r = await API.saveAiSettings(payload);
           if (r.ok) {
             toast("Settings saved", "info");
             // Refresh local state and reload so AI enablement/dropdown update.
@@ -1311,7 +1452,7 @@
           }
         }}, "Save"),
         hasKey ? el("button", { class: "btn danger sm", onclick: async () => {
-          const r = await API.saveAiSettings({ api_key: "", model: model });
+          const r = await API.saveAiSettings({ api_key: "", model: $("#ai-model").value });
           if (r.ok) { toast("API key cleared", "ok"); hasKey = false; $("#ai-key").value = ""; }
         }}, "Clear key") : null));
     main.appendChild(card);
@@ -1446,8 +1587,8 @@
         el("select", { id: "u-team" },
           el("option", { value: "" }, "— none —"),
           ...m.teams.map((t) => el("option", { value: t.id, ...(user?.team_id === t.id ? { selected: "" } : {}) }, t.name)))),
-      !isEdit ? el("label", { class: "field" }, el("span", { class: "label" }, "Password (default if blank: password)"),
-        el("input", { type: "password", id: "u-pass", autocomplete: "new-password", placeholder: "••••••••" })) : null,
+      el("label", { class: "field" }, el("span", { class: "label" }, isEdit ? "Reset password (optional)" : "Password (default if blank: password)"),
+        el("input", { type: "password", id: "u-pass", autocomplete: "new-password", placeholder: isEdit ? "Leave blank to keep current" : "••••••••" })),
       el("div", { class: "row" }, el("div", { class: "spacer" }),
         el("button", { class: "btn primary sm", onclick: saveUser }, "Save"))));
 
@@ -1458,7 +1599,9 @@
         role: $("#u-role").value,
         team_id: $("#u-team").value ? Number($("#u-team").value) : null,
       };
-      if (!isEdit) payload.password = $("#u-pass").value.trim() || "password";
+      const pass = $("#u-pass").value.trim();
+      if (!isEdit) payload.password = pass || "password";
+      else if (pass) payload.password = pass; // only reset when a new one was typed
       try {
         if (isEdit) await API.adminUpdateUser(user.id, payload);
         else await API.adminCreateUser(payload);

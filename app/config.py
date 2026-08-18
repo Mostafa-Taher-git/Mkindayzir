@@ -79,7 +79,7 @@ SMTP_FROM = os.environ.get("OPERADESK_SMTP_FROM", "noreply@opsdesk.local")
 APP_BASE_URL = os.environ.get("OPERADESK_APP_URL", "http://localhost:5000")
 
 # Password reset token lifetime (minutes).
-RESET_TOKEN_MINUTES = 30
+RESET_TOKEN_MINUTES = int(os.environ.get("OPERADESK_RESET_TOKEN_MINUTES", "30"))
 
 # Input length caps (only subject was capped before; now applied everywhere).
 MAX_SUBJECT = 100
