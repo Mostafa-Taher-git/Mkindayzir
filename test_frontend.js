@@ -114,6 +114,16 @@ async function login(email, password) {
   window.fetch = (url, opts = {}) => fetch(resolve(url), withCookie(opts, cookie2));
   await go("#/my");
   assert(/My Requests/.test(appHTML()), "requester My Requests renders");
+  assert(/SLA/.test(appHTML()), "requester queue shows SLA column");
+
+  // sam's newest ticket: follow/edit/SLA-due-date visible
+  const myTickets = await window.eval("API.listTickets()");
+  const mine = myTickets.tickets.filter((t) => t.requester_id === 5).sort((a, b) => b.id - a.id);
+  await go("#/ticket/" + mine[0].id, 1200);
+  const mineHTML = appHTML();
+  assert(/Follow/.test(mineHTML), "requester detail shows follow toggle");
+  assert(/Expected first response/.test(mineHTML), "requester detail shows SLA due dates");
+  assert(/Edit/.test(mineHTML), "requester detail shows Edit button while unassigned");
 
   console.log("\nJS errors during run:", errs.length);
   errs.slice(0, 8).forEach((e) => console.log("  ", e));
