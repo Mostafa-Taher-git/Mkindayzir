@@ -192,17 +192,44 @@
 
   async function viewReports() {
     if (state.user.role !== "manager" && state.user.role !== "admin") { navigate("/dashboard"); return; }
+    const filters = () => ({
+      team_id: document.getElementById("rep-team")?.value || "",
+      assignee_id: document.getElementById("rep-assignee")?.value || "",
+      date_from: document.getElementById("rep-from")?.value || "",
+      date_to: document.getElementById("rep-to")?.value || "",
+    });
+    const clean = (obj) => Object.fromEntries(Object.entries(obj).filter(([,v]) => v !== ""));
     const main = el("div", {}, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading reports…"));
     shell(main);
-    try {
+    const bar = el("div", { class: "filters mt-2" },
+      el("label", { class: "field" }, el("span", { class: "label" }, "Team"),
+        el("select", { id: "rep-team" },
+          el("option", { value: "" }, "All teams"),
+          ...(state.meta.teams || []).map((t) => el("option", { value: t.id }, t.name)))),
+      el("label", { class: "field" }, el("span", { class: "label" }, "Agent"),
+        el("select", { id: "rep-assignee" },
+          el("option", { value: "" }, "All agents"),
+          ...(state.meta.users || []).map((u) => el("option", { value: u.id }, u.name)))),
+      el("label", { class: "field" }, el("span", { class: "label" }, "From"),
+        el("input", { type: "date", id: "rep-from" })),
+      el("label", { class: "field" }, el("span", { class: "label" }, "To"),
+        el("input", { type: "date", id: "rep-to" })),
+      el("button", { class: "btn primary sm", onclick: async () => {
+        try { await renderReports(); } catch (e) { toast(e.message, "error"); }
+      }}, "Apply"));
+    async function renderReports() {
+      const p = clean(filters());
       const [sum, work, sla, trend] = await Promise.all([
-        API.reportsSummary(), API.reportsWorkload(), API.reportsSla(), API.reportsTrend(30)]);
+        API.reportsSummary(p), API.reportsWorkload(p), API.reportsSla(p), API.reportsTrend({days: p.days || 30, ...p})]);
       const s = sum, w = work, sl = sla, tr = trend;
       const cards = el("div", { class: "report-cards" },
         reportCard("Total tickets", s.total),
         reportCard("Open", s.open),
+        reportCard("Backlog ending", s.backlog?.ending),
         reportCard("SLA attainment", (s.sla_attainment_pct != null ? s.sla_attainment_pct + "%" : "n/a")),
         reportCard("Avg resolution", (s.avg_resolution_hours != null ? s.avg_resolution_hours + "h" : "n/a")),
+        reportCard("Median resolution", (s.median_resolution_hours != null ? s.median_resolution_hours + "h" : "n/a")),
+        reportCard("P90 resolution", (s.p90_resolution_hours != null ? s.p90_resolution_hours + "h" : "n/a")),
         reportCard("Avg CSAT", (s.avg_csat != null ? s.avg_csat + " / 5" : "n/a"), s.csat_responses ? "(" + s.csat_responses + " ratings)" : ""));
       const workloadTable = el("div", { class: "card mt-4" },
         el("h3", { class: "h3 mt-2" }, "Workload by staff"),
@@ -228,13 +255,25 @@
               el("div", { class: "bar created", style: "width:" + createdW + "%", title: "Created " + d.created }, ""),
               el("div", { class: "bar resolved", style: "width:" + resolvedW + "%", title: "Resolved " + d.resolved }, "")));
         })));
+      const csat = el("div", { class: "card mt-4" },
+        el("h3", { class: "h3 mt-2" }, "CSAT distribution"),
+        el("div", { class: "csat-bars" }, [1,2,3,4,5].map((score) => {
+          const count = s.csat_distribution?.[score] || 0;
+          const max = Math.max(1, ...Object.values(s.csat_distribution || {}));
+          const width = Math.round((count / max) * 100);
+          return el("div", { class: "csat-row" },
+            el("span", {}, "★".repeat(score) + "☆".repeat(5-score)),
+            el("div", { class: "bar resolved", style: "width:" + width + "%", title: score + ": " + count }, String(count)));
+        })));
       const exportBtn = el("button", { class: "btn primary mt-4", onclick: async () => {
           try { await API.exportCsv(); } catch (e) { toast(e.message, "error"); }
         } }, "Export CSV");
       main.replaceChildren(
         el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }), exportBtn),
-        cards, workloadTable, slaBox, trendList);
-    } catch (e) {
+        bar, cards, workloadTable, slaBox, trendList, csat);
+    }
+    try { await renderReports(); }
+    catch (e) {
       main.replaceChildren(
         el("div", { class: "empty" },
           el("span", { class: "label" }, "Couldn't load reports"),
@@ -684,11 +723,31 @@
         el("h3", { class: "h3 mb-4" }, "Aged / Needs Attention"),
         d.aged.length ? ticketTable(d.aged, { showAged: true })
                       : el("div", { class: "empty" }, "No aged tickets. 🎉"));
+      let actionSection = el("div", {});
+      try {
+        const ac = await API.actionCenter();
+        const section = (title, rows) => el("div", { class: "card mt-4" },
+          el("h3", { class: "h3 mt-2" }, title),
+          rows.length ? el("table", { class: "table" },
+            el("thead", {}, el("tr", {}, el("th", {}, "ID"), el("th", {}, "Subject"), el("th", {}, "Status"), el("th", {}, "Priority"))),
+            el("tbody", {}, ...rows.map((r) => el("tr", { style: "cursor:pointer" },
+              el("td", {}, "#" + r.id),
+              el("td", {}, r.subject),
+              el("td", {}, r.status),
+              el("td", {}, r.priority),
+              ...([r.breach_at, r.updated_at, r.created_at].filter(Boolean).slice(0,1).map((ts) => el("td", { class: "muted" }, String(ts))))))))
+            : el("div", { class: "empty muted" }, "None"));
+        actionSection = el("div", { class: "mt-6" },
+          el("h2", { class: "h3 mb-4" }, "Action Center"),
+          section("Unassigned", ac.unassigned),
+          section("SLA breaches", ac.breached),
+          section("Stale tickets", ac.stale));
+      } catch (_) {}
       const inner = el("div", {},
         el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Manager Dashboard"),
           el("div", { class: "spacer" }),
           el("button", { class: "btn secondary sm", onclick: () => navigate("/queue") }, "Open Queue")),
-        tiles, agedSection);
+        tiles, agedSection, actionSection);
       shell(inner);
     } catch (e) { toast(e.message, "error"); }
   }

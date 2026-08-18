@@ -104,10 +104,11 @@ const API = (() => {
     kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
 
     // Phase 4 — Reports & CSAT
-    reportsSummary: () => req("GET", "/api/reports/summary"),
-    reportsWorkload: () => req("GET", "/api/reports/workload"),
-    reportsSla: () => req("GET", "/api/reports/sla"),
-    reportsTrend: (days) => req("GET", "/api/reports/trend?days=" + (days || 30)),
+    reportsSummary: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/summary" + (q ? "?" + q : "")); },
+    reportsWorkload: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/workload" + (q ? "?" + q : "")); },
+    reportsSla: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/sla" + (q ? "?" + q : "")); },
+    reportsTrend: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/trend" + (q ? "?" + q : "")); },
+    actionCenter: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/dashboard/action-center" + (q ? "?" + q : "")); },
     exportCsv: async () => {
       const token = await API.initCsrf();
       const res = await fetch("/api/reports/export.csv", {
