@@ -109,12 +109,20 @@
     shell(main);
     try {
       const { article } = await API.getKb(id);
-      const wrap = $("#kb-article");
+      const linksRes = state.user.role !== "requester" ? await API.listKbLinks(id).catch(() => ({ outbound: [], inbound: [] })) : { outbound: [], inbound: [] };
+      const related = linksRes.outbound || [];
+      const backlinks = linksRes.inbound || [];
+      const connections = related.length || backlinks.length ? el("div", { class: "mt-6 card", style: "padding:16px" },
+        el("div", { class: "label mb-2" }, "Knowledge connections"),
+        related.length ? el("div", {}, el("div", { class: "muted", style: "font-size:12px" }, "Related"), el("div", { class: "mt-2" }, ...related.map((r) => el("a", { class: "card kb-card mt-2", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, el("div", { class: "kb-title" }, r.title))))) : null,
+        backlinks.length ? el("div", { class: "mt-3" }, el("div", { class: "muted", style: "font-size:12px" }, "Linked from"), el("div", { class: "mt-2" }, ...backlinks.map((r) => el("a", { class: "card kb-card mt-2", href: `#/kb/${r.id}`, onclick: () => navigate(`/kb/${r.id}`) }, el("div", { class: "kb-title" }, r.title))))) : null,
+      ) : null;
       wrap.replaceChildren(
         el("a", { href: "#/kb", onclick: () => navigate("/kb") }, "Back to Help Center"),
         el("h1", { class: "h2 mt-3" }, article.title),
         el("div", { class: "muted mb-4" }, categoryName(article.category_id) + (article.author_name ? " . by " + article.author_name : "")),
         el("div", { class: "kb-body" }, esc(article.body)),
+        connections,
         el("div", { class: "mt-6 card", style: "padding:16px" },
           el("div", { class: "label mb-2" }, "Was this helpful?"),
           el("div", { id: "kb-feedback-btns" },
