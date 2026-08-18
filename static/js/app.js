@@ -322,9 +322,28 @@
       const exportBtn = el("button", { class: "btn primary mt-4", onclick: async () => {
           try { await API.exportCsv(); } catch (e) { toast(e.message, "error"); }
         } }, "Export CSV");
+      const kbBtn = el("button", { class: "btn secondary sm", onclick: async () => { try { await renderKnowledgeAnalytics(); } catch (e) { toast(e.message, "error"); } } }, "Knowledge Analytics");
       main.replaceChildren(
-        el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }), exportBtn),
+        el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }), kbBtn, exportBtn),
         bar, cards, workloadTable, slaBox, trendList, csat);
+    }
+    async function renderKnowledgeAnalytics() {
+      const p = clean(filters());
+      const data = await API.reportsKnowledge(p);
+      const mainWrap = $("#kb-analytics") || main;
+      const box = el("div", { class: "card mt-4", id: "kb-analytics" },
+        el("h3", { class: "h3 mt-2" }, "Knowledge health"),
+        el("div", { class: "report-cards mt-3" },
+          reportCard("Articles", data.articles),
+          reportCard("Views", data.article_views),
+          reportCard("Helpful", data.helpful_count),
+          reportCard("Feedbacks", data.feedback_count),
+          reportCard("Ticket usage", data.ticket_usage_count),
+          reportCard("Orphans", data.orphan_count)));
+      main.replaceChildren(
+        el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Reports"), el("div", { class: "spacer" }),
+          el("button", { class: "btn secondary sm", onclick: async () => { try { await renderReports(); } catch (e) { toast(e.message, "error"); } } }, "Ticket reports")),
+        bar, box);
     }
     try { await renderReports(); }
     catch (e) {
