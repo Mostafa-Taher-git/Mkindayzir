@@ -1225,3 +1225,44 @@ def test_csat_serialized_in_ticket_list(client):
     data = client.get("/api/tickets").get_json()
     row = next(x for x in data["tickets"] if x["id"] == t["id"])
     assert row["csat"] == 4
+
+
+# ---------------------------------------------------------------------------
+# Dashboard — role-aware shape
+# ---------------------------------------------------------------------------
+def test_dashboard_requester_forbidden(client):
+    _login(client, "sam@opsdesk.local")
+    assert client.get("/api/dashboard").status_code == 403
+
+
+def test_dashboard_manager_shape(client):
+    _login(client, "manager@opsdesk.local")
+    r = client.get("/api/dashboard")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["role"] == "manager"
+    assert "counts" in data
+    assert "unassigned" in data
+    assert "urgent" in data
+    assert "blocked" in data
+    assert "resolved" in data
+    assert "avg_resolution_hours" in data
+    assert "aged" in data
+    assert "my_open" not in data
+
+
+def test_dashboard_agent_shape(client):
+    _login(client, "agent@opsdesk.local")
+    r = client.get("/api/dashboard")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["role"] == "agent"
+    assert "my_open" in data
+    assert "my_urgent" in data
+    assert "my_blocked" in data
+    assert "my_resolved_today" in data
+    assert "my_avg_response_hours" in data
+    assert "my_avg_resolution_hours" in data
+    assert "my_rated_tickets" in data
+    assert "aged" in data
+    assert "counts" in data

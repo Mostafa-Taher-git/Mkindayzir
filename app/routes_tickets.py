@@ -639,7 +639,8 @@ def dashboard():
 
     # Aged tickets (FR-17)
     aged = _aged_tickets(where, wparams)
-    return jsonify(
+
+    out = dict(
         counts=counts,
         unassigned=unassigned,
         urgent=urgent,
@@ -648,6 +649,66 @@ def dashboard():
         avg_resolution_hours=avg_resolution_hours,
         aged=[_serialize(t) for t in aged],
     )
+    if user["role"] == config.ROLE_AGENT:
+        uid = user["id"]
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        my_open = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.status NOT IN (?,?)",
+            (uid, config.STATUS_RESOLVED, config.STATUS_CLOSED),
+        ).fetchone()["c"]
+        my_assigned_today = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND date(t.created_at,'utc') = ?",
+            (uid, today),
+        ).fetchone()["c"]
+        my_urgent = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.priority = ? AND t.status NOT IN (?,?)",
+            (uid, config.PRIORITY_URGENT, config.STATUS_RESOLVED, config.STATUS_CLOSED),
+        ).fetchone()["c"]
+        my_blocked = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.status = ?",
+            (uid, config.STATUS_BLOCKED),
+        ).fetchone()["c"]
+        my_resolved_today = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.resolved_at IS NOT NULL "
+            "AND date(t.resolved_at,'utc') = ?",
+            (uid, today),
+        ).fetchone()["c"]
+        my_rated = dbc.execute(
+            "SELECT COUNT(*) c FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.csat IS NOT NULL",
+            (uid,),
+        ).fetchone()["c"]
+        first_response_avg = dbc.execute(
+            "SELECT AVG((julianday(ts.first_response_at) - julianday(t.created_at)) * 24.0) av "
+            "FROM ticket_sla ts JOIN tickets t ON ts.ticket_id = t.id "
+            "WHERE t.assignee_id = ? AND ts.first_response_at IS NOT NULL",
+            (uid,),
+        ).fetchone()["av"]
+        resolution_avg = dbc.execute(
+            "SELECT AVG((julianday(t.resolved_at) - julianday(t.created_at)) * 24.0) av "
+            "FROM tickets t "
+            "WHERE t.assignee_id = ? AND t.resolved_at IS NOT NULL",
+            (uid,),
+        ).fetchone()["av"]
+        out.update(
+            role="agent",
+            my_open=my_open,
+            my_assigned_today=my_assigned_today,
+            my_urgent=my_urgent,
+            my_blocked=my_blocked,
+            my_resolved_today=my_resolved_today,
+            my_rated_tickets=my_rated,
+            my_avg_response_hours=round(first_response_avg, 1) if first_response_avg is not None else None,
+            my_avg_resolution_hours=round(resolution_avg, 1) if resolution_avg is not None else None,
+        )
+    else:
+        out["role"] = "manager"
+    return jsonify(out)
 
 
 @tickets.route("/api/meta")

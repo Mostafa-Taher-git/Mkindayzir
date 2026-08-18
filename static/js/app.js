@@ -647,10 +647,29 @@
 
   /* ----------------------------- dashboard ----------------------------- */
   async function viewDashboard() {
-    if (!isAgent()) { navigate("/my"); return; }
     shell(el("div", { id: "dash" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading dashboard…")));
     try {
       const d = await API.dashboard();
+      if (d.role === "agent") {
+        const tiles = el("div", { class: "grid cols-4" },
+          statTile(d.my_open, "My Open", "primary"),
+          statTile(d.my_urgent, "My Urgent", "primary urgent"),
+          statTile(d.my_blocked, "My Blocked", "primary blocked"),
+          statTile(d.my_assigned_today, "My New Today", "info"),
+          statTile(d.my_resolved_today, "Resolved Today", "ok"),
+          statTile(d.my_avg_response_hours != null ? d.my_avg_response_hours + "h" : "—", "My Avg Response", "info"),
+          statTile(d.my_avg_resolution_hours != null ? d.my_avg_resolution_hours + "h" : "—", "My Avg Resolution", "info"),
+          statTile(d.my_rated_tickets, "My Rated Tickets", ""));
+        const agedSection = el("div", { class: "card mt-6" },
+          el("h3", { class: "h3 mb-4" }, "Needs Attention"),
+          d.aged && d.aged.length ? ticketTable(d.aged, { showAged: true })
+                        : el("div", { class: "empty" }, "No aged tickets. 🎉"));
+        const inner = el("div", {},
+          el("div", { class: "page-head" }, el("h1", { class: "h2" }, "My Dashboard"), el("div", { class: "spacer" }), el("button", { class: "btn secondary sm", onclick: () => navigate("/queue") }, "Open Queue")),
+          tiles, agedSection);
+        shell(inner);
+        return;
+      }
       const c = d.counts;
       const tiles = el("div", { class: "grid cols-4" },
         statTile(c.new, "New", "primary"),
