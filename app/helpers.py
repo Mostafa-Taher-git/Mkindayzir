@@ -8,6 +8,7 @@ These keep the route modules small and the security rules in one place:
 """
 from functools import wraps
 import time
+import json
 
 from flask import session, jsonify, request, redirect, url_for, g
 
@@ -167,13 +168,38 @@ def can_view_ticket(user, ticket):
     return ticket["requester_id"] == user["id"]
 
 
-def log_activity(ticket_id, actor_id, action, from_status=None,
-                 to_status=None, note=None):
-    """Append a row to the activity log. Called from ticket mutations."""
+def log_activity(entity_type, entity_id, actor_id, action, detail=None,
+                 note=None):
+    """Append a row to the polymorphic activity log (entity_activity).
+
+    Called from entity mutations. `detail` may be a dict (serialized as JSON)
+    carrying from/to values; `note` is a legacy convenience for plain-text
+    details and is folded into the JSON.
+    """
+    if detail is None:
+        detail = {}
+    elif not isinstance(detail, dict):
+        detail = {"note": detail}
+    if note is not None and "note" not in detail:
+        detail["note"] = note
     db.get_db().execute(
-        """INSERT INTO ticket_activity
-           (ticket_id, actor_id, action, from_status, to_status, note, created_at)
+        """INSERT INTO entity_activity
+           (entity_type, entity_id, actor_id, action, detail, created_at)
+           VALUES (?,?,?,?,?,?)""",
+        (entity_type, entity_id, actor_id, action,
+         json.dumps(detail), db.now_iso()),
+    )
+    db.get_db().commit()
+
+
+def audit(user_id, action, entity_type=None, entity_id=None, details=None):
+    """Record an administrative action in the audit log (Master Plan §4.1)."""
+    db.get_db().execute(
+        """INSERT INTO audit_log
+           (user_id, action, entity_type, entity_id, details, ip_address, created_at)
            VALUES (?,?,?,?,?,?,?)""",
-        (ticket_id, actor_id, action, from_status, to_status, note, db.now_iso()),
+        (user_id, action, entity_type, entity_id,
+         json.dumps(details) if details is not None else None,
+         request.remote_addr, db.now_iso()),
     )
     db.get_db().commit()

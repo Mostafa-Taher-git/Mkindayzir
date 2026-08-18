@@ -59,6 +59,7 @@ async function login(email, password) {
     document.body.appendChild(s);
   };
   inject("api.js");
+  inject("views/core.js");
   inject("app.js");
 
   const results = [];
@@ -94,12 +95,14 @@ async function login(email, password) {
   await go("#/admin");
   assert(/Teams/.test(appHTML()) && /Users/.test(appHTML()) && /Categories/.test(appHTML()), "admin renders teams/categories/users");
 
-  // KB version diff: create + publish + edit an article, then open the diff modal
+  // KB version diff: create + publish + edit an article, then open the diff modal.
+  // Title is unique per run because kb_notes enforces UNIQUE(folder_id, title).
   const API2 = window.eval("API"); // top-level const, not on window
-  const art = await API2.createKb({ title: "Frontend diff test", body: "line one\nline two", category_id: 1 });
-  const aid = art.article.id;
+  const kt = "Frontend diff test " + Date.now();
+  const art = await API2.createKb({ title: kt, body: "line one\nline two", category_id: 1 });
+  const aid = art.note.id;
   await API2.publishKb(aid);
-  await API2.updateKb(aid, { title: "Frontend diff test", body: "line one\nline two\nline three" });
+  await API2.updateKb(aid, { title: kt, body: "line one\nline two\nline three" });
   await go("#/kb/" + aid, 1200);
   assert(/Version history/.test(appHTML()), "KB article shows version history");
   const diffBtn = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Diff vs previous");
@@ -117,8 +120,8 @@ async function login(email, password) {
   assert(/SLA/.test(appHTML()), "requester queue shows SLA column");
 
   // sam's newest ticket: follow/edit/SLA-due-date visible
-  const myTickets = await window.eval("API.listTickets()");
-  const mine = myTickets.tickets.filter((t) => t.requester_id === 5).sort((a, b) => b.id - a.id);
+  const myTickets = await window.eval("API.listIssues()");
+  const mine = myTickets.issues.filter((t) => t.requester_id === 5).sort((a, b) => b.id - a.id);
   await go("#/ticket/" + mine[0].id, 1200);
   const mineHTML = appHTML();
   assert(/Follow/.test(mineHTML), "requester detail shows follow toggle");

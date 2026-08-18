@@ -23,12 +23,13 @@ notif = Blueprint("notif", __name__)
 def list_notifications():
     uid = request.current_user["id"]
     total = db.get_db().execute(
-        "SELECT COUNT(*) AS c FROM notifications WHERE user_id=?", (uid,)
+        "SELECT COUNT(*) AS c FROM notifications_v2 WHERE user_id=?", (uid,)
     ).fetchone()["c"]
     rows = db.get_db().execute(
-        """SELECT n.*, t.ticket_ref, t.subject
-             FROM notifications n
-        LEFT JOIN tickets t ON t.id = n.ticket_id
+        """SELECT n.*, ji.issue_key, ji.summary
+             FROM notifications_v2 n
+        LEFT JOIN jira_issues ji ON ji.id = n.entity_id
+                               AND n.entity_type = 'jira_issue'
             WHERE n.user_id = ?
          ORDER BY n.created_at DESC
             LIMIT ?""",
@@ -39,7 +40,7 @@ def list_notifications():
     start = (page - 1) * per_page
     page_rows = rows[start:start + per_page]
     unread = db.get_db().execute(
-        "SELECT COUNT(*) AS c FROM notifications WHERE user_id=? AND read=0", (uid,),
+        "SELECT COUNT(*) AS c FROM notifications_v2 WHERE user_id=? AND read=0", (uid,),
     ).fetchone()["c"]
     return jsonify(
         notifications=[_serialize(r) for r in page_rows],
@@ -54,12 +55,12 @@ def list_notifications():
 def mark_read(nid):
     uid = request.current_user["id"]
     row = db.get_db().execute(
-        "SELECT id FROM notifications WHERE id=? AND user_id=?", (nid, uid)
+        "SELECT id FROM notifications_v2 WHERE id=? AND user_id=?", (nid, uid)
     ).fetchone()
     if not row:
         return jsonify(error="Not found"), 404
     db.get_db().execute(
-        "UPDATE notifications SET read=1 WHERE id=?", (nid,)
+        "UPDATE notifications_v2 SET read=1 WHERE id=?", (nid,)
     )
     db.get_db().commit()
     return jsonify(ok=True)
@@ -71,7 +72,7 @@ def mark_read(nid):
 def mark_all_read():
     uid = request.current_user["id"]
     db.get_db().execute(
-        "UPDATE notifications SET read=1 WHERE user_id=?", (uid,)
+        "UPDATE notifications_v2 SET read=1 WHERE user_id=?", (uid,)
     )
     db.get_db().commit()
     return jsonify(ok=True)
@@ -80,9 +81,11 @@ def mark_all_read():
 def _serialize(n):
     return {
         "id": n["id"],
-        "ticket_id": n["ticket_id"],
-        "ticket_ref": n["ticket_ref"],
-        "subject": n["subject"],
+        "entity_type": n["entity_type"],
+        "entity_id": n["entity_id"],
+        "ticket_id": n["entity_id"] if n["entity_type"] == "jira_issue" else None,
+        "issue_key": n["issue_key"],
+        "summary": n["summary"],
         "kind": n["kind"],
         "message": n["message"],
         "read": bool(n["read"]),

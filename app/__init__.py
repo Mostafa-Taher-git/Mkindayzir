@@ -14,7 +14,7 @@ from flask import Flask, jsonify
 from . import config, db
 from . import helpers
 from .routes_auth import auth as auth_bp
-from .routes_tickets import tickets as tickets_bp
+from .routes_jira import jira as jira_bp
 from .routes_admin import admin as admin_bp
 from .routes_notif import notif as notif_bp
 from .routes_kb import kb as kb_bp
@@ -52,7 +52,7 @@ def create_app():
         db.init_db()
 
     app.register_blueprint(auth_bp)
-    app.register_blueprint(tickets_bp)
+    app.register_blueprint(jira_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(notif_bp)
     app.register_blueprint(kb_bp)
@@ -121,11 +121,11 @@ def create_app():
 
 
 def auto_close_resolved():
-    """Close any resolved ticket whose reopen window has elapsed."""
+    """Close any resolved issue whose reopen window has elapsed."""
     cutoff = (datetime.now(timezone.utc) - timedelta(
         hours=config.AUTO_CLOSE_HOURS)).isoformat()
     cur = db.get_db().execute(
-        """UPDATE tickets SET status='closed', closed_at=? , updated_at=?
+        """UPDATE jira_issues SET status='closed', closed_at=? , updated_at=?
            WHERE status='resolved' AND resolved_at <= ?""",
         (datetime.now(timezone.utc).isoformat(),
          datetime.now(timezone.utc).isoformat(), cutoff),
@@ -135,10 +135,11 @@ def auto_close_resolved():
     if n:
         # log each closure lightly
         for t in db.get_db().execute(
-                "SELECT id FROM tickets WHERE status='closed' AND closed_at >= ?",
+                "SELECT id FROM jira_issues WHERE status='closed' AND closed_at >= ?",
                 (cutoff,)).fetchall():
-            helpers.log_activity(t["id"], None, "auto_closed",
-                                 config.STATUS_RESOLVED, config.STATUS_CLOSED)
+            helpers.log_activity("jira_issue", t["id"], None, "auto_closed",
+                                 detail={"from_status": config.STATUS_RESOLVED,
+                                         "to_status": config.STATUS_CLOSED})
     return n
 
 

@@ -135,7 +135,7 @@ def _ticket_block(ticket, comments=None):
         return (str(s or "")).replace("<<<", "<").replace(">>>", ">")
     lines = [
         "<<<DATA type=ticket>>>",
-        f"subject: {_safe(ticket.get('subject', ''))}",
+        f"summary: {_safe(ticket.get('summary') or ticket.get('subject', ''))}",
         f"description: {_safe(ticket.get('description', ''))}",
         f"priority: {_safe(ticket.get('priority', ''))}",
         f"status: {_safe(ticket.get('status', ''))}",

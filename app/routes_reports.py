@@ -5,12 +5,12 @@ Manager/admin endpoints:
   GET /api/reports/summary      -> counts, backlog, SLA attainment %, avg/median/p90 resolution, CSAT + distribution
   GET /api/reports/workload     -> per-agent open/reassigned counts + avg resolution
   GET /api/reports/sla          -> SLA attainment (met / breached / pending)
-  GET /api/reports/trend        -> tickets created/resolved per day (?days=30)
-  GET /api/reports/export.csv   -> full ticket dump (CSV)
-  GET /api/dashboard/action-center -> unassigned, SLA breaches, stale tickets
+  GET /api/reports/trend        -> issues created/resolved per day (?days=30)
+  GET /api/reports/export.csv   -> full issue dump (CSV)
+  GET /api/dashboard/action-center -> unassigned, SLA breaches, stale issues
 
 Requester satisfaction:
-  POST /api/tickets/<id>/rate   -> requester rates 1-5 (owns ticket, once)
+  POST /api/jira/issues/<id>/rate -> requester rates 1-5 (owns issue, once)
 
 All report endpoints accept optional filters:
   ?team_id=&assignee_id=&date_from=&date_to=&days=
@@ -109,7 +109,7 @@ def _avg_resolution_seconds(where="", where_params=None):
     where_params = where_params or []
     resolved_where, resolved_params = _extend_where(where, where_params, "t.resolved_at IS NOT NULL", [])
     rows = db.get_db().execute(
-        f"SELECT created_at, resolved_at FROM tickets t{resolved_where}",
+        f"SELECT created_at, resolved_at FROM jira_issues t{resolved_where}",
         resolved_params,
     ).fetchall()
     total = 0
@@ -132,7 +132,7 @@ def summary():
     conn = db.get_db()
     counts = {}
     for row in conn.execute(
-        f"SELECT status, COUNT(*) c FROM tickets t{where} GROUP BY status",
+        f"SELECT status, COUNT(*) c FROM jira_issues t{where} GROUP BY status",
         where_params,
     ).fetchall():
         counts[row["status"]] = row["c"]
@@ -144,17 +144,17 @@ def summary():
           COALESCE(SUM(CASE WHEN t.created_at IS NOT NULL THEN 1 ELSE 0 END),0) new_tickets,
           COALESCE(SUM(CASE WHEN t.resolved_at IS NOT NULL THEN 1 ELSE 0 END),0) resolved,
           COALESCE(SUM(CASE WHEN t.status='reopened' THEN 1 ELSE 0 END),0) reopened
-        FROM tickets t {where}
+        FROM jira_issues t {where}
     """
     backlog = conn.execute(backlog_sql, where_params).fetchone()
     ending_backlog = (backlog["opening"] or 0) + (backlog["new_tickets"] or 0) - (backlog["resolved"] or 0) + (backlog["reopened"] or 0)
-    sla_where, sla_params = _extend_where(where, where_params, "ts.ticket_id = t.id", [])
+    sla_where, sla_params = _extend_where(where, where_params, "ts.issue_id = t.id", [])
     sla = conn.execute(
         f"SELECT "
         "SUM(CASE WHEN ts.resolution_met = 1 THEN 1 ELSE 0 END) met, "
         "SUM(CASE WHEN ts.resolution_met = 0 OR ts.breached = 1 THEN 1 ELSE 0 END) missed, "
         "COUNT(*) all_sla "
-        "FROM ticket_sla ts JOIN tickets t ON t.id = ts.ticket_id "
+        "FROM issue_sla ts JOIN jira_issues t ON t.id = ts.issue_id "
         f"{sla_where}",
         sla_params,
     ).fetchone()
@@ -165,7 +165,7 @@ def summary():
     res_times = []
     resolved_where, resolved_params = _extend_where(where, where_params, "t.resolved_at IS NOT NULL", [])
     for r in conn.execute(
-        f"SELECT created_at, resolved_at FROM tickets t{resolved_where}",
+        f"SELECT created_at, resolved_at FROM jira_issues t{resolved_where}",
         resolved_params,
     ).fetchall():
         c = helpers._parse_iso(r["created_at"])
@@ -180,14 +180,14 @@ def summary():
         p90_res_hours = round(res_times[int(len(res_times) * 0.9)] / 3600, 1)
     csat_where, csat_params = _extend_where(where, where_params, "t.csat IS NOT NULL", [])
     csat_rows = conn.execute(
-        f"SELECT AVG(csat) avg_csat, COUNT(csat) n FROM tickets t{csat_where}",
+        f"SELECT AVG(csat) avg_csat, COUNT(csat) n FROM jira_issues t{csat_where}",
         csat_params,
     ).fetchone()
     csat_distribution = {}
     for score in range(1, 6):
         csat_score_where, csat_score_params = _extend_where(where, where_params, "t.csat = ?", [score])
         row = conn.execute(
-            f"SELECT COUNT(*) c FROM tickets t{csat_score_where}",
+            f"SELECT COUNT(*) c FROM jira_issues t{csat_score_where}",
             csat_score_params,
         ).fetchone()
         csat_distribution[score] = row["c"]
@@ -228,17 +228,17 @@ def workload():
     for a in agents:
         open_where, open_params = _extend_where(where, where_params, "t.assignee_id=? AND t.status IN ('assigned','in_progress','blocked','reopened')", [a["id"]])
         open_n = conn.execute(
-            f"SELECT COUNT(*) c FROM tickets t {open_where}",
+            f"SELECT COUNT(*) c FROM jira_issues t {open_where}",
             open_params,
         ).fetchone()["c"]
         res_where, res_params = _extend_where(where, where_params, "t.assignee_id=? AND t.resolved_at IS NOT NULL", [a["id"]])
         resolved = conn.execute(
-            f"SELECT COUNT(*) c FROM tickets t {res_where}",
+            f"SELECT COUNT(*) c FROM jira_issues t {res_where}",
             res_params,
         ).fetchone()["c"]
         avg = None
         rows = conn.execute(
-            f"SELECT created_at, resolved_at FROM tickets t {res_where}",
+            f"SELECT created_at, resolved_at FROM jira_issues t {res_where}",
             res_params,
         ).fetchall()
         if rows:
@@ -267,15 +267,15 @@ def sla_report():
     where, where_params, _ = _combined_where()
     conn = db.get_db()
     met = conn.execute(
-        f"SELECT COUNT(*) c FROM ticket_sla ts JOIN tickets t ON t.id=ts.ticket_id {where} AND ts.resolution_met=1",
+        f"SELECT COUNT(*) c FROM issue_sla ts JOIN jira_issues t ON t.id=ts.issue_id {where} AND ts.resolution_met=1",
         where_params,
     ).fetchone()["c"]
     missed = conn.execute(
-        f"SELECT COUNT(*) c FROM ticket_sla ts JOIN tickets t ON t.id=ts.ticket_id {where} AND (ts.resolution_met=0 OR ts.breached=1)",
+        f"SELECT COUNT(*) c FROM issue_sla ts JOIN jira_issues t ON t.id=ts.issue_id {where} AND (ts.resolution_met=0 OR ts.breached=1)",
         where_params,
     ).fetchone()["c"]
     pending = conn.execute(
-        f"SELECT COUNT(*) c FROM ticket_sla ts JOIN tickets t ON t.id=ts.ticket_id {where} AND ts.resolution_met IS NULL AND t.status NOT IN ('resolved','closed')",
+        f"SELECT COUNT(*) c FROM issue_sla ts JOIN jira_issues t ON t.id=ts.issue_id {where} AND ts.resolution_met IS NULL AND t.status NOT IN ('resolved','closed')",
         where_params,
     ).fetchone()["c"]
     return jsonify(met=met, missed=missed, pending=pending,
@@ -291,25 +291,26 @@ def action_center():
     conn = db.get_db()
     unassigned_where, unassigned_params = _extend_where(where, where_params, "t.assignee_id IS NULL AND t.status NOT IN ('resolved','closed')", [])
     unassigned = conn.execute(
-        f"SELECT id, subject, status, priority, created_at FROM tickets t {unassigned_where} ORDER BY created_at ASC",
+        f"SELECT id, summary, status, priority, created_at FROM jira_issues t {unassigned_where} ORDER BY created_at ASC",
         unassigned_params,
     ).fetchall()
     breached_where, breached_params = _extend_where(where, where_params, "ts.breached=1", [])
     breached = conn.execute(
-        f"SELECT t.id, t.subject, t.status, t.priority, ts.breach_at FROM ticket_sla ts "
-        f"JOIN tickets t ON t.id=ts.ticket_id {breached_where} ORDER BY ts.breach_at ASC",
+        f"SELECT t.id, t.summary, t.status, t.priority, ts.breach_at FROM issue_sla ts "
+        f"JOIN jira_issues t ON t.id=ts.issue_id {breached_where} ORDER BY ts.breach_at ASC",
         breached_params,
     ).fetchall()
     stale_where, stale_params = _extend_where(where, where_params, "t.status IN ('assigned','in_progress') AND t.updated_at <= datetime('now','-24 hours','utc')", [])
     stale = conn.execute(
-        f"SELECT t.id, t.subject, t.status, t.priority, t.updated_at FROM tickets t {stale_where} ORDER BY t.updated_at ASC",
+        f"SELECT t.id, t.summary, t.status, t.priority, t.updated_at FROM jira_issues t {stale_where} ORDER BY t.updated_at ASC",
         stale_params,
     ).fetchall()
 
     def _serialize_ticket(row):
         return {
             "id": row["id"],
-            "subject": row["subject"],
+            "summary": row["summary"],
+            "subject": row["summary"],
             "status": row["status"],
             "priority": row["priority"],
             "created_at": row["created_at"] if "created_at" in row.keys() else None,
@@ -352,11 +353,11 @@ def trend():
         resolved_where = " WHERE t.resolved_at IS NOT NULL"
     conn = db.get_db()
     created = conn.execute(
-        f"SELECT substr(t.created_at,1,10) d, COUNT(*) c FROM tickets t {where} GROUP BY d ORDER BY d",
+        f"SELECT substr(t.created_at,1,10) d, COUNT(*) c FROM jira_issues t {where} GROUP BY d ORDER BY d",
         where_params,
     ).fetchall()
     resolved = conn.execute(
-        f"SELECT substr(t.resolved_at,1,10) d, COUNT(*) c FROM tickets t {resolved_where} GROUP BY d ORDER BY d",
+        f"SELECT substr(t.resolved_at,1,10) d, COUNT(*) c FROM jira_issues t {resolved_where} GROUP BY d ORDER BY d",
         resolved_params,
     ).fetchall()
     created_map = {r["d"]: r["c"] for r in created}
@@ -378,9 +379,9 @@ def export_csv():
     where, where_params, _ = _combined_where()
     conn = db.get_db()
     query = (
-        "SELECT id, ticket_ref, subject, status, priority, requester_id, "
+        "SELECT id, issue_key, summary, status, priority, requester_id, "
         "assignee_id, team_id, category_id, created_at, resolved_at, closed_at, csat "
-        f"FROM tickets t {where} ORDER BY id"
+        f"FROM jira_issues t {where} ORDER BY id"
     )
     rows = conn.execute(query, where_params).fetchall()
     buf = io.StringIO()
@@ -392,24 +393,24 @@ def export_csv():
             return "'" + s
         return s
 
-    w.writerow(["id", "ref", "subject", "status", "priority", "requester_id",
+    w.writerow(["id", "ref", "summary", "status", "priority", "requester_id",
                 "assignee_id", "team_id", "category_id", "created_at",
                 "resolved_at", "closed_at", "csat"])
     for r in rows:
-        w.writerow([_safe(r["id"]), _safe(r["ticket_ref"]), _safe(r["subject"]), _safe(r["status"]), _safe(r["priority"]),
+        w.writerow([_safe(r["id"]), _safe(r["issue_key"]), _safe(r["summary"]), _safe(r["status"]), _safe(r["priority"]),
                     _safe(r["requester_id"]), _safe(r["assignee_id"]), _safe(r["team_id"]), _safe(r["category_id"]),
                     _safe(r["created_at"]), _safe(r["resolved_at"]), _safe(r["closed_at"]), _safe(r["csat"])])
     return Response(buf.getvalue(), mimetype="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=opsdesk-tickets.csv"})
+                    headers={"Content-Disposition": "attachment; filename=opsdesk-issues.csv"})
 
 
-@reports.route("/api/tickets/<int:tid>/rate", methods=["POST"])
+@reports.route("/api/jira/issues/<int:iid>/rate", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
-def rate_ticket(tid):
+def rate_issue(iid):
     user = request.current_user
     t = db.get_db().execute(
-        "SELECT id, requester_id, status, csat FROM tickets WHERE id=?", (tid,)
+        "SELECT id, requester_id, status, csat FROM jira_issues WHERE id=?", (iid,)
     ).fetchone()
     if not t:
         return jsonify(error="Not found"), 404
@@ -418,14 +419,14 @@ def rate_ticket(tid):
     if t["csat"] is not None:
         return jsonify(error="Already rated"), 400
     if t["status"] not in ("resolved", "closed"):
-        return jsonify(error="Can only rate resolved tickets"), 400
+        return jsonify(error="Can only rate resolved issues"), 400
     data = request.get_json(force=True, silent=True) or {}
     score = data.get("score")
     if not isinstance(score, int) or score < 1 or score > 5:
         return jsonify(error="score must be 1-5"), 400
-    db.get_db().execute("UPDATE tickets SET csat=? WHERE id=?", (score, tid))
+    db.get_db().execute("UPDATE jira_issues SET csat=? WHERE id=?", (score, iid))
     db.get_db().commit()
-    helpers.log_activity(tid, user["id"], "rated", note=f"CSAT {score}/5")
+    helpers.log_activity("jira_issue", iid, user["id"], "rated", detail={"note": f"CSAT {score}/5"})
     return jsonify(ok=True, csat=score)
 
 
@@ -438,13 +439,13 @@ def knowledge_report():
     conn = db.get_db()
     stats = conn.execute("""
         SELECT
-          (SELECT COALESCE(SUM(views),0) FROM kb_articles) AS views,
-          (SELECT COUNT(*) FROM kb_articles) AS articles,
-          (SELECT COALESCE(SUM(helpful),0) FROM kb_feedback) AS helpful,
-          (SELECT COUNT(*) FROM kb_feedback) AS feedbacks,
-          (SELECT COUNT(DISTINCT ticket_id) FROM ticket_kb_links) AS linked_tickets,
-          (SELECT COUNT(*) FROM kb_articles) -
-          (SELECT COUNT(DISTINCT article_id) FROM ticket_kb_links) AS orphan_articles
+          (SELECT COALESCE(SUM(views),0) FROM kb_notes) AS views,
+          (SELECT COUNT(*) FROM kb_notes) AS articles,
+          (SELECT COALESCE(SUM(helpful),0) FROM kb_note_feedback) AS helpful,
+          (SELECT COUNT(*) FROM kb_note_feedback) AS feedbacks,
+          (SELECT COUNT(DISTINCT source_id) FROM entity_links WHERE source_type='jira_issue' AND target_type='kb_note') AS linked_tickets,
+          (SELECT COUNT(*) FROM kb_notes) -
+          (SELECT COUNT(DISTINCT target_id) FROM entity_links WHERE source_type='jira_issue' AND target_type='kb_note') AS orphan_articles
     """).fetchone()
     no_result_searches = 0
     top_gaps = []

@@ -4,6 +4,10 @@
    rest of the app never touches URLs directly. Session cookie is sent
    automatically by the browser.
 
+   Phase 0 (unified schema): tickets live under /api/jira/issues; the
+   backend keeps legacy field aliases (subject/ticket_ref) in responses,
+   so views can keep using them until Phase 5 migrations are complete.
+
    CSRF: the backend requires a per-session token on every mutating request,
    sent in the X-CSRF-Token header. We fetch it once after login (and on
    demand) and cache it here. Our own same-site fetch calls include it;
@@ -61,29 +65,30 @@ const API = (() => {
     me:       () => req("GET", "/api/auth/me"),
     csrf:     () => req("GET", "/api/auth/csrf"),
 
-    listTickets: (params = {}) => {
+    // Issues (tickets) — /api/jira/issues/*
+    listIssues: (params = {}) => {
       const q = new URLSearchParams(params).toString();
-      return req("GET", "/api/tickets" + (q ? "?" + q : ""));
+      return req("GET", "/api/jira/issues" + (q ? "?" + q : ""));
     },
-    getTicket:  (id) => req("GET", `/api/tickets/${id}`),
-    createTicket: (payload) => req("POST", "/api/tickets", payload),
-    assign:     (id, payload) => req("POST", `/api/tickets/${id}/assign`, payload),
-    setStatus:  (id, payload) => req("POST", `/api/tickets/${id}/status`, payload),
-    setPriority: (id, priority) => req("POST", `/api/tickets/${id}/priority`, { priority }),
-    updateTicket: (id, payload) => req("PATCH", `/api/tickets/${id}`, payload),
-    bulkAction: (payload) => req("POST", "/api/tickets/bulk", payload),
-    listFollowers: (id) => req("GET", `/api/tickets/${id}/followers`),
-    followTicket: (id) => req("POST", `/api/tickets/${id}/follow`),
-    unfollowTicket: (id) => req("DELETE", `/api/tickets/${id}/follow`),
+    getIssue:   (id) => req("GET", `/api/jira/issues/${id}`),
+    createIssue: (payload) => req("POST", "/api/jira/issues", payload),
+    assignIssue: (id, payload) => req("POST", `/api/jira/issues/${id}/assign`, payload),
+    setStatus:  (id, payload) => req("POST", `/api/jira/issues/${id}/status`, payload),
+    setPriority: (id, priority) => req("POST", `/api/jira/issues/${id}/priority`, { priority }),
+    updateIssue: (id, payload) => req("PATCH", `/api/jira/issues/${id}`, payload),
+    bulkAction: (payload) => req("POST", "/api/jira/issues/bulk", payload),
+    listFollowers: (id) => req("GET", `/api/jira/issues/${id}/followers`),
+    followIssue: (id) => req("POST", `/api/jira/issues/${id}/follow`),
+    unfollowIssue: (id) => req("DELETE", `/api/jira/issues/${id}/follow`),
     kbSuggest: (q) => req("GET", "/api/kb/suggest?q=" + encodeURIComponent(q)),
-    reopen:     (id) => req("POST", `/api/tickets/${id}/reopen`),
-    comment:    (id, payload) => req("POST", `/api/tickets/${id}/comments`, payload),
+    reopen:     (id) => req("POST", `/api/jira/issues/${id}/reopen`),
+    comment:    (id, payload) => req("POST", `/api/jira/issues/${id}/comments`, payload),
     upload:     (id, file) => {
       const fd = new FormData();
       fd.append("file", file);
-      return req("POST", `/api/tickets/${id}/attachments`, fd, true);
+      return req("POST", `/api/jira/issues/${id}/attachments`, fd, true);
     },
-    attachmentUrl: (tid, aid) => `${base}/api/tickets/${tid}/attachments/${aid}`,
+    attachmentUrl: (iid, aid) => `${base}/api/jira/issues/${iid}/attachments/${aid}`,
 
     dashboard: () => req("GET", "/api/dashboard"),
     meta:      () => req("GET", "/api/meta"),
@@ -120,17 +125,18 @@ const API = (() => {
     removeKbLink: (aid, targetId) => req("DELETE", `/api/kb/${aid}/links/${targetId}`),
     draftKbFromTicket: (aid, payload) => req("POST", `/api/kb/${aid}/draft-from-ticket`, payload),
 
-    listTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge`),
-    linkTicketKnowledge: (tid, payload) => req("POST", `/api/tickets/${tid}/knowledge`, payload),
-    unlinkTicketKnowledge: (tid, aid) => req("DELETE", `/api/tickets/${tid}/knowledge/${aid}`),
-    suggestTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge/suggested`),
-    promoteTicketToKb: (tid) => req("POST", `/api/tickets/${tid}/promote-kb`),
+    listIssueKnowledge: (iid) => req("GET", `/api/jira/issues/${iid}/knowledge`),
+    linkIssueKnowledge: (iid, payload) => req("POST", `/api/jira/issues/${iid}/knowledge`, payload),
+    unlinkIssueKnowledge: (iid, aid) => req("DELETE", `/api/jira/issues/${iid}/knowledge/${aid}`),
+    suggestIssueKnowledge: (iid) => req("GET", `/api/jira/issues/${iid}/knowledge/suggested`),
+    promoteIssueToKb: (iid) => req("POST", `/api/jira/issues/${iid}/promote-kb`),
 
     // Phase 4 — Reports & CSAT
     reportsSummary: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/summary" + (q ? "?" + q : "")); },
     reportsWorkload: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/workload" + (q ? "?" + q : "")); },
     reportsSla: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/sla" + (q ? "?" + q : "")); },
     reportsTrend: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/trend" + (q ? "?" + q : "")); },
+    reportsKnowledge: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/knowledge" + (q ? "?" + q : "")); },
     actionCenter: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/dashboard/action-center" + (q ? "?" + q : "")); },
     exportCsv: async (params = {}) => {
       const q = new URLSearchParams(params).toString();
@@ -157,7 +163,7 @@ const API = (() => {
       a.remove();
       URL.revokeObjectURL(url);
     },
-    rateTicket: (id, score) => req("POST", `/api/tickets/${id}/rate`, { score }),
+    rateIssue: (id, score) => req("POST", `/api/jira/issues/${id}/rate`, { score }),
 
     // Settings — user AI key + model (per-user OpenRouter key)
     getAiSettings: () => req("GET", "/api/settings/ai"),

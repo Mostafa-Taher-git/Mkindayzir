@@ -41,9 +41,9 @@ def create_team():
 @csrf_protect
 def delete_team(tid):
     dbc = db.get_db()
-    # Don't orphan tickets/users: null their team_id (FK is ON DELETE SET NULL,
+    # Don't orphan issues/users: null their team_id (FK is ON DELETE SET NULL,
     # but only when the column itself is nullable — be explicit and safe).
-    dbc.execute("UPDATE tickets SET team_id = NULL WHERE team_id = ?", (tid,))
+    dbc.execute("UPDATE jira_issues SET team_id = NULL WHERE team_id = ?", (tid,))
     dbc.execute("UPDATE users SET team_id = NULL WHERE team_id = ?", (tid,))
     dbc.execute("DELETE FROM teams WHERE id = ?", (tid,))
     dbc.commit()
@@ -149,19 +149,19 @@ def delete_user(uid):
     user = db.get_db().execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not user:
         return jsonify(error="User not found"), 404
-    ticket_count = db.get_db().execute(
-        "SELECT COUNT(*) AS c FROM tickets WHERE requester_id=? OR assignee_id=?",
+    issue_count = db.get_db().execute(
+        "SELECT COUNT(*) AS c FROM jira_issues WHERE requester_id=? OR assignee_id=?",
         (uid, uid)
     ).fetchone()["c"]
     comment_count = db.get_db().execute(
-        "SELECT COUNT(*) AS c FROM ticket_comments WHERE author_id=?", (uid,)
+        "SELECT COUNT(*) AS c FROM entity_comments WHERE author_id=?", (uid,)
     ).fetchone()["c"]
     kb_count = db.get_db().execute(
-        "SELECT COUNT(*) AS c FROM kb_articles WHERE author_id=?", (uid,)
+        "SELECT COUNT(*) AS c FROM kb_notes WHERE author_id=?", (uid,)
     ).fetchone()["c"]
-    if ticket_count or comment_count or kb_count:
+    if issue_count or comment_count or kb_count:
         return jsonify(
-            error="Cannot delete user with existing ticket history. "
+            error="Cannot delete user with existing issue history. "
                  "Reassign or archive related records first."
         ), 409
     db.get_db().execute("DELETE FROM users WHERE id=?", (uid,))

@@ -18,7 +18,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Where uploaded attachments are stored on disk.
 # Deliberately OUTSIDE static/ so files are never served by Flask's static
-# file handler. Downloads go only through /api/tickets/<id>/attachments/<aid>,
+# file handler. Downloads go only through /api/jira/issues/<id>/attachments/<aid>,
 # which is @login_required + can_view_ticket checked.
 UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploads")
 

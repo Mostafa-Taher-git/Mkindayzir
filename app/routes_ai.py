@@ -10,7 +10,7 @@ request so the model only ever sees authorized data.
 from flask import Blueprint, jsonify, request
 
 from . import db, config, helpers
-from .routes_tickets import _fetch, _comments_for
+from .routes_jira import _fetch, _comments_for
 from .helpers import can_view_ticket, role_required, decrypt_secret
 from . import ai
 

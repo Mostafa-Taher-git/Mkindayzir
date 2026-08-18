@@ -1,17 +1,23 @@
 """
-Knowledge Base API (Phase 2).
+Knowledge Base API (Phase 2, migrated to Obsidian-style notes).
 
 Self-service content for requesters plus authoring for agents/managers.
 
-Endpoints:
-  GET  /api/kb                 -> list articles (published for requesters; all for
-                                 agents/managers). ?q=search&category_id=
-  GET  /api/kb/<id>           -> one article; published views counter increments
+Endpoints (paths unchanged for Phase 0; data model now kb_notes/kb_folders/
+kb_wikilinks/kb_note_versions/kb_note_feedback/kb_collections_v2):
+  GET  /api/kb                 -> list notes (published for requesters; all for
+                                 agents/managers). ?q=search&category_id=&folder_id=
+  GET  /api/kb/<id>           -> one note; published views counter increments
   POST /api/kb                -> create (agent/manager); status defaults to 'draft'
   PATCH /api/kb/<id>          -> edit (author or agent/manager)
   POST /api/kb/<id>/publish  -> publish (agent/manager)
   DELETE /api/kb/<id>         -> delete (agent/manager)
   POST /api/kb/<id>/feedback -> "was this helpful?" (any logged-in user)
+  GET  /api/kb/folders        -> folder tree
+  POST /api/kb/folders        -> create folder (agent/manager)
+  GET/POST/DELETE /api/kb/<id>/links (+ <target_id>)
+  GET  /api/kb/<id>/versions
+  GET/POST /api/kb/collections, GET/POST/DELETE collections/<cid>/notes
 
 Python is kept thin; the editable surface (search UI, authoring form) lives in JS.
 """
@@ -23,8 +29,19 @@ kb = Blueprint("kb", __name__)
 
 
 def _serialize(a):
-    """Article row -> JSON-safe dict. author name resolved from meta users."""
+    """Note row -> JSON-safe dict. author name resolved from meta users.
+
+    Emits a `body` alias for `content` (legacy API compat) plus category_id
+    derived from the folder so pre-Phase-0 clients keep working.
+    """
     d = dict(a)
+    d["body"] = d.get("content")
+    if d.get("folder_id") is not None:
+        cat = db.get_db().execute(
+            """SELECT c.id FROM categories c
+               JOIN kb_folders f ON f.name = c.name AND f.parent_id IS NOT NULL
+              WHERE f.id = ?""", (d["folder_id"],)).fetchone()
+        d["category_id"] = cat["id"] if cat else None
     return d
 
 
@@ -36,10 +53,36 @@ def _author_name(user_id):
     return u["name"] if u else None
 
 
+def _folder_for_category(category_id):
+    """Return the kb_folder used for notes of a given category.
+
+    Creates the folder on first use (under General). Idempotent. Used by
+    routes_jira.promote_to_kb too.
+    """
+    conn = db.get_db()
+    if category_id is not None:
+        cat = conn.execute(
+            "SELECT name FROM categories WHERE id=?", (category_id,)).fetchone()
+        if cat:
+            row = conn.execute(
+                "SELECT f.id FROM kb_folders f WHERE f.name=? AND f.parent_id IS NOT NULL",
+                (cat["name"],)).fetchone()
+            if row:
+                return row["id"]
+    row = conn.execute(
+        "SELECT id FROM kb_folders WHERE name='General' AND parent_id IS NULL").fetchone()
+    if not row:
+        cur = conn.execute(
+            "INSERT INTO kb_folders (name, parent_id) VALUES ('General', NULL)")
+        conn.commit()
+        return cur.lastrowid
+    return row["id"]
+
+
 @kb.route("/api/kb/suggest", methods=["GET"])
 @helpers.login_required
-def suggest_articles():
-    """Top published articles by keyword overlap with a free-text query.
+def suggest_notes():
+    """Top published notes by keyword overlap with a free-text query.
 
     Powers the pre-submit "does this already answer your request?" card on the
     New Request form. Published-only, ranked, top 5.
@@ -47,44 +90,44 @@ def suggest_articles():
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify(suggestions=[])
-    from .routes_tickets import _keyword_terms
+    from .routes_jira import _keyword_terms
     terms = _keyword_terms(q)
     if not terms:
         return jsonify(suggestions=[])
     rows = db.get_db().execute(
-        "SELECT a.*, c.name AS category_name FROM kb_articles a "
-        "LEFT JOIN categories c ON c.id = a.category_id "
-        "WHERE a.status='published'",
+        "SELECT n.*, f.name AS folder_name FROM kb_notes n "
+        "LEFT JOIN kb_folders f ON f.id = n.folder_id "
+        "WHERE n.status='published'",
     ).fetchall()
     scored = []
     for r in rows:
-        hay = _keyword_terms(r["title"] + " " + r["body"])
+        hay = _keyword_terms(r["title"] + " " + r["content"])
         if not hay:
             continue
         score = sum(terms.get(w, 0) * hay.get(w, 0) for w in terms)
         if score > 0:
             scored.append((score, r))
     scored.sort(key=lambda x: x[0], reverse=True)
-    out = [{"id": r["id"], "title": r["title"], "category_name": r["category_name"], "score": s}
+    out = [{"id": r["id"], "title": r["title"], "folder_name": r["folder_name"], "score": s}
            for s, r in scored[:5]]
     return jsonify(suggestions=out)
 
 
 @kb.route("/api/kb", methods=["GET"])
 @helpers.login_required
-def list_articles():
+def list_notes():
     user = request.current_user
-    sql = "SELECT * FROM kb_articles WHERE 1=1"
+    sql = "SELECT n.*, f.name AS folder_name, f.parent_id AS folder_parent_id FROM kb_notes n LEFT JOIN kb_folders f ON f.id = n.folder_id WHERE 1=1"
     params = []
     if user["role"] == "requester":
         sql += " AND status='published'"
     q = (request.args.get("q") or "").strip()
     published_only = request.args.get("published_only") == "1"
     if user["role"] == "requester" or published_only:
-        sql += " AND status='published'"
+        sql += " AND n.status='published'"
     if q:
         like = f"%{q}%"
-        sql += " AND (title LIKE ? OR body LIKE ?)"
+        sql += " AND (n.title LIKE ? OR n.content LIKE ?)"
         params += [like, like]
     cat = request.args.get("category_id")
     if cat:
@@ -93,74 +136,88 @@ def list_articles():
         except (TypeError, ValueError):
             cat = None
         if cat is not None:
-            sql += " AND category_id=?"
-            params.append(cat)
+            # kb_notes dropped category_id (Phase 0): categories map to folders.
+            sql += " AND n.folder_id=?"
+            params.append(_folder_for_category(cat))
+    folder_id = request.args.get("folder_id", type=int)
+    if folder_id:
+        sql += " AND n.folder_id=?"
+        params.append(folder_id)
     status = request.args.get("status")
     if status in ("draft", "published"):
-        sql += " AND status=?"
+        sql += " AND n.status=?"
         params.append(status)
     author_id = request.args.get("author_id", type=int)
     if author_id:
-        sql += " AND author_id=?"
+        sql += " AND n.author_id=?"
         params.append(author_id)
     date_from = request.args.get("date_from")
     date_to = request.args.get("date_to")
     if date_from:
-        sql += " AND created_at >= ?"
+        sql += " AND n.created_at >= ?"
         params.append(date_from + " 00:00:00")
     if date_to:
-        sql += " AND created_at <= ?"
+        sql += " AND n.created_at <= ?"
         params.append(date_to + " 23:59:59")
     sort = request.args.get("sort")
     if sort == "views":
-        sql += " ORDER BY views DESC"
+        sql += " ORDER BY n.views DESC"
     elif sort == "helpful":
-        sql += " ORDER BY (SELECT COALESCE(SUM(helpful),0) FROM kb_feedback WHERE kb_feedback.article_id=kb_articles.id) DESC"
+        sql += " ORDER BY (SELECT COALESCE(SUM(helpful),0) FROM kb_note_feedback WHERE kb_note_feedback.note_id=n.id) DESC"
     else:
-        sql += " ORDER BY updated_at DESC"
+        sql += " ORDER BY n.updated_at DESC"
     rows = db.get_db().execute(sql, params).fetchall()
     out = []
     for r in rows:
         a = _serialize(r)
         a["author_name"] = _author_name(a["author_id"])
         a["helpful_count"] = db.get_db().execute(
-            "SELECT COALESCE(SUM(helpful),0) AS c FROM kb_feedback WHERE article_id=?", (a["id"],)
+            "SELECT COALESCE(SUM(helpful),0) AS c FROM kb_note_feedback WHERE note_id=?", (a["id"],)
         ).fetchone()["c"]
         a["feedback_count"] = db.get_db().execute(
-            "SELECT COUNT(*) AS c FROM kb_feedback WHERE article_id=?", (a["id"],)
+            "SELECT COUNT(*) AS c FROM kb_note_feedback WHERE note_id=?", (a["id"],)
         ).fetchone()["c"]
         out.append(a)
-    return jsonify(articles=out)
+    return jsonify(notes=out)
 
 
-@kb.route("/api/kb/<int:aid>", methods=["GET"])
+@kb.route("/api/kb/<int:nid>", methods=["GET"])
 @helpers.login_required
-def get_article(aid):
+def get_note(nid):
     user = request.current_user
     a = db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+        "SELECT n.*, f.name AS folder_name FROM kb_notes n "
+        "LEFT JOIN kb_folders f ON f.id = n.folder_id WHERE n.id=?", (nid,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     if user["role"] == "requester" and a["status"] != "published":
-        return jsonify(error="Article not found"), 404
-    # Count a view only when a published article is read.
+        return jsonify(error="Note not found"), 404
+    # Count a view only when a published note is read.
     if a["status"] == "published":
         db.get_db().execute(
-            "UPDATE kb_articles SET views = views + 1 WHERE id=?", (aid,))
+            "UPDATE kb_notes SET views = views + 1 WHERE id=?", (nid,))
         db.get_db().commit()
-        a = dict(db.get_db().execute(
-            "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone())
+        a = db.get_db().execute(
+            "SELECT n.*, f.name AS folder_name FROM kb_notes n "
+            "LEFT JOIN kb_folders f ON f.id = n.folder_id WHERE n.id=?", (nid,)).fetchone()
+    a = _serialize(a)
     a["author_name"] = _author_name(a["author_id"])
-    return jsonify(article=a)
+    a["helpful_count"] = db.get_db().execute(
+        "SELECT COALESCE(SUM(helpful),0) AS c FROM kb_note_feedback WHERE note_id=?", (nid,)
+    ).fetchone()["c"]
+    a["feedback_count"] = db.get_db().execute(
+        "SELECT COUNT(*) AS c FROM kb_note_feedback WHERE note_id=?", (nid,)
+    ).fetchone()["c"]
+    return jsonify(note=a)
 
 
 @kb.route("/api/kb", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
-def create_article():
+def create_note():
     user = request.current_user
     if user["role"] not in ("agent", "manager", "admin"):
-        return jsonify(error="Only agents and managers can author articles"), 403
+        return jsonify(error="Only agents and managers can author notes"), 403
     data = request.get_json(force=True, silent=True) or {}
     title = (data.get("title") or "").strip()
     body = (data.get("body") or "").strip()
@@ -177,135 +234,159 @@ def create_article():
             "SELECT 1 FROM categories WHERE id=?", (cid,)).fetchone()
         if not cat:
             return jsonify(error="Unknown category"), 400
+    folder_id = data.get("folder_id")
+    if not folder_id:
+        folder_id = _folder_for_category(cid)
     cur = db.get_db().execute(
-        """INSERT INTO kb_articles (title, body, category_id, author_id, status, views, created_at, updated_at)
+        """INSERT INTO kb_notes (folder_id, title, content, author_id, status, views, created_at, updated_at)
            VALUES (?,?,?,?, 'draft', 0, ?, ?)""",
-        (title, body, data.get("category_id") or None, user["id"], now, now))
+        (folder_id, title, body, user["id"], now, now))
     db.get_db().commit()
-    return jsonify(article=dict(db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+    return jsonify(note=_serialize(db.get_db().execute(
+        "SELECT * FROM kb_notes WHERE id=?", (cur.lastrowid,)).fetchone())), 201
 
 
-@kb.route("/api/kb/<int:aid>", methods=["PATCH"])
+@kb.route("/api/kb/<int:nid>", methods=["PATCH"])
 @helpers.login_required
 @helpers.csrf_protect
-def edit_article(aid):
+def edit_note(nid):
     user = request.current_user
     a = db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+        "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     if user["role"] not in ("agent", "manager", "admin") or (
             user["role"] == "agent" and a["author_id"] != user["id"]):
-        return jsonify(error="Not allowed to edit this article"), 403
+        return jsonify(error="Not allowed to edit this note"), 403
     data = request.get_json(force=True, silent=True) or {}
     title = (data.get("title") or a["title"]).strip()
-    body = (data.get("body") or a["body"]).strip()
+    body = (data.get("body") or a["content"]).strip()
     if not title or not body:
         return jsonify(error="Title and body are required"), 400
     if len(body) > config.MAX_KB_BODY:
         return jsonify(error=f"Body must be ≤ {config.MAX_KB_BODY} characters"), 400
     if len(title) > config.MAX_KB_TITLE:
         return jsonify(error=f"Title must be ≤ {config.MAX_KB_TITLE} characters"), 400
-    cid = data.get("category_id", a["category_id"])
-    if cid is not None:
-        cat = db.get_db().execute(
-            "SELECT 1 FROM categories WHERE id=?", (cid,)).fetchone()
-        if not cat:
-            return jsonify(error="Unknown category"), 400
     now = db.now_iso()
     db.get_db().execute(
-        "INSERT INTO kb_article_versions (article_id, title, body, category_id, status, created_by, created_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (aid, a["title"], a["body"], a["category_id"], a["status"], user["id"], now),
+        "INSERT INTO kb_note_versions (note_id, title, body, saved_by_id, change_note, saved_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (nid, a["title"], a["content"], user["id"], "", now),
     )
     db.get_db().execute(
-        "UPDATE kb_articles SET title=?, body=?, category_id=?, updated_at=? WHERE id=?",
-        (title, body, data.get("category_id", a["category_id"]), now, aid))
+        "UPDATE kb_notes SET title=?, content=?, updated_at=? WHERE id=?",
+        (title, body, now, nid))
     db.get_db().commit()
-    return jsonify(article=dict(db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()))
+    return jsonify(note=_serialize(db.get_db().execute(
+        "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()))
 
 
-@kb.route("/api/kb/<int:aid>/publish", methods=["POST"])
+@kb.route("/api/kb/<int:nid>/publish", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
-def publish_article(aid):
+def publish_note(nid):
     user = request.current_user
     if user["role"] not in ("agent", "manager", "admin"):
         return jsonify(error="Not allowed"), 403
     a = db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+        "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     if user["role"] == "agent" and a["author_id"] != user["id"]:
-        return jsonify(error="Not allowed to publish this article"), 403
-    db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
-    if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Not allowed to publish this note"), 403
     now = db.now_iso()
     db.get_db().execute(
-        "INSERT INTO kb_article_versions (article_id, title, body, category_id, status, created_by, created_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (aid, a["title"], a["body"], a["category_id"], a["status"], user["id"], now),
+        "INSERT INTO kb_note_versions (note_id, title, body, saved_by_id, change_note, saved_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (nid, a["title"], a["content"], user["id"], "", now),
     )
     db.get_db().execute(
-        "UPDATE kb_articles SET status='published', updated_at=? WHERE id=?",
-        (now, aid))
+        "UPDATE kb_notes SET status='published', updated_at=? WHERE id=?",
+        (now, nid))
     db.get_db().commit()
-    return jsonify(ok=True, article=dict(db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()))
+    return jsonify(ok=True, note=_serialize(db.get_db().execute(
+        "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()))
 
 
-@kb.route("/api/kb/<int:aid>", methods=["DELETE"])
+@kb.route("/api/kb/<int:nid>", methods=["DELETE"])
 @helpers.login_required
 @helpers.csrf_protect
-def delete_article(aid):
+def delete_note(nid):
     user = request.current_user
     if user["role"] not in ("agent", "manager", "admin"):
         return jsonify(error="Not allowed"), 403
     a = db.get_db().execute(
-        "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+        "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     if user["role"] == "agent" and a["author_id"] != user["id"]:
-        return jsonify(error="Not allowed to delete this article"), 403
-    db.get_db().execute("DELETE FROM kb_articles WHERE id=?", (aid,))
+        return jsonify(error="Not allowed to delete this note"), 403
+    db.get_db().execute("DELETE FROM kb_notes WHERE id=?", (nid,))
     db.get_db().commit()
     return jsonify(ok=True)
 
 
-@kb.route("/api/kb/<int:aid>/feedback", methods=["POST"])
+@kb.route("/api/kb/<int:nid>/feedback", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
-def feedback(aid):
+def feedback(nid):
     user = request.current_user
     a = db.get_db().execute(
-        "SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+        "SELECT id FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     data = request.get_json(force=True, silent=True) or {}
     helpful = data.get("helpful")
     if helpful not in (0, 1, True, False):
         return jsonify(error="helpful must be true/false"), 400
     helpful = 1 if helpful else 0
-    # One vote per user per article (upsert by replacing prior vote).
+    # One vote per user per note (upsert by replacing prior vote).
     db.get_db().execute(
-        "DELETE FROM kb_feedback WHERE article_id=? AND user_id=?", (aid, user["id"]))
+        "DELETE FROM kb_note_feedback WHERE note_id=? AND user_id=?", (nid, user["id"]))
     db.get_db().execute(
-        "INSERT INTO kb_feedback (article_id, user_id, helpful, comment, created_at) VALUES (?,?,?,?,?)",
-        (aid, user["id"], helpful, (data.get("comment") or "")[:1000] or None, db.now_iso()))
+        "INSERT INTO kb_note_feedback (note_id, user_id, helpful, comment, created_at) VALUES (?,?,?,?,?)",
+        (nid, user["id"], helpful, (data.get("comment") or "")[:1000] or None, db.now_iso()))
     db.get_db().commit()
     return jsonify(ok=True)
+
+
+@kb.route("/api/kb/folders", methods=["GET"])
+@helpers.login_required
+def list_folders():
+    rows = db.get_db().execute(
+        "SELECT * FROM kb_folders ORDER BY parent_id IS NOT NULL, name").fetchall()
+    return jsonify(folders=[dict(r) for r in rows])
+
+
+@kb.route("/api/kb/folders", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def create_folder():
+    user = request.current_user
+    if user["role"] not in ("agent", "manager", "admin"):
+        return jsonify(error="Not allowed"), 403
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify(error="name is required"), 400
+    parent_id = data.get("parent_id")
+    try:
+        cur = db.get_db().execute(
+            "INSERT INTO kb_folders (name, parent_id) VALUES (?,?)",
+            (name, parent_id or None))
+        db.get_db().commit()
+    except Exception:
+        db.get_db().execute("ROLLBACK")
+        return jsonify(error="Folder already exists"), 409
+    return jsonify(folder=dict(db.get_db().execute(
+        "SELECT * FROM kb_folders WHERE id=?", (cur.lastrowid,)).fetchone())), 201
 
 
 @kb.route("/api/kb/collections", methods=["GET"])
 @helpers.login_required
 def list_collections():
-    user = request.current_user
     rows = db.get_db().execute(
-        "SELECT * FROM kb_collections ORDER BY updated_at DESC"
+        "SELECT * FROM kb_collections_v2 ORDER BY updated_at DESC"
     ).fetchall()
     out = []
     for c in rows:
@@ -329,19 +410,20 @@ def create_collection():
         return jsonify(error="name is required"), 400
     now = db.now_iso()
     cur = db.get_db().execute(
-        "INSERT INTO kb_collections (name, description, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)",
+        "INSERT INTO kb_collections_v2 (name, description, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)",
         (name, description, user["id"], now, now))
     db.get_db().commit()
     return jsonify(collection=dict(db.get_db().execute(
-        "SELECT * FROM kb_collections WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+        "SELECT * FROM kb_collections_v2 WHERE id=?", (cur.lastrowid,)).fetchone())), 201
 
 
-@kb.route("/api/kb/collections/<int:cid>/articles", methods=["GET"])
+@kb.route("/api/kb/collections/<int:cid>/notes", methods=["GET"])
+@kb.route("/api/kb/collections/<int:cid>/articles", methods=["GET"], endpoint="list_collection_notes_alias")
 @helpers.login_required
-def list_collection_articles(cid):
+def list_collection_notes(cid):
     rows = db.get_db().execute(
-        "SELECT a.*, ca.position FROM kb_collection_articles ca "
-        "JOIN kb_articles a ON a.id = ca.article_id WHERE ca.collection_id=? ORDER BY ca.position ASC, a.updated_at DESC",
+        "SELECT n.*, cn.position FROM kb_collection_notes cn "
+        "JOIN kb_notes n ON n.id = cn.note_id WHERE cn.collection_id=? ORDER BY cn.position ASC, n.updated_at DESC",
         (cid,)
     ).fetchall()
     out = []
@@ -349,30 +431,31 @@ def list_collection_articles(cid):
         a = dict(r)
         a["author_name"] = _author_name(a.get("author_id"))
         out.append(a)
-    return jsonify(articles=out)
+    return jsonify(notes=out)
 
 
-@kb.route("/api/kb/collections/<int:cid>/articles", methods=["POST"])
+@kb.route("/api/kb/collections/<int:cid>/notes", methods=["POST"])
+@kb.route("/api/kb/collections/<int:cid>/articles", methods=["POST"], endpoint="add_collection_note_alias")
 @helpers.login_required
 @helpers.csrf_protect
-def add_collection_article(cid):
+def add_collection_note(cid):
     user = request.current_user
     if user["role"] == "requester":
         return jsonify(error="Forbidden"), 403
-    c = db.get_db().execute("SELECT * FROM kb_collections WHERE id=?", (cid,)).fetchone()
+    c = db.get_db().execute("SELECT * FROM kb_collections_v2 WHERE id=?", (cid,)).fetchone()
     if not c:
         return jsonify(error="Collection not found"), 404
     data = request.get_json(force=True, silent=True) or {}
-    article_id = data.get("article_id")
-    if not article_id:
-        return jsonify(error="article_id is required"), 400
-    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (article_id,)).fetchone()
+    note_id = data.get("note_id") or data.get("article_id")
+    if not note_id:
+        return jsonify(error="note_id is required"), 400
+    a = db.get_db().execute("SELECT * FROM kb_notes WHERE id=?", (note_id,)).fetchone()
     if not a:
-        return jsonify(error="Article not found"), 404
+        return jsonify(error="Note not found"), 404
     try:
         db.get_db().execute(
-            "INSERT INTO kb_collection_articles (collection_id, article_id, position, created_at) VALUES (?,?,?,?)",
-            (cid, article_id, 0, db.now_iso()))
+            "INSERT INTO kb_collection_notes (collection_id, note_id, position, created_at) VALUES (?,?,?,?)",
+            (cid, note_id, 0, db.now_iso()))
         db.get_db().commit()
     except Exception:
         db.get_db().execute("ROLLBACK")
@@ -380,75 +463,76 @@ def add_collection_article(cid):
     return jsonify(ok=True), 201
 
 
-@kb.route("/api/kb/collections/<int:cid>/articles/<int:aid>", methods=["DELETE"])
+@kb.route("/api/kb/collections/<int:cid>/notes/<int:nid>", methods=["DELETE"])
+@kb.route("/api/kb/collections/<int:cid>/articles/<int:nid>", methods=["DELETE"], endpoint="remove_collection_note_alias")
 @helpers.login_required
 @helpers.csrf_protect
-def remove_collection_article(cid, aid):
+def remove_collection_note(cid, nid):
     user = request.current_user
     if user["role"] == "requester":
         return jsonify(error="Forbidden"), 403
-    db.get_db().execute("DELETE FROM kb_collection_articles WHERE collection_id=? AND article_id=?", (cid, aid))
+    db.get_db().execute("DELETE FROM kb_collection_notes WHERE collection_id=? AND note_id=?", (cid, nid))
     db.get_db().commit()
     return jsonify(ok=True)
 
 
-@kb.route("/api/kb/<int:aid>/versions", methods=["GET"])
+@kb.route("/api/kb/<int:nid>/versions", methods=["GET"])
 @helpers.login_required
-def list_versions(aid):
-    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+def list_versions(nid):
+    a = db.get_db().execute("SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
         return jsonify(error="Not found"), 404
     if request.current_user["role"] == "requester" and a["status"] != "published":
         return jsonify(error="Not found"), 404
     rows = db.get_db().execute(
-        "SELECT * FROM kb_article_versions WHERE article_id=? ORDER BY created_at DESC",
-        (aid,),
+        "SELECT * FROM kb_note_versions WHERE note_id=? ORDER BY saved_at DESC",
+        (nid,),
     ).fetchall()
     return jsonify(versions=[dict(r) for r in rows])
 
 
-@kb.route("/api/kb/<int:aid>/links", methods=["GET"])
+@kb.route("/api/kb/<int:nid>/links", methods=["GET"])
 @helpers.login_required
-def list_links(aid):
-    a = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+def list_links(nid):
+    a = db.get_db().execute("SELECT id FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
         return jsonify(error="Not found"), 404
     outbound = db.get_db().execute(
-        "SELECT a.*, l.created_at AS linked_at FROM kb_article_links l "
-        "JOIN kb_articles a ON a.id = l.target_id WHERE l.source_id=?",
-        (aid,),
+        "SELECT n.*, l.created_at AS linked_at FROM kb_wikilinks l "
+        "JOIN kb_notes n ON n.id = l.target_note_id WHERE l.source_note_id=?",
+        (nid,),
     ).fetchall()
     inbound = db.get_db().execute(
-        "SELECT a.*, l.created_at AS linked_at FROM kb_article_links l "
-        "JOIN kb_articles a ON a.id = l.source_id WHERE l.target_id=?",
-        (aid,),
+        "SELECT n.*, l.created_at AS linked_at FROM kb_wikilinks l "
+        "JOIN kb_notes n ON n.id = l.source_note_id WHERE l.target_note_id=?",
+        (nid,),
     ).fetchall()
     return jsonify(outbound=[dict(r) for r in outbound], inbound=[dict(r) for r in inbound])
 
 
-@kb.route("/api/kb/<int:aid>/links", methods=["POST"])
+@kb.route("/api/kb/<int:nid>/links", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect
-def add_link(aid):
+def add_link(nid):
     user = request.current_user
     if user["role"] == "requester":
         return jsonify(error="Forbidden"), 403
-    src = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    src = db.get_db().execute("SELECT id FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not src:
         return jsonify(error="Not found"), 404
     data = request.get_json(force=True, silent=True) or {}
     target_id = data.get("target_id")
     if not target_id:
         return jsonify(error="target_id is required"), 400
-    if int(target_id) == aid:
-        return jsonify(error="An article cannot link to itself"), 400
-    tgt = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (target_id,)).fetchone()
+    if int(target_id) == nid:
+        return jsonify(error="A note cannot link to itself"), 400
+    tgt = db.get_db().execute("SELECT id FROM kb_notes WHERE id=?", (target_id,)).fetchone()
     if not tgt:
         return jsonify(error="Target not found"), 404
     try:
         db.get_db().execute(
-            "INSERT INTO kb_article_links (source_id, target_id, created_by, created_at) VALUES (?,?,?,?)",
-            (aid, target_id, user["id"], db.now_iso()))
+            "INSERT INTO kb_wikilinks (source_note_id, target_note_id, alias, created_at) VALUES (?,?,?,?)",
+            (nid, target_id, data.get("alias") or None, db.now_iso()))
         db.get_db().commit()
     except Exception:
         db.get_db().execute("ROLLBACK")
@@ -456,25 +540,25 @@ def add_link(aid):
     return jsonify(ok=True), 201
 
 
-@kb.route("/api/kb/<int:aid>/links/<int:target_id>", methods=["DELETE"])
+@kb.route("/api/kb/<int:nid>/links/<int:target_id>", methods=["DELETE"])
 @helpers.login_required
 @helpers.csrf_protect
-def remove_link(aid, target_id):
+def remove_link(nid, target_id):
     user = request.current_user
     if user["role"] == "requester":
         return jsonify(error="Forbidden"), 403
-    db.get_db().execute("DELETE FROM kb_article_links WHERE source_id=? AND target_id=?", (aid, target_id))
+    db.get_db().execute("DELETE FROM kb_wikilinks WHERE source_note_id=? AND target_note_id=?", (nid, target_id))
     db.get_db().commit()
     return jsonify(ok=True)
 
 
-def _draft_kb_body(user, ticket):
-    """AI-draft a KB body from a ticket using the user's own OpenRouter key.
+def _draft_kb_body(user, issue):
+    """AI-draft a KB body from an issue using the user's own OpenRouter key.
 
     Returns (body, ai_used). Fails closed: no key, network failure, or any
     exception falls back to a plaintext skeleton so drafting never blocks.
     """
-    plain = f"# {ticket['subject']}\n\n{ticket['description'] or ''}\n\n<!-- TODO: expand from ticket {ticket['id']} -->"
+    plain = f"# {issue['summary']}\n\n{issue['description'] or ''}\n\n<!-- TODO: expand from issue {issue['id']} -->"
     try:
         from app.ai import client as ai_client
         key = helpers.decrypt_secret(user.get("ai_key"))
@@ -482,9 +566,9 @@ def _draft_kb_body(user, ticket):
             return plain, False
         prompt = (
             "You are an internal helpdesk knowledge assistant. "
-            "Write a concise internal KB article draft from this ticket thread. "
+            "Write a concise internal KB note draft from this issue thread. "
             "Return markdown only.\n\n"
-            f"Subject: {ticket['subject']}\nDescription: {ticket['description'] or ''}"
+            f"Summary: {issue['summary']}\nDescription: {issue['description'] or ''}"
         )
         body = ai_client.chat(user["ai_model"],
                               [{"role": "user", "content": prompt}],
@@ -496,25 +580,26 @@ def _draft_kb_body(user, ticket):
     return plain + "\n\n<!-- AI draft unavailable; please edit before publishing. -->", False
 
 
-@kb.route("/api/kb/<int:aid>/draft-from-ticket", methods=["POST"])
+@kb.route("/api/kb/<int:nid>/draft-from-issue", methods=["POST"])
+@kb.route("/api/kb/<int:nid>/draft-from-ticket", methods=["POST"], endpoint="draft_from_ticket_alias")
 @helpers.login_required
 @helpers.csrf_protect
-def draft_from_ticket(aid):
+def draft_from_issue(nid):
     user = request.current_user
     if user["role"] == "requester":
         return jsonify(error="Forbidden"), 403
-    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    a = db.get_db().execute("SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
         return jsonify(error="Not found"), 404
     data = request.get_json(force=True, silent=True) or {}
-    ticket_id = data.get("ticket_id")
-    if not ticket_id:
-        return jsonify(error="ticket_id is required"), 400
+    issue_id = data.get("issue_id") or data.get("ticket_id")
+    if not issue_id:
+        return jsonify(error="issue_id is required"), 400
     t = db.get_db().execute(
-        "SELECT id, subject, description, category_id, status FROM tickets WHERE id=?",
-        (ticket_id,),
+        "SELECT id, summary, description, category_id, status FROM jira_issues WHERE id=?",
+        (issue_id,),
     ).fetchone()
     if not t:
-        return jsonify(error="Ticket not found"), 404
+        return jsonify(error="Issue not found"), 404
     body, _ai_used = _draft_kb_body(user, t)
-    return jsonify(title=t["subject"], body=body, category_id=t["category_id"], source_ticket_id=ticket_id), 200
+    return jsonify(title=t["summary"], body=body, category_id=t["category_id"], source_issue_id=issue_id), 200

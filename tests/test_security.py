@@ -66,12 +66,12 @@ def _login(client, email, password="password"):
                         headers={"X-CSRF-Token": token})
 
 
-def _create_ticket(client, csrf, subject="Broken laptop", desc="Won't turn on",
+def _create_issue(client, csrf, subject="Broken laptop", desc="Won't turn on",
                    as_user="sam@opsdesk.local"):
     # Self-contained: log in as the requested user and use a matching token.
     _login(client, as_user)
     csrf = _csrf(client)
-    return client.post("/api/tickets", json={"subject": subject, "description": desc},
+    return client.post("/api/jira/issues", json={"subject": subject, "description": desc},
                        headers={"X-CSRF-Token": csrf})
 
 
@@ -110,12 +110,12 @@ def test_meta_shows_users_to_agent(client):
 def test_requester_cannot_spoof_requester_id(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post("/api/tickets",
+    r = client.post("/api/jira/issues",
                     json={"subject": "X", "description": "y", "requester_id": 1},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
     # The ticket belongs to the logged-in requester, not the spoofed id.
-    body = r.get_json()["ticket"]
+    body = r.get_json()["issue"]
     assert body["requester_id"] != 1
     # sam's id is 5 in the seed; verify it's actually sam's.
     me = client.get("/api/auth/me").get_json()["user"]
@@ -127,14 +127,14 @@ def test_requester_cannot_spoof_requester_id(client):
 # ---------------------------------------------------------------------------
 def test_mutating_request_without_csrf_is_rejected(client):
     _login(client, "agent@opsdesk.local")
-    r = client.post("/api/tickets", json={"subject": "No token", "description": "z"})
+    r = client.post("/api/jira/issues", json={"subject": "No token", "description": "z"})
     assert r.status_code == 403
 
 
 def test_mutating_request_with_csrf_succeeds(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post("/api/tickets", json={"subject": "With token", "description": "ok"},
+    r = client.post("/api/jira/issues", json={"subject": "With token", "description": "ok"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
 
@@ -158,29 +158,29 @@ def test_reopen_count_not_double_incremented(client):
     # Ticket belongs to sam (the requester) so he can reopen it.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf).get_json()["ticket"]
+    t = _create_issue(client, csrf).get_json()["issue"]
     tid = t["id"]
     # agent drives it through the real lifecycle: assign -> in_progress -> resolved
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{tid}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{tid}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{tid}/status", json={"status": "in_progress"},
+    client.post(f"/api/jira/issues/{tid}/status", json={"status": "in_progress"},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{tid}/status", json={"status": "resolved"},
+    client.post(f"/api/jira/issues/{tid}/status", json={"status": "resolved"},
                 headers={"X-CSRF-Token": csrf})
     # requester reopens
     _login(client, "sam@opsdesk.local")
-    r = client.post(f"/api/tickets/{tid}/reopen", headers={"X-CSRF-Token": _csrf(client)})
+    r = client.post(f"/api/jira/issues/{tid}/reopen", headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["reopen_count"] == 1
+    assert r.get_json()["issue"]["reopen_count"] == 1
     # agent assigns it onward (was reopened) — must NOT bump reopen_count again.
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{tid}/assign", json={"self": True},
+    r = client.post(f"/api/jira/issues/{tid}/assign", json={"self": True},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["reopen_count"] == 1
+    assert r.get_json()["issue"]["reopen_count"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -190,14 +190,14 @@ def test_manager_can_close_new_ticket(client):
     _login(client, "manager@opsdesk.local")
     csrf = _csrf(client)
     # Create as the manager (manager is in is_agent_or_manager, so allowed).
-    r = client.post("/api/tickets", json={"subject": "Spam", "description": "dup"},
+    r = client.post("/api/jira/issues", json={"subject": "Spam", "description": "dup"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    tid = r.get_json()["ticket"]["id"]
-    r = client.post(f"/api/tickets/{tid}/status", json={"status": "closed"},
+    tid = r.get_json()["issue"]["id"]
+    r = client.post(f"/api/jira/issues/{tid}/status", json={"status": "closed"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["status"] == "closed"
+    assert r.get_json()["issue"]["status"] == "closed"
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ def test_oversized_description_rejected(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     big = "x" * (config.MAX_DESCRIPTION + 1)
-    r = client.post("/api/tickets", json={"subject": "big", "description": big},
+    r = client.post("/api/jira/issues", json={"subject": "big", "description": big},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -215,9 +215,9 @@ def test_oversized_description_rejected(client):
 def test_oversized_comment_rejected(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf).get_json()["ticket"]
+    t = _create_issue(client, csrf).get_json()["issue"]
     big = "y" * (config.MAX_COMMENT + 1)
-    r = client.post(f"/api/tickets/{t['id']}/comments", json={"body": big},
+    r = client.post(f"/api/jira/issues/{t['id']}/comments", json={"body": big},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -229,10 +229,10 @@ def test_assignment_notifies_requester(client):
     # sam creates, agent claims it -> sam gets an in-app notification.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     # sam reads her notifications
@@ -245,10 +245,10 @@ def test_assignment_notifies_requester(client):
 def test_mark_notification_read(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
     nid = client.get("/api/notifications").get_json()["notifications"][0]["id"]
@@ -295,20 +295,20 @@ def test_kb_authoring_and_visibility(client):
     r = client.post("/api/kb", json={"title": "VPN setup", "body": "Use the client.", "category_id": 1},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     # Draft is hidden from requesters.
     _login(client, "sam@opsdesk.local")
-    assert client.get("/api/kb").get_json()["articles"] == []
+    assert client.get("/api/kb").get_json()["notes"] == []
     # Agent publishes.
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     assert client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": csrf}).status_code == 200
     # Now visible to requester.
     _login(client, "sam@opsdesk.local")
-    arts = client.get("/api/kb").get_json()["articles"]
+    arts = client.get("/api/kb").get_json()["notes"]
     assert len(arts) == 1 and arts[0]["id"] == aid
     # Search works.
-    found = client.get("/api/kb?q=vpn").get_json()["articles"]
+    found = client.get("/api/kb?q=vpn").get_json()["notes"]
     assert len(found) == 1
     # Requester cannot publish.
     _login(client, "sam@opsdesk.local")
@@ -327,11 +327,11 @@ def test_category_routing_and_sla_attach(client):
     # the HR team and attach the matching SLA policy.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post("/api/tickets", json={"subject": "Payroll", "description": "x",
+    r = client.post("/api/jira/issues", json={"subject": "Payroll", "description": "x",
                                           "category_id": 4},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    t = r.get_json()["ticket"]
+    t = r.get_json()["issue"]
     assert t["team_id"] is not None          # routed, not unassigned
     assert t["sla"] is not None
     assert t["sla"]["policy_name"] == "HR - normal"
@@ -341,24 +341,24 @@ def test_sla_first_response_and_resolution_eval(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     # category 2 (Hardware) routes to IT, which the seeded agent belongs to.
-    t = client.post("/api/tickets", json={"subject": "Laptop", "description": "x",
+    t = client.post("/api/jira/issues", json={"subject": "Laptop", "description": "x",
                                          "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    assert client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
     # first response should now be recorded
     with app.app_context():
         from app import db as dbmod
         row = dbmod.get_db().execute(
-            "SELECT first_response_at FROM ticket_sla WHERE ticket_id=?", (t["id"],)).fetchone()
+            "SELECT first_response_at FROM issue_sla WHERE issue_id=?", (t["id"],)).fetchone()
         assert row["first_response_at"] is not None
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla["resolution_met"] == 1
     assert sla["breached"] == 0
 
@@ -366,10 +366,10 @@ def test_sla_first_response_and_resolution_eval(client, app):
 def test_recently_created_ticket_not_breached(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "VPN", "description": "x",
+    t = client.post("/api/jira/issues", json={"subject": "VPN", "description": "x",
                                          "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla["breached"] == 0
     assert sla["resolution_met"] is None  # not resolved yet
 
@@ -404,7 +404,7 @@ def test_kb_cross_agent_publish_forbidden(client):
     _login(client, "hragent@opsdesk.local")
     csrf = _csrf(client)
     aid = client.post("/api/kb", json={"title": "HR draft", "body": "secret"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+                      headers={"X-CSRF-Token": csrf}).get_json()["note"]["id"]
     _login(client, "agent@opsdesk.local")  # different agent
     csrf = _csrf(client)
     assert client.post(f"/api/kb/{aid}/publish",
@@ -417,7 +417,7 @@ def test_kb_requester_draft_by_id_404(client):
     _login(client, "hragent@opsdesk.local")
     csrf = _csrf(client)
     aid = client.post("/api/kb", json={"title": "hidden", "body": "x"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+                      headers={"X-CSRF-Token": csrf}).get_json()["note"]["id"]
     _login(client, "sam@opsdesk.local")  # requester
     r = client.get(f"/api/kb/{aid}")
     assert r.status_code == 404  # draft hidden from requesters
@@ -427,12 +427,12 @@ def test_kb_views_counter_not_lagging(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     aid = client.post("/api/kb", json={"title": "Viewed", "body": "content"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["article"]["id"]
+                      headers={"X-CSRF-Token": csrf}).get_json()["note"]["id"]
     # publish so requesters can view
     assert client.post(f"/api/kb/{aid}/publish",
                         headers={"X-CSRF-Token": _csrf(client)}).status_code == 200
     _login(client, "sam@opsdesk.local")
-    art = client.get(f"/api/kb/{aid}").get_json()["article"]
+    art = client.get(f"/api/kb/{aid}").get_json()["note"]
     assert art["views"] >= 1  # reflects the increment, not stale 0
 
 
@@ -442,46 +442,46 @@ def test_kb_views_counter_not_lagging(client):
 def test_csat_requester_rates_resolved_ticket(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Rate me", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Rate me", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    assert client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/rate", json={"score": 5},
+    r = client.post(f"/api/jira/issues/{t['id']}/rate", json={"score": 5},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    # the rating must round-trip through GET /api/tickets/<id> (serialized csat)
-    detail = client.get(f"/api/tickets/{t['id']}").get_json()["ticket"]
+    # the rating must round-trip through GET /api/jira/issues/<id> (serialized csat)
+    detail = client.get(f"/api/jira/issues/{t['id']}").get_json()["issue"]
     assert detail["csat"] == 5
     # second rating rejected
-    assert client.post(f"/api/tickets/{t['id']}/rate", json={"score": 3},
+    assert client.post(f"/api/jira/issues/{t['id']}/rate", json={"score": 3},
                        headers={"X-CSRF-Token": csrf}).status_code == 400
 
 
 def test_csat_forbidden_for_non_owner(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "x", "description": "y", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "x", "description": "y", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    assert client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
     # another requester cannot rate
     _login(client, "manager@opsdesk.local")  # manager, not owner/requester
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/rate", json={"score": 4},
+    assert client.post(f"/api/jira/issues/{t['id']}/rate", json={"score": 4},
                        headers={"X-CSRF-Token": csrf}).status_code == 403
 
 
@@ -520,11 +520,11 @@ def test_response_met_uses_creation_time_not_first_response(client, app):
     # Late first response (well past the response SLA) must yield response_met=0.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Late reply", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Late reply", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    assert client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
     # backdate first_response_at far past creation via direct DB
     with app.app_context():
@@ -532,55 +532,55 @@ def test_response_met_uses_creation_time_not_first_response(client, app):
         # First response recorded FAR in the future (after the response SLA
         # deadline of created_at + response_hours) -> must count as missed.
         dbmod.get_db().execute(
-            "UPDATE ticket_sla SET first_response_at=? WHERE ticket_id=?",
+            "UPDATE issue_sla SET first_response_at=? WHERE issue_id=?",
             ("2030-01-01T00:00:00+00:00", t["id"]))
         dbmod.get_db().commit()
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    assert client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    assert client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                        headers={"X-CSRF-Token": csrf}).status_code == 200
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla["response_met"] == 0  # missed, not always 1
 
 
 def test_open_ticket_breach_computed_live(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Overdue", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Overdue", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     with app.app_context():
         from app import db as dbmod
         dbmod.get_db().execute(
-            "UPDATE ticket_sla SET breach_at=? WHERE ticket_id=?",
+            "UPDATE issue_sla SET breach_at=? WHERE issue_id=?",
             ("2000-01-01T00:00:00+00:00", t["id"]))
         dbmod.get_db().commit()
     # ticket is still 'new' (open) but breach_at is in the past -> live breach
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla["breached"] is True
 
 
 def test_first_response_recorded_on_comment(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Comment first", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Comment first", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     # agent comments WITHOUT assigning -> first response should still be recorded
-    r = client.post(f"/api/tickets/{t['id']}/comments", json={"body": "Looking into it", "visibility": "public"},
+    r = client.post(f"/api/jira/issues/{t['id']}/comments", json={"body": "Looking into it", "visibility": "public"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
     with app.app_context():
         from app import db as dbmod
         fr = dbmod.get_db().execute(
-            "SELECT first_response_at FROM ticket_sla WHERE ticket_id=?", (t["id"],)).fetchone()
+            "SELECT first_response_at FROM issue_sla WHERE issue_id=?", (t["id"],)).fetchone()
         assert fr["first_response_at"] is not None
 
 
 def test_invalid_category_id_returns_400_not_500(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post("/api/tickets", json={"subject": "x", "description": "y", "category_id": 99999},
+    r = client.post("/api/jira/issues", json={"subject": "x", "description": "y", "category_id": 99999},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -590,19 +590,19 @@ def test_requester_cannot_override_team_routing(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     # category 2 (Hardware) -> IT team (id 1); try to force team 2 (HR)
-    t = client.post("/api/tickets", json={"subject": "route", "description": "y",
+    t = client.post("/api/jira/issues", json={"subject": "route", "description": "y",
                                           "category_id": 2, "team_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     assert t["team_id"] == 1  # routed by category, not the client value
 
 
 def test_ticket_list_includes_sla_without_extra_queries(client, app):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "list sla", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    data = client.get("/api/tickets").get_json()
-    row = next(x for x in data["tickets"] if x["id"] == t["id"])
+    t = client.post("/api/jira/issues", json={"subject": "list sla", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    data = client.get("/api/jira/issues").get_json()
+    row = next(x for x in data["issues"] if x["id"] == t["id"])
     assert row["sla"] is not None  # SLA attached/serialized via the joined row
     assert "policy_name" in row["sla"]
 
@@ -610,20 +610,20 @@ def test_ticket_list_includes_sla_without_extra_queries(client, app):
 def test_rating_logs_activity(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "rate log", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "rate log", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/rate", json={"score": 5}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/rate", json={"score": 5}, headers={"X-CSRF-Token": csrf})
     with app.app_context():
         from app import db as dbmod
         acts = dbmod.get_db().execute(
-            "SELECT action, note FROM ticket_activity WHERE ticket_id=?", (t["id"],)).fetchall()
+            "SELECT action, json_extract(detail, '$.note') AS note FROM entity_activity WHERE entity_type='jira_issue' AND entity_id=?", (t["id"],)).fetchall()
         assert any(a["action"] == "rated" and "5/5" in (a["note"] or "") for a in acts)
 
 
@@ -634,8 +634,8 @@ def test_ai_endpoints_unavailable_without_key(client):
     # No OPERADESK_OPENROUTER_KEY in test env -> AI_ENABLED False -> 503.
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "ai", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "ai", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     for ep in ("summarize", "suggest-reply", "suggest-priority"):
         r = client.get(f"/api/ai/{ep}/{t['id']}")
         assert r.status_code == 503, (ep, r.status_code)
@@ -649,8 +649,8 @@ def test_ai_endpoints_forbidden_for_requester(client):
     # feature is enabled and the provider would return real text. (BUG-1 fix)
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "ai req", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "ai req", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     import app.config as cfg, app.ai.client as aicl
     old_key, old_flag, old_fn = os.environ.get("OPERADESK_OPENROUTER_KEY"), cfg.AI_ENABLED, aicl.ai_enabled
     os.environ["OPERADESK_OPENROUTER_KEY"] = "test-key"
@@ -686,8 +686,8 @@ def test_ai_endpoint_404_on_invisible_ticket(client):
     # Create a ticket in IT team via an agent+manager? sam creates -> team by category.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "ai vis", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]  # category 2 -> IT
+    t = client.post("/api/jira/issues", json={"subject": "ai vis", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]  # category 2 -> IT
     _login(client, "hragent@opsdesk.local")
     csrf = _csrf(client)
     import app.config as cfg
@@ -728,23 +728,23 @@ def test_all_four_priorities_accepted_and_listed(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     for p in PRIORITIES:
-        r = client.post("/api/tickets", json={"subject": "Prio " + p, "description": "x",
+        r = client.post("/api/jira/issues", json={"subject": "Prio " + p, "description": "x",
                                               "category_id": 2, "priority": p},
                         headers={"X-CSRF-Token": csrf})
         assert r.status_code == 201, (p, r.status_code)
-        assert r.get_json()["ticket"]["priority"] == p
+        assert r.get_json()["issue"]["priority"] == p
     # meta advertises all four
     _login(client, "agent@opsdesk.local")
     assert client.get("/api/meta").get_json()["priorities"] == PRIORITIES
     # change-priority accepts every level (agent owns the IT-team ticket)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    tid = client.get("/api/tickets?status=new").get_json()["tickets"][0]["id"]
+    tid = client.get("/api/jira/issues?status=new").get_json()["issues"][0]["id"]
     for p in PRIORITIES:
-        r = client.post(f"/api/tickets/{tid}/priority", json={"priority": p},
+        r = client.post(f"/api/jira/issues/{tid}/priority", json={"priority": p},
                         headers={"X-CSRF-Token": csrf})
         assert r.status_code == 200, (p, r.status_code)
-        assert r.get_json()["ticket"]["priority"] == p
+        assert r.get_json()["issue"]["priority"] == p
 
 
 def test_ai_fail_closed_when_content_is_null():
@@ -812,22 +812,22 @@ def test_ai_settings_key_is_encrypted_at_rest(client, app):
 def test_priority_change_by_agent(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Pri test", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Pri test", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "urgent"},
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "urgent"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["priority"] == "urgent"
+    assert r.get_json()["issue"]["priority"] == "urgent"
 
 
 def test_priority_change_forbidden_for_requester(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Pri forbid", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "urgent"},
+    t = client.post("/api/jira/issues", json={"subject": "Pri forbid", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "urgent"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 403
 
@@ -835,9 +835,9 @@ def test_priority_change_forbidden_for_requester(client):
 def test_priority_change_invalid_rejected(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Pri invalid", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "critical"},
+    t = client.post("/api/jira/issues", json={"subject": "Pri invalid", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "critical"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -845,14 +845,14 @@ def test_priority_change_invalid_rejected(client):
 def test_priority_change_logs_activity(client, app):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Pri log", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "urgent"},
+    t = client.post("/api/jira/issues", json={"subject": "Pri log", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "urgent"},
                 headers={"X-CSRF-Token": csrf})
     with app.app_context():
         from app import db as dbmod
         acts = dbmod.get_db().execute(
-            "SELECT action, from_status, to_status FROM ticket_activity WHERE ticket_id=?", (t["id"],)).fetchall()
+            "SELECT action, json_extract(detail, '$.from_status') AS from_status, json_extract(detail, '$.to_status') AS to_status FROM entity_activity WHERE entity_type='jira_issue' AND entity_id=?", (t["id"],)).fetchall()
         assert any(a["action"] == "priority_change" and a["from_status"] == "normal" and a["to_status"] == "urgent"
                    for a in acts)
 
@@ -861,19 +861,19 @@ def test_priority_change_triggers_sla_reattach(client, app):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     # Create urgent ticket -> SLA should match urgent policy
-    t = client.post("/api/tickets", json={"subject": "SLA reattach", "description": "x",
+    t = client.post("/api/jira/issues", json={"subject": "SLA reattach", "description": "x",
                                           "category_id": 1, "priority": "urgent"},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     # Verify it got the Urgent policy
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla["policy_name"] == "Urgent"
     # Change to normal -> SLA should update to Standard policy
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "normal"},
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "normal"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    sla = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla is not None
     assert sla["policy_name"] == "Standard"
 
@@ -881,12 +881,12 @@ def test_priority_change_triggers_sla_reattach(client, app):
 def test_priority_change_same_value_noop(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Same pri", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "normal"},
+    t = client.post("/api/jira/issues", json={"subject": "Same pri", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "normal"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["priority"] == "normal"
+    assert r.get_json()["issue"]["priority"] == "normal"
 
 
 # ---------------------------------------------------------------------------
@@ -895,17 +895,17 @@ def test_priority_change_same_value_noop(client):
 def test_assign_to_specific_person(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Assign me", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Assign me", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")  # IT agent (id 3)
     csrf = _csrf(client)
     # Manager can assign to a specific person; agent can assign to teammate
     # Here agent assigns the ticket to themselves explicitly
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"assignee_id": 3},
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"assignee_id": 3},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["assignee_id"] == 3
-    assert r.get_json()["ticket"]["status"] == "assigned"
+    assert r.get_json()["issue"]["assignee_id"] == 3
+    assert r.get_json()["issue"]["status"] == "assigned"
 
 
 def test_assign_to_other_team_forbidden(client):
@@ -914,11 +914,11 @@ def test_assign_to_other_team_forbidden(client):
     # can_view_ticket returns False -> 404 to avoid leaking ticket existence).
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "X-team", "description": "x", "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "X-team", "description": "x", "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "hragent@opsdesk.local")  # HR team (id 4)
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"assignee_id": 4},
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"assignee_id": 4},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 404
 
@@ -926,9 +926,9 @@ def test_assign_to_other_team_forbidden(client):
 def test_assign_nonexistent_user_rejected(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "No user", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"assignee_id": 9999},
+    t = client.post("/api/jira/issues", json={"subject": "No user", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"assignee_id": 9999},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -937,15 +937,15 @@ def test_manager_assign_to_any_team_member(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     # HR category -> HR team
-    t = client.post("/api/tickets", json={"subject": "Mgr assign", "description": "x", "category_id": 4},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Mgr assign", "description": "x", "category_id": 4},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "manager@opsdesk.local")
     csrf = _csrf(client)
     # Manager assigns to HR agent (id 4)
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"assignee_id": 4},
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"assignee_id": 4},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["assignee_id"] == 4
+    assert r.get_json()["issue"]["assignee_id"] == 4
 
 
 # ---------------------------------------------------------------------------
@@ -954,13 +954,13 @@ def test_manager_assign_to_any_team_member(client):
 def test_notification_on_blocked_status(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     # Agent assigns so it's in a state to be blocked (new->assigned->blocked)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    r = client.post(f"/api/tickets/{t['id']}/status", json={"status": "blocked", "note": "Waiting on external"},
+    r = client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "blocked", "note": "Waiting on external"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     _login(client, "sam@opsdesk.local")
@@ -972,14 +972,14 @@ def test_notification_on_blocked_status(client):
 def test_notification_on_agent_reopen(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
     # Agent reopens (manager/admin can reopen from resolved)
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "reopened"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "reopened"},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
     d = client.get("/api/notifications").get_json()
@@ -990,10 +990,10 @@ def test_notification_on_agent_reopen(client):
 def test_notification_on_priority_change(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "urgent"},
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "urgent"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     _login(client, "sam@opsdesk.local")
@@ -1005,10 +1005,10 @@ def test_notification_on_priority_change(client):
 def test_notification_on_agent_public_comment(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/comments", json={"body": "Checking in", "visibility": "public"},
+    r = client.post(f"/api/jira/issues/{t['id']}/comments", json={"body": "Checking in", "visibility": "public"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
     _login(client, "sam@opsdesk.local")
@@ -1025,16 +1025,16 @@ def test_requester_reopen_does_not_notify_self(client):
     # (they're the one doing it). Only staff reopens should notify.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"}, headers={"X-CSRF-Token": csrf})
     # Now sam reopens their own ticket
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/reopen", headers={"X-CSRF-Token": csrf})
+    r = client.post(f"/api/jira/issues/{t['id']}/reopen", headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     # sam should have an "assigned" notification but NOT a "reopened" one
     d = client.get("/api/notifications").get_json()
@@ -1051,7 +1051,7 @@ def test_kb_cross_agent_edit_forbidden(client):
     r = client.post("/api/kb", json={"title": "HR secret", "body": "confidential"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     _login(client, "agent@opsdesk.local")  # different agent, different team
     csrf = _csrf(client)
     r = client.patch(f"/api/kb/{aid}", json={"title": "hacked", "body": "pwned"},
@@ -1065,7 +1065,7 @@ def test_kb_requester_cannot_edit(client):
     r = client.post("/api/kb", json={"title": "Draft", "body": "content"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     r = client.patch(f"/api/kb/{aid}", json={"title": "hacked", "body": "pwned"},
@@ -1079,16 +1079,16 @@ def test_kb_requester_cannot_edit(client):
 def test_blocked_to_resolved_rejected(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True}, headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"}, headers={"X-CSRF-Token": csrf})
     # Now block it
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "blocked", "note": "dep"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "blocked", "note": "dep"},
                 headers={"X-CSRF-Token": csrf})
     # blocked -> resolved should be rejected (lifecycle doesn't allow it)
-    r = client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    r = client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -1108,18 +1108,18 @@ def test_priority_change_updates_sla_breach_at(client, app):
     # When priority goes urgent->normal, the SLA resolution window extends.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "SLA breach", "description": "x",
+    t = client.post("/api/jira/issues", json={"subject": "SLA breach", "description": "x",
                                           "category_id": 1, "priority": "urgent"},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     # Urgent policy = 8h resolution -> breach_at = created + 8h
-    sla_before = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla_before = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla_before["policy_name"] == "Urgent"
     # Change to normal -> Standard policy = 72h resolution
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "normal"},
+    client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "normal"},
                 headers={"X-CSRF-Token": csrf})
-    sla_after = client.get(f"/api/tickets/{t['id']}/sla").get_json()["sla"]
+    sla_after = client.get(f"/api/jira/issues/{t['id']}/sla").get_json()["sla"]
     assert sla_after["policy_name"] == "Standard"
     # breach_at should be later than before (72h window vs 8h)
     from datetime import datetime
@@ -1134,12 +1134,12 @@ def test_kb_author_can_edit_own_article(client):
     r = client.post("/api/kb", json={"title": "My draft", "body": "original content"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     # Same author edits
     r = client.patch(f"/api/kb/{aid}", json={"title": "My draft", "body": "updated content"},
                      headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["article"]["body"] == "updated content"
+    assert r.get_json()["note"]["body"] == "updated content"
 
 
 def test_kb_published_article_visible_to_requester(client):
@@ -1148,20 +1148,20 @@ def test_kb_published_article_visible_to_requester(client):
     r = client.post("/api/kb", json={"title": "VPN guide", "body": "Step 1: connect", "category_id": 1},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
     r = client.get(f"/api/kb/{aid}")
     assert r.status_code == 200
-    assert r.get_json()["article"]["title"] == "VPN guide"
+    assert r.get_json()["note"]["title"] == "VPN guide"
 
 
 def test_requester_cannot_assign_ticket_to_anyone(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "No assign", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/assign", json={"assignee_id": 3},
+    t = client.post("/api/jira/issues", json={"subject": "No assign", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/assign", json={"assignee_id": 3},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 403
 
@@ -1169,14 +1169,14 @@ def test_requester_cannot_assign_ticket_to_anyone(client):
 def test_manager_can_change_priority_on_any_ticket(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Mgr pri", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Mgr pri", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "manager@opsdesk.local")
     csrf = _csrf(client)
-    r = client.post(f"/api/tickets/{t['id']}/priority", json={"priority": "urgent"},
+    r = client.post(f"/api/jira/issues/{t['id']}/priority", json={"priority": "urgent"},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["priority"] == "urgent"
+    assert r.get_json()["issue"]["priority"] == "urgent"
 
 
 # ---------------------------------------------------------------------------
@@ -1185,23 +1185,23 @@ def test_manager_can_change_priority_on_any_ticket(client):
 def test_list_tickets_assignee_filter_me(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t1 = client.post("/api/tickets", json={"subject": "A1", "description": "x", "category_id": 1},
-                     headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t1 = client.post("/api/jira/issues", json={"subject": "A1", "description": "x", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     # agent claims it
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t1['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t1['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
     # create another unassigned ticket
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    client.post("/api/tickets", json={"subject": "A2", "description": "x", "category_id": 1},
+    client.post("/api/jira/issues", json={"subject": "A2", "description": "x", "category_id": 1},
                 headers={"X-CSRF-Token": csrf})
     # agent views queue filtered to me
     _login(client, "agent@opsdesk.local")
-    r = client.get("/api/tickets?assignee_id=me")
+    r = client.get("/api/jira/issues?assignee_id=me")
     assert r.status_code == 200
-    tickets = r.get_json()["tickets"]
+    tickets = r.get_json()["issues"]
     assert all(t["assignee_id"] == 3 for t in tickets)
     assert any(t["id"] == t1["id"] for t in tickets)
 
@@ -1209,27 +1209,27 @@ def test_list_tickets_assignee_filter_me(client):
 def test_list_tickets_assignee_filter_unassigned(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    client.post("/api/tickets", json={"subject": "U1", "description": "x", "category_id": 1},
+    client.post("/api/jira/issues", json={"subject": "U1", "description": "x", "category_id": 1},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "agent@opsdesk.local")
-    r = client.get("/api/tickets?assignee_id=unassigned")
+    r = client.get("/api/jira/issues?assignee_id=unassigned")
     assert r.status_code == 200
-    tickets = r.get_json()["tickets"]
+    tickets = r.get_json()["issues"]
     assert all(t["assignee_id"] is None for t in tickets)
 
 
 def test_list_tickets_assignee_filter_specific_user(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t1 = client.post("/api/tickets", json={"subject": "S1", "description": "x", "category_id": 1},
-                     headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t1 = client.post("/api/jira/issues", json={"subject": "S1", "description": "x", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t1['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t1['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    r = client.get(f"/api/tickets?assignee_id=3")
+    r = client.get(f"/api/jira/issues?assignee_id=3")
     assert r.status_code == 200
-    tickets = r.get_json()["tickets"]
+    tickets = r.get_json()["issues"]
     assert all(t["assignee_id"] == 3 for t in tickets)
 
 
@@ -1239,23 +1239,23 @@ def test_list_tickets_assignee_filter_specific_user(client):
 def test_csat_serialized_in_ticket_list(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Rate list", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Rate list", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/rate", json={"score": 4},
+    client.post(f"/api/jira/issues/{t['id']}/rate", json={"score": 4},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "agent@opsdesk.local")
-    data = client.get("/api/tickets").get_json()
-    row = next(x for x in data["tickets"] if x["id"] == t["id"])
+    data = client.get("/api/jira/issues").get_json()
+    row = next(x for x in data["issues"] if x["id"] == t["id"])
     assert row["csat"] == 4
 
 
@@ -1323,31 +1323,31 @@ def test_kb_list_filters_for_agent(client):
     r = client.get("/api/kb?status=published&sort=views")
     assert r.status_code == 200
     data = r.get_json()
-    assert "articles" in data
+    assert "notes" in data
 
 
 def test_ticket_kb_link_lifecycle(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    ticket = client.post("/api/tickets", json={"subject": "KB link", "description": "x", "category_id": 1},
-                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    ticket = client.post("/api/jira/issues", json={"subject": "KB link", "description": "x", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     article = client.post("/api/kb", json={"title": "Link me", "body": "body", "category_id": 1},
-                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
-    r = client.post(f"/api/tickets/{ticket['id']}/knowledge", json={"article_id": article["id"]},
+                          headers={"X-CSRF-Token": csrf}).get_json()["note"]
+    r = client.post(f"/api/jira/issues/{ticket['id']}/knowledge", json={"article_id": article["id"]},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    linked = client.get(f"/api/tickets/{ticket['id']}/knowledge").get_json()["articles"]
+    linked = client.get(f"/api/jira/issues/{ticket['id']}/knowledge").get_json()["notes"]
     assert any(x["id"] == article["id"] for x in linked)
-    r2 = client.post(f"/api/tickets/{ticket['id']}/knowledge",
+    r2 = client.post(f"/api/jira/issues/{ticket['id']}/knowledge",
                      json={"article_id": article["id"]},
                      headers={"X-CSRF-Token": csrf})
     assert r2.status_code == 409
-    r3 = client.delete(f"/api/tickets/{ticket['id']}/knowledge/{article['id']}",
+    r3 = client.delete(f"/api/jira/issues/{ticket['id']}/knowledge/{article['id']}",
                        headers={"X-CSRF-Token": csrf})
     assert r3.status_code == 200
-    final = client.get(f"/api/tickets/{ticket['id']}/knowledge").get_json()["articles"]
+    final = client.get(f"/api/jira/issues/{ticket['id']}/knowledge").get_json()["notes"]
     assert not any(x["id"] == article["id"] for x in final)
 
 
@@ -1358,7 +1358,7 @@ def test_collection_crud_and_membership(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     article = client.post("/api/kb", json={"title": "Coll", "body": "body", "category_id": 1},
-                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                          headers={"X-CSRF-Token": csrf}).get_json()["note"]
     c = client.post("/api/kb/collections", json={"name": "Ops", "description": "Ops stuff"},
                     headers={"X-CSRF-Token": csrf}).get_json()["collection"]
     assert c["name"] == "Ops"
@@ -1368,7 +1368,7 @@ def test_collection_crud_and_membership(client):
                     json={"article_id": article["id"]},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
-    arts = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["articles"]
+    arts = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["notes"]
     assert any(x["id"] == article["id"] for x in arts)
     r2 = client.post(f"/api/kb/collections/{c['id']}/articles",
                      json={"article_id": article["id"]},
@@ -1377,7 +1377,7 @@ def test_collection_crud_and_membership(client):
     r3 = client.delete(f"/api/kb/collections/{c['id']}/articles/{article['id']}",
                        headers={"X-CSRF-Token": csrf})
     assert r3.status_code == 200
-    after = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["articles"]
+    after = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["notes"]
     assert not any(x["id"] == article["id"] for x in after)
 
 
@@ -1385,7 +1385,7 @@ def test_kb_versions_and_draft_from_ticket(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     article = client.post("/api/kb", json={"title": "Ver", "body": "v1", "category_id": 1},
-                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                          headers={"X-CSRF-Token": csrf}).get_json()["note"]
     r = client.get(f"/api/kb/{article['id']}/versions")
     assert r.status_code == 200
     assert r.get_json()["versions"] == []
@@ -1395,8 +1395,8 @@ def test_kb_versions_and_draft_from_ticket(client):
     assert len(versions) >= 1
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    ticket = client.post("/api/tickets", json={"subject": "T", "description": "D", "category_id": 1},
-                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    ticket = client.post("/api/jira/issues", json={"subject": "T", "description": "D", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     draft = client.post(f"/api/kb/{article['id']}/draft-from-ticket",
@@ -1410,9 +1410,9 @@ def test_kb_article_links(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     a1 = client.post("/api/kb", json={"title": "A1", "body": "b1", "category_id": 1},
-                     headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                     headers={"X-CSRF-Token": csrf}).get_json()["note"]
     a2 = client.post("/api/kb", json={"title": "A2", "body": "b2", "category_id": 1},
-                     headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                     headers={"X-CSRF-Token": csrf}).get_json()["note"]
     r = client.post(f"/api/kb/{a1['id']}/links", json={"target_id": a2["id"]},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 201
@@ -1444,18 +1444,18 @@ def test_unassign_resets_status_to_new(client):
     # B-8: the dedicated unassign contract must reset status to new.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf).get_json()["ticket"]
+    t = _create_issue(client, csrf).get_json()["issue"]
     tid = t["id"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{tid}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{tid}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{tid}/status", json={"status": "in_progress"},
+    client.post(f"/api/jira/issues/{tid}/status", json={"status": "in_progress"},
                 headers={"X-CSRF-Token": csrf})
-    r = client.post(f"/api/tickets/{tid}/assign", json={"unassign": True},
+    r = client.post(f"/api/jira/issues/{tid}/assign", json={"unassign": True},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    ticket = r.get_json()["ticket"]
+    ticket = r.get_json()["issue"]
     assert ticket["assignee_id"] is None
     assert ticket["status"] == "new"
 
@@ -1464,16 +1464,16 @@ def test_reopen_window_uses_closed_at_when_never_resolved(client):
     # B-7: closing a ticket without resolving it must not block reopening.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, subject="Closed new").get_json()["ticket"]
+    t = _create_issue(client, csrf, subject="Closed new").get_json()["issue"]
     tid = t["id"]
     _login(client, "manager@opsdesk.local")
-    r = client.post(f"/api/tickets/{tid}/status", json={"status": "closed"},
+    r = client.post(f"/api/jira/issues/{tid}/status", json={"status": "closed"},
                     headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 200
     _login(client, "sam@opsdesk.local")
-    r = client.post(f"/api/tickets/{tid}/reopen", headers={"X-CSRF-Token": _csrf(client)})
+    r = client.post(f"/api/jira/issues/{tid}/reopen", headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["status"] == "reopened"
+    assert r.get_json()["issue"]["status"] == "reopened"
 
 
 def test_kb_self_link_rejected(client):
@@ -1481,7 +1481,7 @@ def test_kb_self_link_rejected(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     a = client.post("/api/kb", json={"title": "Self", "body": "b", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["note"]
     r = client.post(f"/api/kb/{a['id']}/links", json={"target_id": a["id"]},
                     headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
@@ -1494,14 +1494,14 @@ def test_reports_summary_sla_respects_team_filter(client):
     # N-2: summary's SLA figure must move with the active filters.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, subject="SLA filter check").get_json()["ticket"]
+    t = _create_issue(client, csrf, subject="SLA filter check").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "in_progress"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "in_progress"},
                 headers={"X-CSRF-Token": csrf})
-    client.post(f"/api/tickets/{t['id']}/status", json={"status": "resolved"},
+    client.post(f"/api/jira/issues/{t['id']}/status", json={"status": "resolved"},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "manager@opsdesk.local")
     all_data = client.get("/api/reports/summary").get_json()
@@ -1537,12 +1537,12 @@ def test_ai_draft_uses_ai_when_key_configured(client, monkeypatch):
     client.post("/api/settings/ai", json={"api_key": "sk-or-ai-draft-1", "model": "x/y:free"}, headers=h)
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    ticket = client.post("/api/tickets", json={"subject": "Printer jam", "description": "Jammed again", "category_id": 1},
-                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    ticket = client.post("/api/jira/issues", json={"subject": "Printer jam", "description": "Jammed again", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
     article = client.post("/api/kb", json={"title": "A", "body": "b", "category_id": 1},
-                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+                          headers={"X-CSRF-Token": csrf}).get_json()["note"]
     calls = {}
     def fake_chat(model, messages, **kw):
         calls["model"] = model
@@ -1563,28 +1563,28 @@ def test_promote_to_kb_creates_draft_and_links(client):
     # 2.6: promoting a ticket creates a linked draft article.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, subject="Promote me", desc="Please document this").get_json()["ticket"]
+    t = _create_issue(client, csrf, subject="Promote me", desc="Please document this").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
-    r = client.post(f"/api/tickets/{t['id']}/promote-kb",
+    r = client.post(f"/api/jira/issues/{t['id']}/promote-kb",
                     headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 201
-    article = r.get_json()["article"]
+    article = r.get_json()["note"]
     assert article["status"] == "draft"
     assert article["title"] == "Promote me"
     assert "Promote me" in article["body"]
-    linked = client.get(f"/api/tickets/{t['id']}/knowledge").get_json()["articles"]
+    linked = client.get(f"/api/jira/issues/{t['id']}/knowledge").get_json()["notes"]
     assert any(a["id"] == article["id"] for a in linked)
-    r2 = client.post(f"/api/tickets/{t['id']}/promote-kb",
+    r2 = client.post(f"/api/jira/issues/{t['id']}/promote-kb",
                      headers={"X-CSRF-Token": _csrf(client)})
     assert r2.status_code == 201  # distinct drafts each time
-    assert r2.get_json()["article"]["id"] != article["id"]
+    assert r2.get_json()["note"]["id"] != article["id"]
 
 
 def test_promote_to_kb_forbidden_for_requester(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf).get_json()["ticket"]
-    r = client.post(f"/api/tickets/{t['id']}/promote-kb",
+    t = _create_issue(client, csrf).get_json()["issue"]
+    r = client.post(f"/api/jira/issues/{t['id']}/promote-kb",
                     headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 403
 
@@ -1624,7 +1624,7 @@ def _publish_kb(client, title, body, category_id=1):
     csrf = _csrf(client)
     r = client.post("/api/kb", json={"title": title, "body": body, "category_id": category_id},
                     headers={"X-CSRF-Token": csrf})
-    aid = r.get_json()["article"]["id"]
+    aid = r.get_json()["note"]["id"]
     assert client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": _csrf(client)}).status_code == 200
     return aid
 
@@ -1634,8 +1634,8 @@ def test_suggested_articles_ranked_by_keyword_overlap(client):
     _publish_kb(client, "Onboarding checklist", "Welcome kit and laptop setup.", 1)
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, subject="Printer jammed again", desc="paper jam in tray").get_json()["ticket"]
-    r = client.get(f"/api/tickets/{t['id']}/knowledge/suggested")
+    t = _create_issue(client, csrf, subject="Printer jammed again", desc="paper jam in tray").get_json()["issue"]
+    r = client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested")
     assert r.status_code == 200
     titles = [s["title"] for s in r.get_json()["suggestions"]]
     assert "Printer jam troubleshooting" in titles          # strong overlap
@@ -1648,13 +1648,13 @@ def test_suggested_articles_exclude_already_linked(client):
     aid = _publish_kb(client, "VPN setup guide", "Install the client and connect.", 1)
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, subject="VPN broken", desc="VPN setup fails").get_json()["ticket"]
+    t = _create_issue(client, csrf, subject="VPN broken", desc="VPN setup fails").get_json()["issue"]
     # agent links the article
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/knowledge", json={"article_id": aid},
+    assert client.post(f"/api/jira/issues/{t['id']}/knowledge", json={"article_id": aid},
                        headers={"X-CSRF-Token": csrf}).status_code == 201
-    r = client.get(f"/api/tickets/{t['id']}/knowledge/suggested")
+    r = client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested")
     titles = [s["title"] for s in r.get_json()["suggestions"]]
     assert "VPN setup guide" not in titles
 
@@ -1663,22 +1663,22 @@ def test_suggested_articles_require_ticket_access(client):
     # category 2 (Hardware) routes to IT, so other teams can't peek.
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Router down", "description": "no network",
+    t = client.post("/api/jira/issues", json={"subject": "Router down", "description": "no network",
                                           "category_id": 2},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     assert t["team_id"] is not None
     # A different-team agent cannot see sam's suggestions.
     _login(client, "hragent@opsdesk.local")
-    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 404
+    assert client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested").status_code == 404
     # Anonymous is rejected outright.
     client.post("/api/auth/logout", headers={"X-CSRF-Token": _csrf(client)})
-    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 401
+    assert client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested").status_code == 401
     # The owner can.
     _login(client, "sam@opsdesk.local")
-    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 200
+    assert client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested").status_code == 200
     # A same-team agent can (they handle the ticket).
     _login(client, "agent@opsdesk.local")
-    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 200
+    assert client.get(f"/api/jira/issues/{t['id']}/knowledge/suggested").status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -1687,14 +1687,14 @@ def test_suggested_articles_require_ticket_access(client):
 def test_agent_can_edit_ticket(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    r = client.patch(f"/api/tickets/{t['id']}",
+    r = client.patch(f"/api/jira/issues/{t['id']}",
                      json={"subject": "Renamed", "description": "New body"},
                      headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    got = r.get_json()["ticket"]
+    got = r.get_json()["issue"]
     assert got["subject"] == "Renamed" and got["description"] == "New body"
     assert got["id"] == t["id"]  # same ticket, not a new one
 
@@ -1702,24 +1702,24 @@ def test_agent_can_edit_ticket(client):
 def test_requester_can_edit_own_ticket_while_new(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
-    r = client.patch(f"/api/tickets/{t['id']}",
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
+    r = client.patch(f"/api/jira/issues/{t['id']}",
                      json={"subject": "Fixed typo", "description": "more detail"},
                      headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert r.get_json()["ticket"]["subject"] == "Fixed typo"
+    assert r.get_json()["issue"]["subject"] == "Fixed typo"
 
 
 def test_requester_cannot_edit_after_assignment(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
-    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Too late"},
+    r = client.patch(f"/api/jira/issues/{t['id']}", json={"subject": "Too late"},
                      headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 403
 
@@ -1728,16 +1728,16 @@ def test_requester_cannot_edit_someone_elses_ticket(client):
     # category 1 routes to IT, so the HR agent can't even see it
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Laptop", "description": "x", "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    t = client.post("/api/jira/issues", json={"subject": "Laptop", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     # hragent is not on sam's IT team -> cannot even see it
     _login(client, "hragent@opsdesk.local")
-    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Hijack"},
+    r = client.patch(f"/api/jira/issues/{t['id']}", json={"subject": "Hijack"},
                      headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 404
     # manager (sees everything) can edit
     _login(client, "manager@opsdesk.local")
-    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Manager fix"},
+    r = client.patch(f"/api/jira/issues/{t['id']}", json={"subject": "Manager fix"},
                      headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 200
 
@@ -1746,14 +1746,14 @@ def test_edit_category_reroutes_team_and_sla(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
     # category 1 (Access & Accounts) routes to IT
-    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    t = _create_issue(client, csrf, as_user="sam@opsdesk.local").get_json()["issue"]
     it_team = t["team_id"]
     # requester moves it to HR category (id 4) -> should re-route to HR
     _login(client, "sam@opsdesk.local")
-    r = client.patch(f"/api/tickets/{t['id']}", json={"category_id": 4},
+    r = client.patch(f"/api/jira/issues/{t['id']}", json={"category_id": 4},
                      headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 200
-    got = r.get_json()["ticket"]
+    got = r.get_json()["issue"]
     assert got["team_id"] != it_team
     assert got["sla"] is not None and got["sla"]["policy_name"] == "HR - normal"
 
@@ -1761,8 +1761,8 @@ def test_edit_category_reroutes_team_and_sla(client):
 def test_edit_requires_subject(client):
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    t = _create_ticket(client, csrf).get_json()["ticket"]
-    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "   "},
+    t = _create_issue(client, csrf).get_json()["issue"]
+    r = client.patch(f"/api/jira/issues/{t['id']}", json={"subject": "   "},
                      headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
 
@@ -1774,9 +1774,9 @@ def _make_team_ticket(client):
     """sam's ticket routed to IT (category 1) so the IT agent can act on it."""
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "Broken laptop", "description": "Won't turn on",
+    t = client.post("/api/jira/issues", json={"subject": "Broken laptop", "description": "Won't turn on",
                                           "category_id": 1},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     return t
 
 
@@ -1784,13 +1784,13 @@ def test_follow_unfollow_lifecycle(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    assert client.post(f"/api/tickets/{t['id']}/follow",
+    assert client.post(f"/api/jira/issues/{t['id']}/follow",
                        headers={"X-CSRF-Token": csrf}).get_json()["following"] is True
-    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    followers = client.get(f"/api/jira/issues/{t['id']}/followers").get_json()["followers"]
     assert any(f["name"] == "IT Agent" for f in followers)
-    assert client.delete(f"/api/tickets/{t['id']}/follow",
+    assert client.delete(f"/api/jira/issues/{t['id']}/follow",
                          headers={"X-CSRF-Token": csrf}).get_json()["following"] is False
-    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    followers = client.get(f"/api/jira/issues/{t['id']}/followers").get_json()["followers"]
     assert followers == []
 
 
@@ -1801,10 +1801,10 @@ def test_follower_notified_on_public_comment(client):
     # HR agent cannot see IT tickets; use manager instead as a follower
     _login(client, "manager@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/follow", headers={"X-CSRF-Token": csrf})
+    client.post(f"/api/jira/issues/{t['id']}/follow", headers={"X-CSRF-Token": csrf})
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/comments",
+    client.post(f"/api/jira/issues/{t['id']}/comments",
                 json={"body": "Working on it now.", "visibility": "public"},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "manager@opsdesk.local")
@@ -1816,9 +1816,9 @@ def test_comment_auto_follows(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/comments", json={"body": "Noted."},
+    client.post(f"/api/jira/issues/{t['id']}/comments", json={"body": "Noted."},
                 headers={"X-CSRF-Token": csrf})
-    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    followers = client.get(f"/api/jira/issues/{t['id']}/followers").get_json()["followers"]
     assert any(f["name"] == "IT Agent" for f in followers)
 
 
@@ -1826,9 +1826,9 @@ def test_assignee_auto_follows(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": csrf})
-    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    followers = client.get(f"/api/jira/issues/{t['id']}/followers").get_json()["followers"]
     assert any(f["name"] == "IT Agent" for f in followers)
 
 
@@ -1836,7 +1836,7 @@ def test_mention_notifies_named_user(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/comments",
+    client.post(f"/api/jira/issues/{t['id']}/comments",
                 json={"body": "@Sam Requester please confirm."},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
@@ -1848,7 +1848,7 @@ def test_mention_requires_full_name(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    client.post(f"/api/tickets/{t['id']}/comments",
+    client.post(f"/api/jira/issues/{t['id']}/comments",
                 json={"body": "@Sam please confirm, and @Sammy too."},
                 headers={"X-CSRF-Token": csrf})
     _login(client, "sam@opsdesk.local")
@@ -1862,7 +1862,7 @@ def test_mention_requires_full_name(client):
 def _bulk(client, ids, action, extra=None):
     payload = dict(extra or {})
     payload.update(ticket_ids=ids, action=action)
-    return client.post("/api/tickets/bulk", json=payload,
+    return client.post("/api/jira/issues/bulk", json=payload,
                        headers={"X-CSRF-Token": _csrf(client)})
 
 
@@ -1877,7 +1877,7 @@ def test_bulk_assign_and_status(client):
     assert r.get_json()["processed"] == 2
     r = _bulk(client, [t1["id"]], "status", {"status": "resolved"})
     assert r.get_json()["processed"] == 1
-    d = client.get(f"/api/tickets/{t1['id']}").get_json()["ticket"]
+    d = client.get(f"/api/jira/issues/{t1['id']}").get_json()["issue"]
     assert d["status"] == "resolved" and d["assignee_id"] == 3
 
 
@@ -1896,11 +1896,11 @@ def test_bulk_skips_invalid_transitions(client):
 def test_bulk_blocked_requires_reason(client):
     t = _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
-    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+    client.post(f"/api/jira/issues/{t['id']}/assign", json={"self": True},
                 headers={"X-CSRF-Token": _csrf(client)})
     r = _bulk(client, [t["id"]], "blocked", {"note": "waiting on vendor"})
     assert r.get_json()["processed"] == 1
-    d = client.get(f"/api/tickets/{t['id']}").get_json()["ticket"]
+    d = client.get(f"/api/jira/issues/{t['id']}").get_json()["issue"]
     assert d["status"] == "blocked" and d["blocked_reason"] == "waiting on vendor"
 
 
@@ -1910,7 +1910,7 @@ def test_bulk_requester_forbidden_and_validation(client):
     assert r.status_code == 403
     # id validation needs a staff actor (the role check runs first)
     _login(client, "agent@opsdesk.local")
-    r = client.post("/api/tickets/bulk", json={"action": "close"},
+    r = client.post("/api/jira/issues/bulk", json={"action": "close"},
                     headers={"X-CSRF-Token": _csrf(client)})
     assert r.status_code == 400
 
@@ -1921,9 +1921,9 @@ def test_bulk_requester_forbidden_and_validation(client):
 def test_sla_due_dates_in_serialization(client):
     _login(client, "sam@opsdesk.local")
     csrf = _csrf(client)
-    t = client.post("/api/tickets", json={"subject": "SLA due", "description": "x",
+    t = client.post("/api/jira/issues", json={"subject": "SLA due", "description": "x",
                                           "category_id": 1, "priority": "urgent"},
-                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+                    headers={"X-CSRF-Token": csrf}).get_json()["issue"]
     sla = t["sla"]
     assert sla["response_hours"] == 1 and sla["resolution_hours"] == 8
     assert sla["response_due_at"] and sla["resolution_due_at"]
@@ -1933,7 +1933,7 @@ def test_sla_due_dates_in_serialization(client):
 def test_queue_rows_include_sla_due_dates(client):
     _make_team_ticket(client)
     _login(client, "agent@opsdesk.local")
-    rows = client.get("/api/tickets?status=new").get_json()["tickets"]
+    rows = client.get("/api/jira/issues?status=new").get_json()["issues"]
     assert any(r["sla"] and r["sla"]["response_due_at"] for r in rows)
 
 

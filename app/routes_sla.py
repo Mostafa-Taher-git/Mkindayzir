@@ -3,10 +3,10 @@ SLA policies & ticketing SLA tracking (Phase 3).
 
 - sla_policies: named targets (response/resolution hours) keyed by priority and
   optionally category.
-- ticket_sla: per-ticket row linking to the matched policy, recording the
+- issue_sla: per-ticket row linking to the matched policy, recording the
   first-response timestamp and the resolution breach deadline.
 
-The matching + booking happens in routes_tickets (create/assign/status) so the
+The matching + booking happens in routes_jira (create/assign/status) so the
 SLA is attached exactly once at creation and evaluated on resolution. This
 module exposes helpers + read/admin endpoints and keeps Python thin.
 """
@@ -42,11 +42,11 @@ def pick_policy(category_id, priority):
 
 
 def attach_sla(ticket):
-    """Create a ticket_sla row for a brand-new ticket. Idempotent."""
+    """Create a issue_sla row for a brand-new ticket. Idempotent."""
     ticket = dict(ticket)  # sqlite3.Row -> dict for .get() access
     conn = db.get_db()
     exists = conn.execute(
-        "SELECT 1 FROM ticket_sla WHERE ticket_id=?", (ticket["id"],)).fetchone()
+        "SELECT 1 FROM issue_sla WHERE issue_id=?", (ticket["id"],)).fetchone()
     if exists:
         return
     policy = pick_policy(ticket.get("category_id"), ticket.get("priority", "normal"))
@@ -56,7 +56,7 @@ def attach_sla(ticket):
     else:
         breach_at = created + timedelta(hours=72)
     conn.execute(
-        """INSERT INTO ticket_sla (ticket_id, policy_id, first_response_at, breach_at, breached, response_met, resolution_met)
+        """INSERT INTO issue_sla (issue_id, policy_id, first_response_at, breach_at, breached, response_met, resolution_met)
            VALUES (?,?,?,?,0,NULL,NULL)""",
         (ticket["id"], policy["id"] if policy else None,
          None, breach_at.isoformat()))
@@ -73,7 +73,7 @@ def update_sla_on_priority(ticket_id, category_id, new_priority):
     tickets are left alone (resolution_met/breached were set on close).
     """
     conn = db.get_db()
-    row = conn.execute("SELECT * FROM ticket_sla WHERE ticket_id=?", (ticket_id,)).fetchone()
+    row = conn.execute("SELECT * FROM issue_sla WHERE issue_id=?", (ticket_id,)).fetchone()
     if not row:
         return
     if row["first_response_at"] is not None or row["resolution_met"] is not None:
@@ -82,13 +82,13 @@ def update_sla_on_priority(ticket_id, category_id, new_priority):
     policy = pick_policy(category_id, new_priority)
     if not policy or policy["id"] == row["policy_id"]:
         return
-    tick = conn.execute("SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    tick = conn.execute("SELECT created_at FROM jira_issues WHERE id=?", (ticket_id,)).fetchone()
     if not tick:
         return
     created = helpers._parse_iso(tick["created_at"]) or datetime.now(timezone.utc)
     breach_at = created + timedelta(hours=policy["resolution_hours"])
     conn.execute(
-        "UPDATE ticket_sla SET policy_id=?, breach_at=? WHERE ticket_id=?",
+        "UPDATE issue_sla SET policy_id=?, breach_at=? WHERE issue_id=?",
         (policy["id"], breach_at.isoformat(), ticket_id))
     conn.commit()
 
@@ -96,11 +96,11 @@ def update_sla_on_priority(ticket_id, category_id, new_priority):
 def record_first_response(ticket_id):
     """Mark first agent response (assign/comment) if not already set."""
     conn = db.get_db()
-    row = conn.execute("SELECT * FROM ticket_sla WHERE ticket_id=?", (ticket_id,)).fetchone()
+    row = conn.execute("SELECT * FROM issue_sla WHERE issue_id=?", (ticket_id,)).fetchone()
     if not row or row["first_response_at"]:
         return
     now = db.now_iso()
-    conn.execute("UPDATE ticket_sla SET first_response_at=? WHERE ticket_id=?",
+    conn.execute("UPDATE issue_sla SET first_response_at=? WHERE issue_id=?",
                  (now, ticket_id))
     conn.commit()
 
@@ -122,14 +122,14 @@ def summarize(ticket_id, sla_row=None):
     else:
         row = conn.execute(
             "SELECT ts.*, sp.name AS policy_name, sp.response_hours, sp.resolution_hours "
-            "FROM ticket_sla ts "
-            "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
+            "FROM issue_sla ts "
+            "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.issue_id=?",
             (ticket_id,)).fetchone()
     if not row:
         return None
     now = datetime.now(timezone.utc)
     breach_at = helpers._parse_iso(row["breach_at"])
-    ticket = conn.execute("SELECT status FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    ticket = conn.execute("SELECT status FROM jira_issues WHERE id=?", (ticket_id,)).fetchone()
     is_open = ticket and ticket["status"] not in ("resolved", "closed")
     breached = bool(row["breached"]) or (is_open and breach_at is not None and now > breach_at)
     # Expected-response / resolution deadlines, computed from the policy hours
@@ -139,7 +139,7 @@ def summarize(ticket_id, sla_row=None):
     resolution_hours = row["resolution_hours"] if "resolution_hours" in row.keys() else None
     response_due_at = resolution_due_at = None
     if response_hours is not None or resolution_hours is not None:
-        created = conn.execute("SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+        created = conn.execute("SELECT created_at FROM jira_issues WHERE id=?", (ticket_id,)).fetchone()
         created_dt = helpers._parse_iso(created["created_at"]) if created else None
         if created_dt:
             if response_hours is not None:
@@ -163,7 +163,7 @@ def summarize(ticket_id, sla_row=None):
 def evaluate_on_resolve(ticket_id):
     """When a ticket is resolved, decide response_met / resolution_met / breached."""
     conn = db.get_db()
-    row = conn.execute("SELECT * FROM ticket_sla WHERE ticket_id=?", (ticket_id,)).fetchone()
+    row = conn.execute("SELECT * FROM issue_sla WHERE issue_id=?", (ticket_id,)).fetchone()
     if not row:
         return
     now = datetime.now(timezone.utc)
@@ -175,7 +175,7 @@ def evaluate_on_resolve(ticket_id):
     if row["first_response_at"] and policy:
         # Response SLA: first response must arrive within response_hours of *creation*.
         created = helpers._parse_iso(conn.execute(
-            "SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()["created_at"])
+            "SELECT created_at FROM jira_issues WHERE id=?", (ticket_id,)).fetchone()["created_at"])
         if created:
             resp_target = created + timedelta(hours=policy["response_hours"])
             response_met = 1 if helpers._parse_iso(row["first_response_at"]) <= resp_target else 0
@@ -185,7 +185,7 @@ def evaluate_on_resolve(ticket_id):
         # Resolved with no first response -> response SLA missed.
         response_met = 0
     conn.execute(
-        "UPDATE ticket_sla SET breached=?, response_met=?, resolution_met=? WHERE ticket_id=?",
+        "UPDATE issue_sla SET breached=?, response_met=?, resolution_met=? WHERE issue_id=?",
         (breached, response_met, 0 if breached else 1, ticket_id))
     conn.commit()
 
@@ -223,19 +223,19 @@ def create_policy():
         "SELECT * FROM sla_policies WHERE id=?", (cur.lastrowid,)).fetchone())), 201
 
 
-@sla.route("/api/tickets/<int:tid>/sla", methods=["GET"])
+@sla.route("/api/jira/issues/<int:iid>/sla", methods=["GET"])
 @helpers.login_required
-def ticket_sla(tid):
-    from .routes_tickets import _fetch
-    t = _fetch(tid)
+def issue_sla_route(iid):
+    from .routes_jira import _fetch
+    t = _fetch(iid)
     if not t or not helpers.can_view_ticket(request.current_user, t):
         return jsonify(error="Not found"), 404
     row = db.get_db().execute(
-        "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
-        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
-        (tid,)).fetchone()
+        "SELECT ts.*, sp.name AS policy_name FROM issue_sla ts "
+        "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.issue_id=?",
+        (iid,)).fetchone()
     if not row:
         return jsonify(sla=None)
-    # Compute breach live (overdue open tickets) via summarize() so the client
+    # Compute breach live (overdue open issues) via summarize() so the client
     # sees accurate state without a separate sweep.
-    return jsonify(sla=summarize(tid))
+    return jsonify(sla=summarize(iid))
