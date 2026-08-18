@@ -83,7 +83,10 @@ const API = (() => {
     meta:      () => req("GET", "/api/meta"),
 
     // Phase 1 — notifications
-    notifications: () => req("GET", "/api/notifications"),
+    notifications: (params) => {
+      const q = new URLSearchParams(params).toString();
+      return req("GET", "/api/notifications" + (q ? "?" + q : ""));
+    },
     markNotifRead: (id) => req("POST", `/api/notifications/${id}/read`),
     markAllNotifRead: () => req("POST", "/api/notifications/read-all"),
 

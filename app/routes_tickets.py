@@ -127,7 +127,16 @@ def list_tickets():
         base += " WHERE " + " AND ".join(where)
     base += " ORDER BY t.updated_at DESC"
     rows = db.get_db().execute(base, params).fetchall()
-    return jsonify(tickets=[_serialize(t, sla_row=t) for t in rows])
+
+    page = max(1, int(request.args.get("page", "1") or "1"))
+    per_page = max(1, min(100, int(request.args.get("per_page", "25") or "25")))
+    total = len(rows)
+    start = (page - 1) * per_page
+    page_rows = rows[start:start + per_page]
+    return jsonify(
+        tickets=[_serialize(t, sla_row=t) for t in page_rows],
+        pagination={"page": page, "per_page": per_page, "total": total, "pages": max(1, (total + per_page - 1) // per_page)},
+    )
 
 
 @tickets.route("/api/tickets/<int:tid>")

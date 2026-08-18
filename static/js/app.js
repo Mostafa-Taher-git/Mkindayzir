@@ -114,7 +114,7 @@
         el("a", { href: "#/kb", onclick: () => navigate("/kb") }, "Back to Help Center"),
         el("h1", { class: "h2 mt-3" }, article.title),
         el("div", { class: "muted mb-4" }, categoryName(article.category_id) + (article.author_name ? " . by " + article.author_name : "")),
-        el("div", { class: "kb-body" }, el("p", {}, esc(article.body))),
+        el("div", { class: "kb-body" }, esc(article.body)),
         el("div", { class: "mt-6 card", style: "padding:16px" },
           el("div", { class: "label mb-2" }, "Was this helpful?"),
           el("div", { id: "kb-feedback-btns" },
@@ -218,10 +218,16 @@
           (sl.attainment_pct != null ? " (" + sl.attainment_pct + "%)" : "")));
       const trendList = el("div", { class: "card mt-4" },
         el("h3", { class: "h3 mt-2" }, "Last " + tr.days + " days (created / resolved)"),
-        el("div", { class: "trend" }, ...tr.series.map((d) =>
-          el("div", { class: "trend-row" },
-            el("span", { class: "muted", style: "font-size:12px" }, d.date.slice(5)),
-            el("span", {}, "▲" + d.created + " ▼" + d.resolved)))));
+        el("div", { class: "trend chart" }, ...tr.series.map((d) => {
+          const max = Math.max(1, ...tr.series.map((x) => Math.max(x.created, x.resolved)));
+          const createdW = Math.round((d.created / max) * 100);
+          const resolvedW = Math.round((d.resolved / max) * 100);
+          return el("div", { class: "trend-row chart-row" },
+            el("span", { class: "muted axis-label", style: "font-size:12px" }, d.date.slice(5)),
+            el("div", { class: "bars" },
+              el("div", { class: "bar created", style: "width:" + createdW + "%", title: "Created " + d.created }, ""),
+              el("div", { class: "bar resolved", style: "width:" + resolvedW + "%", title: "Resolved " + d.resolved }, "")));
+        })));
       const exportBtn = el("button", { class: "btn primary mt-4", onclick: async () => {
           try { await API.exportCsv(); } catch (e) { toast(e.message, "error"); }
         } }, "Export CSV");
@@ -485,14 +491,24 @@
         el("h1", { class: "h2" }, "Notifications"),
         el("div", { class: "spacer" }),
         el("button", { class: "btn ghost sm", onclick: () => markAllAndRefresh() }, "Mark all read")),
-      el("div", { class: "mt-4", id: "notif-list" },
-        el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")));
+      el("div", { class: "mt-4", id: "notif-list" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")),
+      el("div", { class: "row between mt-3" },
+        el("div", { class: "row" }, "Page ", el("input", { type: "number", id: "notif-page", min: "1", value: "1", style: "width:70px" }), el("button", { class: "btn ghost sm", onclick: () => loadNotifications() }, "Go")),
+        el("div", { id: "notif-pager", class: "muted" }, "")));
     shell(main);
+    await loadNotifications();
+  }
+
+  async function loadNotifications() {
     const listEl = $("#notif-list");
+    if (!listEl) return;
+    const page = Math.max(1, parseInt((document.getElementById("notif-page")?.value || "1"), 10));
     try {
-      const { notifications } = await API.notifications();
+      const data = await API.notifications({ page: String(page), per_page: "25" });
+      const notifications = data.notifications || [];
       if (!notifications.length) {
         listEl.replaceChildren(el("div", { class: "empty" }, "You're all caught up. 🎉"));
+        document.getElementById("notif-pager")?.replaceChildren(el("span", { class: "muted" }, ""));
         return;
       }
       listEl.replaceChildren(el("div", { class: "notif-list" },
@@ -507,6 +523,11 @@
             el("div", { class: "notif-meta muted" }, n.ticket_ref ? `${n.ticket_ref} · ` : "", ago(n.created_at)));
           return item;
         })));
+      renderPager("notif-pager", data.pagination, (p) => {
+        const el2 = document.getElementById("notif-page");
+        if (el2) el2.value = String(p);
+        loadNotifications();
+      });
     } catch (e) { toast(e.message, "error"); }
   }
 
@@ -659,6 +680,25 @@
       el("div", { class: "lbl label" }, label));
   }
 
+  function renderPager(containerId, pagination, onGo) {
+    const container = document.getElementById(containerId);
+    if (!container || !pagination) { container?.replaceChildren(""); return; }
+    const { page, pages, total } = pagination;
+    if (pages <= 1) { container.replaceChildren(el("span", { class: "muted" }, `${total} tickets`)); return; }
+    const pagesToShow = [1];
+    for (let i = Math.max(2, page - 1); i <= Math.min(pages - 1, page + 1); i++) pagesToShow.push(i);
+    if (pagesToShow[pagesToShow.length - 1] !== pages) pagesToShow.push(pages);
+    const items = [];
+    items.push(el("button", { class: "btn ghost sm", onclick: () => onGo(Math.max(1, page - 1)), disabled: page <= 1 ? "" : undefined }, "← Prev"));
+    pagesToShow.forEach((p) => {
+      const active = p === page;
+      items.push(el("button", { class: "btn ghost sm" + (active ? "" : " outline"), onclick: () => onGo(p), "aria-current": active ? "page" : undefined }, String(p)));
+    });
+    items.push(el("button", { class: "btn ghost sm", onclick: () => onGo(Math.min(pages, page + 1)), disabled: page >= pages ? "" : undefined }, "Next →"));
+    items.push(el("span", { class: "muted ml-2" }, `page ${page}/${pages} · ${total}`));
+    container.replaceChildren(el("div", { class: "row wrap mt-3" }, ...items));
+  }
+
   /* ----------------------------- queue / my requests ----------------------------- */
   function queueFilters() {
     const m = state.meta;
@@ -697,7 +737,10 @@
     shell(el("div", {},
       el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Ticket Queue")),
       queueFilters(),
-      el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…"))));
+      el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")),
+      el("div", { class: "row between mt-3" },
+        el("div", { class: "row" }, "Page ", el("input", { type: "number", id: "ticket-page", min: "1", value: "1", style: "width:70px" }), el("button", { class: "btn ghost sm", onclick: reload }, "Go")),
+        el("div", { id: "ticket-pager", class: "muted" }, ""))));
     await reload();
   }
 
@@ -707,7 +750,10 @@
       el("div", { class: "spacer" }),
       state.user.role === "requester" ? el("button", { class: "btn primary sm", onclick: () => navigate("/new") }, "New Request") : null);
     const wrap = el("div", {}, head, queueFilters(),
-      el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")));
+      el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")),
+      el("div", { class: "row between mt-3" },
+        el("div", { class: "row" }, "Page ", el("input", { type: "number", id: "ticket-page", min: "1", value: "1", style: "width:70px" }), el("button", { class: "btn ghost sm", onclick: reload }, "Go")),
+        el("div", { id: "ticket-pager", class: "muted" }, "")));
     shell(wrap);
     await reload();
   }
@@ -715,6 +761,7 @@
   async function reload() {
     const listEl = $("#ticket-list");
     if (!listEl) return;
+    const page = Math.max(1, parseInt((document.getElementById("ticket-page")?.value || "1"), 10));
     const params = {
       status: $("#f-status")?.value || "",
       priority: $("#f-priority")?.value || "",
@@ -722,15 +769,23 @@
       team_id: $("#f-team")?.value || "",
       q: $("#f-q")?.value || "",
       assignee_id: $("#f-assignee")?.value || "",
+      page: String(page),
+      per_page: "25",
     };
     // requester view: backend already scopes to own; just load
     try {
-      const { tickets } = await API.listTickets(params);
+      const data = await API.listTickets(params);
+      const tickets = data.tickets || [];
       if (!tickets.length) {
         listEl.replaceChildren(el("div", { class: "empty" }, "No tickets match your filters."));
+        document.getElementById("ticket-pager")?.replaceChildren(el("span", { class: "muted" }, ""));
         return;
       }
       listEl.replaceChildren(ticketTable(tickets, { showAged: false }));
+      renderPager("ticket-pager", data.pagination, (p) => {
+        $("#ticket-page").value = String(p);
+        reload();
+      });
     } catch (e) { toast(e.message, "error"); }
   }
 
@@ -1145,6 +1200,8 @@
             el("button", { class: "btn primary sm", onclick: addCat }, "+ Add")))),
       el("div", { class: "card mt-6" },
         el("h3", { class: "h3 mb-4" }, "Users"),
+        el("label", { class: "field mb-2" }, el("span", { class: "label" }, "Search users"),
+          el("input", { type: "text", id: "user-search", placeholder: "Search by name or email…", oninput: renderUsers })),
         el("div", { id: "users-list" }, el("span", { class: "spinner" })),
         el("button", { class: "btn secondary sm mt-4", onclick: () => openUserModal() }, "+ New User"))));
     await refreshAdmin();
@@ -1168,9 +1225,20 @@
           await API.adminDeleteCategory(c.id);
           await refreshAdmin();
         } }, "Deactivate"))));
+    renderUsers(users);
+  }
+
+  function renderUsers(users) {
+    if (typeof users === "undefined") users = window.__adminUsersCache;
+    if (!users) return;
+    window.__adminUsersCache = users;
+    const term = ($("#user-search")?.value || "").trim().toLowerCase();
+    const filtered = term
+      ? users.users.filter((u) => (u.name || "").toLowerCase().includes(term) || (u.email || "").toLowerCase().includes(term))
+      : users.users;
     $("#users-list").replaceChildren(el("table", { class: "tbl" },
       el("thead", {}, el("tr", {}, ...["Name", "Email", "Role", "Team", ""].map((h) => el("th", {}, h)))),
-      el("tbody", {}, ...users.users.map((u) =>
+      el("tbody", {}, ...filtered.map((u) =>
         el("tr", {},
           el("td", {}, u.name),
           el("td", {}, u.email),
@@ -1182,11 +1250,11 @@
               if (!await confirmModal("Delete this user? Users with ticket history cannot be deleted.", "Delete", "btn danger sm")) return;
               await API.adminDeleteUser(u.id);
               await refreshAdmin();
-            } }, "Delete")
-          ))
-        ))
+            } }, "Delete"))
+          )
+        )
       ))
-    );
+    ));
   }
 
   async function addTeam() {

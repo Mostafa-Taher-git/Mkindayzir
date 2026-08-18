@@ -274,4 +274,9 @@ a.kb-card:hover { border-color: var(--accent); }
 .report-value { font-size: 28px; font-weight: 700; color: var(--accent); }
 .report-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .trend { display: flex; flex-direction: column; gap: 4px; }
-.trend-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.trend-row.chart-row { align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: 6px 0; }
+.trend .axis-label { width: 64px; text-align: right; padding-right: 8px; }
+.trend .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.trend .bar { height: 8px; border-radius: 4px; min-width: 2px; }
+.trend .bar.created { background: var(--accent); }
+.trend .bar.resolved { background: var(--ok, #1a7f37); }
