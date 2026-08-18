@@ -83,7 +83,8 @@ def list_tickets():
     # list serializes SLA state without a per-row extra SELECT (no N+1).
     # NOTE: SQLite requires JOINs before the WHERE clause.
     q = ["SELECT t.*, ts.first_response_at, ts.breach_at, ts.breached, "
-         "ts.response_met, ts.resolution_met, sp.name AS policy_name "
+         "ts.response_met, ts.resolution_met, sp.name AS policy_name, "
+         "sp.response_hours, sp.resolution_hours "
          "FROM tickets t "
          "LEFT JOIN ticket_sla ts ON ts.ticket_id = t.id "
          "LEFT JOIN sla_policies sp ON sp.id = ts.policy_id"]
@@ -225,6 +226,67 @@ def create_ticket():
 
 
 # ---------------------------------------------------------------------------
+# Edit (staff always; requester while the ticket is still new)
+# ---------------------------------------------------------------------------
+@tickets.route("/api/tickets/<int:tid>", methods=["PATCH"])
+@login_required
+@csrf_protect
+def update_ticket(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    user = request.current_user
+    if user["role"] == config.ROLE_REQUESTER:
+        # Requesters may only fix their own ticket while it is still unassigned.
+        if t["requester_id"] != user["id"] or t["status"] != config.STATUS_NEW:
+            return jsonify(error="Forbidden"), 403
+    elif not is_agent_or_manager(user):
+        return jsonify(error="Forbidden"), 403
+
+    data = request.get_json(silent=True) or {}
+    subject = (data.get("subject") or t["subject"]).strip()
+    description = data.get("description", t["description"]) or ""
+    category_id = data.get("category_id", t["category_id"])
+    team_id = data.get("team_id", t["team_id"])
+
+    if not subject:
+        return jsonify(error="Subject is required"), 400
+    if len(subject) > config.MAX_SUBJECT:
+        return jsonify(error=f"Subject must be {config.MAX_SUBJECT} characters or fewer"), 400
+    if len(description) > config.MAX_DESCRIPTION:
+        return jsonify(error=f"Description must be {config.MAX_DESCRIPTION} characters or fewer"), 400
+    if category_id is not None:
+        cat = db.get_db().execute(
+            "SELECT id, default_team_id, active FROM categories WHERE id=?", (category_id,)).fetchone()
+        if not cat or not cat["active"]:
+            return jsonify(error="Unknown or inactive category"), 400
+
+    # Category change re-routes to the category's default team (staff may
+    # override with an explicit team; requesters get the default).
+    effective_team = t["team_id"]
+    if category_id != t["category_id"]:
+        if is_agent_or_manager(user) and team_id:
+            effective_team = team_id
+        else:
+            cat = db.get_db().execute(
+                "SELECT default_team_id FROM categories WHERE id=?", (category_id,)).fetchone()
+            effective_team = cat["default_team_id"] if cat else None
+
+    db.get_db().execute(
+        """UPDATE tickets SET subject=?, description=?, category_id=?,
+           team_id=?, updated_at=? WHERE id=?""",
+        (subject, description, category_id, effective_team, db.now_iso(), tid),
+    )
+    db.get_db().commit()
+    helpers.log_activity(tid, user["id"], "updated",
+                         note=f"Ticket edited by {user['name']}")
+    # Category/team change may invalidate the SLA policy -> re-pick it.
+    if category_id != t["category_id"] or effective_team != t["team_id"]:
+        sla.update_sla_on_priority(tid, category_id, t["priority"])
+    return jsonify(ticket=_serialize(_fetch(tid)))
+
+
+# ---------------------------------------------------------------------------
 # Assignment
 # ---------------------------------------------------------------------------
 @tickets.route("/api/tickets/<int:tid>/assign", methods=["POST"])
@@ -283,6 +345,14 @@ def assign(tid):
             f"Your ticket “{t['subject']}” was assigned to {an}.",
             email_subject=f"OpsDesk: ticket {t['ticket_ref']} assigned",
             email_body=f"Hi,\n\nYour ticket '{t['subject']}' ({t['ticket_ref']}) was assigned to {an}.\nView it here: {config.APP_BASE_URL}/#/ticket/{tid}\n")
+    # Watchers: the assignee follows (they own it now); followers get notified.
+    if assignee_id:
+        db.get_db().execute(
+            "INSERT OR IGNORE INTO ticket_followers (ticket_id, user_id, created_at) VALUES (?,?,?)",
+            (tid, assignee_id, db.now_iso()))
+        db.get_db().commit()
+    _notify_followers(tid, user["id"], "assigned",
+                      f"Ticket “{t['subject']}” was assigned." if assignee_id else f"Ticket “{t['subject']}” was unassigned.")
     return jsonify(ticket=_serialize(_fetch(tid)))
 
 
@@ -372,6 +442,9 @@ def change_status(tid):
         notifications.notify(
             t["requester_id"], tid, "reopened",
             f"Your ticket “{t['subject']}” was reopened. It is back in the queue.")
+    # Watchers: keep followers in the loop on every status change.
+    _notify_followers(tid, user["id"], "status_change",
+                      f"Ticket “{t['subject']}” is now {lifecycle.LABELS.get(final_status, final_status)}.")
     return jsonify(ticket=_serialize(_fetch(tid)))
 
 
@@ -444,11 +517,13 @@ def change_priority(tid):
     # Re-evaluate SLA policy if priority changed (policy may differ).
     updated = _fetch(tid)
     sla.update_sla_on_priority(tid, updated["category_id"], new_priority)
-    # Notify the requester when an agent changes the priority.
-    if updated["requester_id"] != user["id"]:
+# Notify the requester when an agent changes the priority.
+    if t["requester_id"] != user["id"]:
         notifications.notify(
             updated["requester_id"], tid, "priority",
             f"Your ticket “{t['subject']}” priority was set to {new_priority}.")
+    _notify_followers(tid, user["id"], "priority",
+                      f"Priority of “{t['subject']}” set to {new_priority}.")
     return jsonify(ticket=_serialize(updated))
 
 
@@ -500,6 +575,16 @@ def add_comment(tid):
     # note) is the first response; record it exactly once.
     if is_agent_or_manager(user) and t["requester_id"] != user["id"]:
         sla.record_first_response(tid)
+    # Watchers: commenting follows the ticket, mentions notify, followers hear
+    # about public replies.
+    db.get_db().execute(
+        "INSERT OR IGNORE INTO ticket_followers (ticket_id, user_id, created_at) VALUES (?,?,?)",
+        (tid, user["id"], db.now_iso()))
+    db.get_db().commit()
+    _notify_mentions(tid, body, user["id"], t["subject"])
+    if visibility == config.VIS_PUBLIC:
+        _notify_followers(tid, user["id"], "comment",
+                          f"{user['name']} commented on “{t['subject']}”.")
     return jsonify(comment=_serialize_comment(c)), 201
 
 
@@ -1034,3 +1119,223 @@ def _keyword_terms(text):
         if len(w) > 2 and w not in _KEYWORD_STOP:
             terms[w] = terms.get(w, 0) + 1
     return terms
+
+
+# ---------------------------------------------------------------------------
+# Followers / watchers + @mentions
+# ---------------------------------------------------------------------------
+def _followers_of(tid):
+    return [r["user_id"] for r in db.get_db().execute(
+        "SELECT user_id FROM ticket_followers WHERE ticket_id=?", (tid,)).fetchall()]
+
+
+def _notify_followers(tid, actor_id, kind, message):
+    """Fan out an in-app notification to every follower except the actor."""
+    for uid in _followers_of(tid):
+        if uid != actor_id:
+            notifications.notify(uid, tid, kind, message)
+
+
+def _notify_mentions(tid, body, actor_id, subject):
+    """Parse @Name mentions in a comment and notify the named users.
+
+    The regex is built from the actual user table (longest names first) so a
+    mention is an exact name match with a word boundary — "@Sam Requester
+    please review" mentions "Sam Requester", and "@Sammy" mentions nobody.
+    """
+    names = [r["name"] for r in db.get_db().execute("SELECT name FROM users")]
+    if not names:
+        return
+    names.sort(key=len, reverse=True)
+    pattern = re.compile(
+        r"@(" + "|".join(re.escape(n) for n in names) + r")(?![A-Za-z0-9.])",
+        re.IGNORECASE)
+    hits = []
+    seen = set()
+    for m in pattern.finditer(body or ""):
+        key = m.group(1).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        row = db.get_db().execute(
+            "SELECT id, name FROM users WHERE LOWER(name)=?", (key,)).fetchone()
+        if row:
+            hits.append(row)
+    if not hits:
+        return
+    actor_name = db.get_db().execute(
+        "SELECT name FROM users WHERE id=?", (actor_id,)).fetchone()["name"]
+    for r in hits:
+        if r["id"] != actor_id:
+            notifications.notify(
+                r["id"], tid, "mention",
+                f"{actor_name} mentioned you on “{subject}”.")
+
+
+@tickets.route("/api/tickets/<int:tid>/followers", methods=["GET"])
+@login_required
+def list_followers(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    rows = db.get_db().execute(
+        "SELECT u.id, u.name FROM ticket_followers f "
+        "JOIN users u ON u.id = f.user_id WHERE f.ticket_id=? ORDER BY f.created_at",
+        (tid,)).fetchall()
+    return jsonify(followers=[{"id": r["id"], "name": r["name"]} for r in rows])
+
+
+@tickets.route("/api/tickets/<int:tid>/follow", methods=["POST"])
+@login_required
+@csrf_protect
+def follow_ticket(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    db.get_db().execute(
+        "INSERT OR IGNORE INTO ticket_followers (ticket_id, user_id, created_at) VALUES (?,?,?)",
+        (tid, request.current_user["id"], db.now_iso()))
+    db.get_db().commit()
+    return jsonify(following=True)
+
+
+@tickets.route("/api/tickets/<int:tid>/follow", methods=["DELETE"])
+@login_required
+@csrf_protect
+def unfollow_ticket(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    db.get_db().execute(
+        "DELETE FROM ticket_followers WHERE ticket_id=? AND user_id=?",
+        (tid, request.current_user["id"]))
+    db.get_db().commit()
+    return jsonify(following=False)
+
+
+# ---------------------------------------------------------------------------
+# Bulk queue actions (staff only)
+# ---------------------------------------------------------------------------
+@tickets.route("/api/tickets/bulk", methods=["POST"])
+@login_required
+@csrf_protect
+def bulk_action():
+    user = request.current_user
+    if not is_agent_or_manager(user):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ticket_ids")
+    if not isinstance(ids, list) or not ids:
+        return jsonify(error="ticket_ids is required"), 400
+    action = data.get("action")
+    if action not in ("assign", "unassign", "status", "priority", "close", "blocked"):
+        return jsonify(error="Unknown action"), 400
+    processed, skipped = 0, []
+    for raw in ids[:200]:
+        try:
+            tid = int(raw)
+        except (TypeError, ValueError):
+            skipped.append({"id": raw, "error": "invalid id"})
+            continue
+        ok, err = _bulk_one(tid, action, data, user)
+        if ok:
+            processed += 1
+        else:
+            skipped.append({"id": tid, "error": err})
+    return jsonify(processed=processed, skipped=skipped)
+
+
+def _bulk_one(tid, action, data, user):
+    """Apply one bulk action to one ticket. Returns (ok, error_or_none)."""
+    t = _fetch(tid)
+    if not t or not can_view_ticket(user, t):
+        return False, "not found or no access"
+    now = db.now_iso()
+
+    if action in ("close", "blocked") or action == "status":
+        to = {"close": config.STATUS_CLOSED, "blocked": config.STATUS_BLOCKED}.get(action)
+        if action == "status":
+            to = data.get("status")
+        if not to:
+            return False, "status is required"
+        allowed, reason_required = lifecycle.can_transition(t["status"], to)
+        if not allowed:
+            return False, f"cannot move from {t['status']} to {to}"
+        if reason_required and not (data.get("note") or data.get("blocked_reason")):
+            return False, "a reason is required"
+        note = (data.get("note") or data.get("blocked_reason") or "")[:1000]
+        resolved_at, closed_at, blocked_reason = t["resolved_at"], t["closed_at"], t["blocked_reason"]
+        if to == config.STATUS_RESOLVED:
+            resolved_at = now
+        elif to == config.STATUS_CLOSED:
+            closed_at = now
+        elif to == config.STATUS_BLOCKED:
+            blocked_reason = note
+        db.get_db().execute(
+            """UPDATE tickets SET status=?, blocked_reason=?, resolved_at=?,
+               closed_at=?, updated_at=? WHERE id=?""",
+            (to, blocked_reason, resolved_at, closed_at, now, tid))
+        db.get_db().commit()
+        helpers.log_activity(tid, user["id"], "status_change", t["status"], to,
+                             note=note or None)
+        if to in (config.STATUS_RESOLVED, config.STATUS_CLOSED):
+            sla.evaluate_on_resolve(tid)
+        if t["requester_id"] != user["id"] and to == config.STATUS_RESOLVED:
+            notifications.notify(
+                t["requester_id"], tid, "resolved",
+                f"Your ticket “{t['subject']}” was marked resolved.")
+        _notify_followers(tid, user["id"], "status_change",
+                          f"Ticket “{t['subject']}” is now {lifecycle.LABELS.get(to, to)}.")
+        return True, None
+
+    if action == "assign":
+        assignee_id = data.get("assignee_id")
+        if not assignee_id:
+            return False, "assignee_id is required"
+        a = db.get_db().execute("SELECT id, team_id FROM users WHERE id=?", (assignee_id,)).fetchone()
+        if not a:
+            return False, "unknown assignee"
+        db.get_db().execute(
+            "UPDATE tickets SET assignee_id=?, team_id=?, status=?, updated_at=? WHERE id=?",
+            (assignee_id, a["team_id"], config.STATUS_ASSIGNED if t["status"] == config.STATUS_NEW else t["status"], now, tid))
+        db.get_db().commit()
+        helpers.log_activity(tid, user["id"], "assigned", t["status"],
+                             config.STATUS_ASSIGNED, note=f"Assigned to user {assignee_id}")
+        db.get_db().execute(
+            "INSERT OR IGNORE INTO ticket_followers (ticket_id, user_id, created_at) VALUES (?,?,?)",
+            (tid, assignee_id, now))
+        db.get_db().commit()
+        if t["requester_id"] != user["id"]:
+            sla.record_first_response(tid)
+            notifications.notify(
+                t["requester_id"], tid, "assigned",
+                f"Your ticket “{t['subject']}” was assigned.")
+        _notify_followers(tid, user["id"], "assigned",
+                          f"Ticket “{t['subject']}” was assigned.")
+        return True, None
+
+    if action == "unassign":
+        db.get_db().execute(
+            "UPDATE tickets SET assignee_id=NULL, team_id=NULL, status=?, updated_at=? WHERE id=?",
+            (config.STATUS_NEW, now, tid))
+        db.get_db().commit()
+        helpers.log_activity(tid, user["id"], "assigned", t["status"],
+                             config.STATUS_NEW, note="Unassigned (bulk)")
+        return True, None
+
+    if action == "priority":
+        new_priority = data.get("priority")
+        if new_priority not in config.PRIORITIES:
+            return False, "invalid priority"
+        if new_priority == t["priority"]:
+            return True, None
+        db.get_db().execute(
+            "UPDATE tickets SET priority=?, updated_at=? WHERE id=?",
+            (new_priority, now, tid))
+        db.get_db().commit()
+        helpers.log_activity(tid, user["id"], "priority_change",
+                             t["priority"], new_priority)
+        sla.update_sla_on_priority(tid, t["category_id"], new_priority)
+        return True, None
+
+    return False, "unsupported action"

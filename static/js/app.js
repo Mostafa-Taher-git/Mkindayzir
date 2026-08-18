@@ -1016,14 +1016,75 @@ const fPriority = el("select", { id: "f-priority" },
 
   async function viewQueue() {
     if (!isAgent()) { navigate("/my"); return; }
+    bulkSel = new Set();
     shell(el("div", {},
       el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Ticket Queue")),
       queueFilters(),
+      bulkBar(),
       el("div", { id: "ticket-list", class: "mt-4" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…")),
       el("div", { class: "row between mt-3" },
         el("div", { class: "row" }, "Page ", el("input", { type: "number", id: "ticket-page", min: "1", value: "1", style: "width:70px" }), el("button", { class: "btn ghost sm", onclick: reload }, "Go")),
         el("div", { id: "ticket-pager", class: "muted" }, ""))));
     await reload();
+  }
+
+  /* Bulk selection + actions (staff queue only). */
+  let bulkSel = new Set();
+  function onTicketSel(id, checked) {
+    if (checked) bulkSel.add(id); else bulkSel.delete(id);
+    const bar = document.getElementById("bulk-bar");
+    if (bar) bar.querySelector("#bulk-count").textContent = bulkSel.size + " selected";
+    bar.querySelectorAll("button").forEach((b) => { b.disabled = bulkSel.size === 0; });
+  }
+  function bulkBar() {
+    return el("div", { id: "bulk-bar", class: "row wrap mt-3", style: "gap:8px;align-items:center" },
+      el("span", { id: "bulk-count", class: "muted" }, "0 selected"),
+      el("button", { class: "btn secondary sm", disabled: "", onclick: bulkAssign }, "Assign…"),
+      el("button", { class: "btn secondary sm", disabled: "", onclick: bulkStatus }, "Status…"),
+      el("button", { class: "btn secondary sm", disabled: "", onclick: bulkPriority }, "Priority…"),
+      el("button", { class: "btn ghost sm", disabled: "", onclick: () => bulkRun("unassign", {}) }, "Unassign"),
+      el("button", { class: "btn ghost sm", disabled: "", onclick: () => bulkRun("close", {}) }, "Close"),
+      el("button", { class: "btn ghost sm", disabled: "", onclick: () => { bulkSel = new Set(); onTicketSel(0, false); reload(); } }, "Clear"));
+  }
+  async function bulkRun(action, extra) {
+    try {
+      const res = await API.bulkAction(Object.assign({ ticket_ids: [...bulkSel], action }, extra));
+      const skipped = (res.skipped || []).length;
+      toast(skipped ? `Updated ${res.processed}, skipped ${skipped}.` : `Updated ${res.processed} ticket(s).`);
+      bulkSel = new Set();
+      reload();
+    } catch (e) { toast(e.message, "error"); }
+  }
+  function bulkAssign() {
+    const sel = el("select", { id: "bulk-assignee" }, el("option", { value: "" }, "Choose an agent…"),
+      ...state.meta.users.filter((u) => u.role !== "requester").map((u) => el("option", { value: u.id }, u.name)));
+    openModal("Assign " + bulkSel.size + " ticket(s)", el("div", {}, sel), async () => {
+      const uid = sel.value;
+      if (!uid) { toast("Pick an assignee.", "error"); return false; }
+      await bulkRun("assign", { assignee_id: Number(uid) });
+      return true;
+    });
+  }
+  function bulkStatus() {
+    const opts = [
+      ["in_progress", "In Progress"], ["resolved", "Resolved"], ["closed", "Closed"], ["blocked", "Blocked"],
+    ];
+    const sel = el("select", { id: "bulk-status" }, ...opts.map(([v, l]) => el("option", { value: v }, l)));
+    const note = el("input", { type: "text", id: "bulk-note", placeholder: "Reason (required for Blocked)…" });
+    openModal("Set status on " + bulkSel.size + " ticket(s)", el("div", {},
+      el("label", { class: "field" }, el("span", { class: "label" }, "Status"), sel),
+      el("label", { class: "field" }, el("span", { class: "label" }, "Note"), note)), async () => {
+      await bulkRun("status", { status: sel.value, note: note.value.trim() });
+      return true;
+    });
+  }
+  function bulkPriority() {
+    const sel = el("select", { id: "bulk-priority" },
+      ...["low", "normal", "high", "urgent"].map((p) => el("option", { value: p }, priorityLabel(p))));
+    openModal("Set priority on " + bulkSel.size + " ticket(s)", el("div", {}, sel), async () => {
+      await bulkRun("priority", { priority: sel.value });
+      return true;
+    });
   }
 
   async function viewMyRequests() {
@@ -1063,7 +1124,7 @@ const fPriority = el("select", { id: "f-priority" },
         document.getElementById("ticket-pager")?.replaceChildren(el("span", { class: "muted" }, ""));
         return;
       }
-      listEl.replaceChildren(ticketTable(tickets, { showAged: false }));
+      listEl.replaceChildren(ticketTable(tickets, { showAged: false, selectable: isAgent() }));
       renderPager("ticket-pager", data.pagination, (p) => {
         $("#ticket-page").value = String(p);
         reload();
@@ -1072,9 +1133,18 @@ const fPriority = el("select", { id: "f-priority" },
   }
 
   function ticketTable(tickets, opts = {}) {
+    const selectable = !!opts.selectable;
     const rows = tickets.map((t) => {
       const urgentCls = t.priority === "urgent" ? "row-urgent" : "";
-      const cells = [
+      const cells = [];
+      if (selectable) {
+        cells.push(el("td", {},
+          el("input", { type: "checkbox", class: "ticket-sel", value: t.id,
+            "aria-label": "Select " + t.ticket_ref,
+            onclick: (e) => e.stopPropagation(),
+            onchange: (e) => onTicketSel(t.id, e.target.checked) })));
+      }
+      cells.push(
         el("td", {}, el("span", { class: "ref" }, t.ticket_ref)),
         el("td", {}, el("a", { href: `#/ticket/${t.id}`, style: "color:var(--on-surface);text-decoration:none;font-weight:600" }, t.subject)),
         el("td", {}, catName(t.category_id)),
@@ -1083,8 +1153,7 @@ const fPriority = el("select", { id: "f-priority" },
         el("td", {}, slaBadge(t) || el("span", { class: "muted" }, "-")),
         el("td", {}, nameOf(t.assignee_id, "Unassigned")),
         el("td", {}, teamName(t.team_id)),
-        el("td", { class: "muted" }, ago(t.updated_at)),
-      ];
+        el("td", { class: "muted" }, ago(t.updated_at)));
       if (opts.showAged) {
         cells.push(el("td", {}, t.status === "new"
           ? el("span", { class: "pill aged" }, "Unassigned >4h")
@@ -1092,10 +1161,12 @@ const fPriority = el("select", { id: "f-priority" },
       }
       return el("tr", { class: urgentCls, onclick: () => navigate(`/ticket/${t.id}`) }, ...cells);
     });
+    const heads = ["Ref", "Subject", "Category", "Status", "Priority", "SLA", "Assignee", "Team", "Updated",
+      ...(opts.showAged ? ["Flag"] : [])];
+    if (selectable) heads.unshift("");
     return el("div", { class: "table-wrap" },
       el("table", { class: "tbl" },
-        el("thead", {}, el("tr", {}, ...["Ref", "Subject", "Category", "Status", "Priority", "Assignee", "Team", "Updated",
-          ...(opts.showAged ? ["Flag"] : [])].map((h) => el("th", { scope: "col" }, h)))),
+        el("thead", {}, el("tr", {}, ...heads.map((h) => el("th", { scope: "col" }, h)))),
         el("tbody", {}, ...rows)));
   }
 
@@ -1104,15 +1175,19 @@ const fPriority = el("select", { id: "f-priority" },
     shell(el("div", {}, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading ticket…")));
     try {
       const isStaff = isAgent();
-      const [{ ticket }, kbRes, suggRes] = await Promise.all([
+      const [{ ticket }, kbRes, suggRes, folRes] = await Promise.all([
         API.getTicket(id),
         isStaff ? API.listTicketKnowledge(id).catch(() => ({ articles: [] })) : Promise.resolve({ articles: [] }),
         API.suggestTicketKnowledge(id).catch(() => ({ suggestions: [] })),
+        API.listFollowers(id).catch(() => ({ followers: [] })),
       ]);
       const t = ticket;
       const canHandle = isStaff;
       const isRequesterOwner = state.user.role === "requester" && t.requester_id === state.user.id;
       const linkedKb = (kbRes && kbRes.articles) || [];
+      const followers = (folRes && folRes.followers) || [];
+      const isFollowing = followers.some((f) => f.id === state.user.id);
+      const canEdit = canHandle || (isRequesterOwner && t.status === "new");
 
       // Header
       const header = el("div", { class: "page-head" },
@@ -1132,6 +1207,7 @@ const fPriority = el("select", { id: "f-priority" },
         kvRow("Created", fmtDate(t.created_at)),
         kvRow("Updated", fmtDate(t.updated_at)),
         t.sla ? kvRow("SLA", (t.sla.breached ? "Breached" : (t.sla.resolution_met === 0 ? "At risk" : "On track")) + (t.sla.policy_name ? " (" + t.sla.policy_name + ")" : "") + (t.sla.breach_at ? " . due " + fmtDate(t.sla.breach_at) : "")) : null,
+        t.sla && t.sla.response_hours ? kvRow("Expected first response", "Within " + t.sla.response_hours + "h" + (t.sla.response_due_at ? " (due " + fmtDate(t.sla.response_due_at) + ")" : "")) : null,
         t.blocked_reason ? el("div", { class: "mt-4" },
           el("span", { class: "label" }, "Blocked reason"),
           el("div", { class: "comment internal", style: "margin-top:4px" }, t.blocked_reason)) : null,
@@ -1196,13 +1272,23 @@ const fPriority = el("select", { id: "f-priority" },
       const actions = el("div", { class: "card compact mb-4" },
         el("div", { class: "label mb-2" }, "Actions"),
         el("div", { class: "row wrap" },
+          canEdit ? el("button", { class: "btn secondary sm", onclick: () => editTicket(t) }, "Edit") : null,
           canHandle ? el("button", { class: "btn secondary sm", onclick: () => claim(t) }, t.assignee_id ? "Reassign" : "Claim") : null,
           canHandle ? statusButtons(t) : null,
           canHandle ? el("button", { class: "btn secondary sm", onclick: () => changePriority(t) }, "Change Priority") : null,
           canHandle && ["resolved", "closed"].includes(t.status)
             ? el("button", { class: "btn secondary sm", onclick: () => promoteToKb(t) }, "Promote to KB Article") : null,
           isRequesterOwner && ["resolved", "closed"].includes(t.status)
-            ? el("button", { class: "btn danger sm", onclick: () => doReopen(t.id) }, "Reopen") : null));
+            ? el("button", { class: "btn danger sm", onclick: () => doReopen(t.id) }, "Reopen") : null,
+          el("button", { class: "btn ghost sm", onclick: async () => {
+            try {
+              if (isFollowing) { await API.unfollowTicket(t.id); toast("Unfollowed."); }
+              else { await API.followTicket(t.id); toast("Following — you'll be notified of updates."); }
+              viewTicket(t.id);
+            } catch (e) { toast(e.message, "error"); }
+          } }, isFollowing ? "Unfollow" : "Follow"),
+          followers.length ? el("span", { class: "muted", style: "font-size:12px;align-self:center" },
+            followers.length + " watching" + (followers.length <= 3 ? ": " + followers.map((f) => f.name).join(", ") : "")) : null));
       const activity = el("div", { class: "card compact" },
         el("div", { class: "label mb-2" }, "Activity"),
         el("ul", { class: "timeline" }, ...t.activity.map(renderActivity)));
@@ -1406,6 +1492,36 @@ const fPriority = el("select", { id: "f-priority" },
     });
   }
 
+  function editTicket(t) {
+    const isStaff = isAgent();
+    const subject = el("input", { type: "text", id: "edit-subject", value: t.subject, maxlength: "100" });
+    const cat = el("select", { id: "edit-cat" },
+      ...state.meta.categories.map((c) => el("option", { value: c.id, selected: c.id === t.category_id ? "" : null }, c.name)));
+    const team = isStaff ? el("select", { id: "edit-team" }, el("option", { value: "" }, "Auto (category)"),
+      ...state.meta.teams.map((tm) => el("option", { value: tm.id, selected: tm.id === t.team_id ? "" : null }, tm.name))) : null;
+    const desc = el("textarea", { id: "edit-desc", rows: "6", maxlength: "2000" }, t.description || "");
+    openModal("Edit ticket " + t.ticket_ref, el("div", {},
+      el("label", { class: "field" }, el("span", { class: "label" }, "Subject"), subject),
+      el("label", { class: "field" }, el("span", { class: "label" }, "Category"), cat),
+      team ? el("label", { class: "field" }, el("span", { class: "label" }, "Team"), team) : null,
+      el("label", { class: "field" }, el("span", { class: "label" }, "Description"), desc)), async () => {
+      const payload = {
+        subject: subject.value.trim(),
+        category_id: cat.value ? Number(cat.value) : null,
+        description: desc.value,
+      };
+      if (!payload.subject) { toast("Subject is required.", "error"); return false; }
+      if (team) payload.team_id = team.value ? Number(team.value) : null;
+      try {
+        await API.updateTicket(t.id, payload);
+        closeModal();
+        viewTicket(t.id);
+        toast("Ticket updated.");
+        return true;
+      } catch (e) { toast(e.message, "error"); return false; }
+    });
+  }
+
   async function doDeleteKb(id) {
     const confirmed = await confirmModal(
       "Delete this article? This cannot be undone.",
@@ -1420,6 +1536,7 @@ const fPriority = el("select", { id: "f-priority" },
   /* ----------------------------- create ----------------------------- */
   function viewCreate() {
     const m = state.meta;
+    let suggestAck = false;
     shell(el("div", {},
       el("div", { class: "page-head" }, el("h1", { class: "h2" }, "New Request")),
       el("div", { class: "card", style: "max-width:640px" },
@@ -1438,6 +1555,7 @@ const fPriority = el("select", { id: "f-priority" },
             el("option", { value: "" }, "Select…"),
             ...m.teams.map((t) => el("option", { value: t.id }, t.name)))),
           field("Description", el("textarea", { name: "description", required: "" }), "What do you need? Include steps, impact, and any error text."),
+          el("div", { id: "kb-suggest" }),
           el("button", { type: "submit", class: "btn primary" }, "Submit Request")))));
 
     function field(label, input, hint) {
@@ -1457,6 +1575,24 @@ const fPriority = el("select", { id: "f-priority" },
         description: f.description.value,
       };
       if (!payload.subject || !payload.category_id) { toast("Subject and category are required.", "error"); return; }
+      // Self-service: if matching articles exist, surface them before creating.
+      if (!suggestAck) {
+        let suggestions = [];
+        try { suggestions = (await API.kbSuggest(payload.subject + " " + payload.description)).suggestions || []; }
+        catch (_) {}
+        if (suggestions.length) {
+          const box = document.getElementById("kb-suggest");
+          if (box) box.replaceChildren(
+            el("div", { class: "card mt-3", style: "padding:16px;border-color:var(--warn)" },
+              el("div", { class: "label mb-2" }, "These articles may already answer your request"),
+              ...suggestions.map((s) => el("div", { class: "row between mt-2" },
+                el("a", { class: "btn ghost sm", href: `#/kb/${s.id}`, onclick: () => navigate(`/kb/${s.id}`) }, s.title),
+                s.category_name ? el("span", { class: "muted" }, s.category_name) : null)),
+              el("div", { class: "muted mt-3", style: "font-size:13px" }, "Click Submit Request again to continue anyway.")));
+          suggestAck = true;
+          return;
+        }
+      }
       try {
         const { ticket } = await API.createTicket(payload);
         toast("Request created: " + ticket.ticket_ref);

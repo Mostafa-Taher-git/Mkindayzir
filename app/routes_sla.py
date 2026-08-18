@@ -121,7 +121,8 @@ def summarize(ticket_id, sla_row=None):
         row = sla_row
     else:
         row = conn.execute(
-            "SELECT ts.*, sp.name AS policy_name FROM ticket_sla ts "
+            "SELECT ts.*, sp.name AS policy_name, sp.response_hours, sp.resolution_hours "
+            "FROM ticket_sla ts "
             "LEFT JOIN sla_policies sp ON sp.id=ts.policy_id WHERE ts.ticket_id=?",
             (ticket_id,)).fetchone()
     if not row:
@@ -131,6 +132,20 @@ def summarize(ticket_id, sla_row=None):
     ticket = conn.execute("SELECT status FROM tickets WHERE id=?", (ticket_id,)).fetchone()
     is_open = ticket and ticket["status"] not in ("resolved", "closed")
     breached = bool(row["breached"]) or (is_open and breach_at is not None and now > breach_at)
+    # Expected-response / resolution deadlines, computed from the policy hours
+    # anchored at creation. Gives requesters a "we will reply within Xh" promise
+    # and staff a per-ticket due readout in the queue.
+    response_hours = row["response_hours"] if "response_hours" in row.keys() else None
+    resolution_hours = row["resolution_hours"] if "resolution_hours" in row.keys() else None
+    response_due_at = resolution_due_at = None
+    if response_hours is not None or resolution_hours is not None:
+        created = conn.execute("SELECT created_at FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+        created_dt = helpers._parse_iso(created["created_at"]) if created else None
+        if created_dt:
+            if response_hours is not None:
+                response_due_at = (created_dt + timedelta(hours=response_hours)).isoformat()
+            if resolution_hours is not None:
+                resolution_due_at = (created_dt + timedelta(hours=resolution_hours)).isoformat()
     return {
         "policy_name": row["policy_name"],
         "breach_at": row["breach_at"],
@@ -138,6 +153,10 @@ def summarize(ticket_id, sla_row=None):
         "first_response_at": row["first_response_at"],
         "response_met": row["response_met"],
         "resolution_met": row["resolution_met"],
+        "response_hours": response_hours,
+        "resolution_hours": resolution_hours,
+        "response_due_at": response_due_at,
+        "resolution_due_at": resolution_due_at,
     }
 
 

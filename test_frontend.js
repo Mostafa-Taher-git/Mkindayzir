@@ -79,12 +79,14 @@ async function login(email, password) {
 
   await go("#/queue");
   assert(/Ticket Queue/.test(appHTML()), "queue view renders");
+  assert(/bulk-bar/.test(appHTML()) && /0 selected/.test(appHTML()), "queue shows bulk action bar");
 
   await go("#/ticket/1", 1200);
   const detail = appHTML();
   assert(/Activity/.test(detail) && /Conversation/.test(detail), "ticket detail renders conversation + activity");
   assert(/OPS-/.test(detail), "ticket detail shows ref id");
   assert(/Knowledge Base/.test(detail), "ticket detail shows the KB bridge section");
+  assert(/Follow/.test(detail), "ticket detail shows follow toggle");
 
   await go("#/kb/manage");
   assert(/Manage Knowledge Base/.test(appHTML()), "Manage KB renders");

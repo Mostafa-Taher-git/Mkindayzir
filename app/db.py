@@ -345,6 +345,17 @@ def _migrate(db):
             )
         """)
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS kb_article_link_unique ON kb_article_links(source_id, target_id)")
+    fol_table = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ticket_followers'").fetchone()
+    if not fol_table:
+        db.execute("""
+            CREATE TABLE ticket_followers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                UNIQUE (ticket_id, user_id)
+            )
+        """)
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}

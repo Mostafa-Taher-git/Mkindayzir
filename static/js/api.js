@@ -70,6 +70,12 @@ const API = (() => {
     assign:     (id, payload) => req("POST", `/api/tickets/${id}/assign`, payload),
     setStatus:  (id, payload) => req("POST", `/api/tickets/${id}/status`, payload),
     setPriority: (id, priority) => req("POST", `/api/tickets/${id}/priority`, { priority }),
+    updateTicket: (id, payload) => req("PATCH", `/api/tickets/${id}`, payload),
+    bulkAction: (payload) => req("POST", "/api/tickets/bulk", payload),
+    listFollowers: (id) => req("GET", `/api/tickets/${id}/followers`),
+    followTicket: (id) => req("POST", `/api/tickets/${id}/follow`),
+    unfollowTicket: (id) => req("DELETE", `/api/tickets/${id}/follow`),
+    kbSuggest: (q) => req("GET", "/api/kb/suggest?q=" + encodeURIComponent(q)),
     reopen:     (id) => req("POST", `/api/tickets/${id}/reopen`),
     comment:    (id, payload) => req("POST", `/api/tickets/${id}/comments`, payload),
     upload:     (id, file) => {

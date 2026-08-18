@@ -739,7 +739,7 @@ def test_all_four_priorities_accepted_and_listed(client):
     # change-priority accepts every level (agent owns the IT-team ticket)
     _login(client, "agent@opsdesk.local")
     csrf = _csrf(client)
-    tid = client.get("/api/tickets?status=open").get_json()["tickets"][0]["id"]
+    tid = client.get("/api/tickets?status=new").get_json()["tickets"][0]["id"]
     for p in PRIORITIES:
         r = client.post(f"/api/tickets/{tid}/priority", json={"priority": p},
                         headers={"X-CSRF-Token": csrf})
@@ -1679,3 +1679,279 @@ def test_suggested_articles_require_ticket_access(client):
     # A same-team agent can (they handle the ticket).
     _login(client, "agent@opsdesk.local")
     assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Edit ticket (PATCH) — staff always, requester while new
+# ---------------------------------------------------------------------------
+def test_agent_can_edit_ticket(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.patch(f"/api/tickets/{t['id']}",
+                     json={"subject": "Renamed", "description": "New body"},
+                     headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    got = r.get_json()["ticket"]
+    assert got["subject"] == "Renamed" and got["description"] == "New body"
+    assert got["id"] == t["id"]  # same ticket, not a new one
+
+
+def test_requester_can_edit_own_ticket_while_new(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    r = client.patch(f"/api/tickets/{t['id']}",
+                     json={"subject": "Fixed typo", "description": "more detail"},
+                     headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200
+    assert r.get_json()["ticket"]["subject"] == "Fixed typo"
+
+
+def test_requester_cannot_edit_after_assignment(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Too late"},
+                     headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 403
+
+
+def test_requester_cannot_edit_someone_elses_ticket(client):
+    # category 1 routes to IT, so the HR agent can't even see it
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Laptop", "description": "x", "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    # hragent is not on sam's IT team -> cannot even see it
+    _login(client, "hragent@opsdesk.local")
+    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Hijack"},
+                     headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 404
+    # manager (sees everything) can edit
+    _login(client, "manager@opsdesk.local")
+    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "Manager fix"},
+                     headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 200
+
+
+def test_edit_category_reroutes_team_and_sla(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    # category 1 (Access & Accounts) routes to IT
+    t = _create_ticket(client, csrf, as_user="sam@opsdesk.local").get_json()["ticket"]
+    it_team = t["team_id"]
+    # requester moves it to HR category (id 4) -> should re-route to HR
+    _login(client, "sam@opsdesk.local")
+    r = client.patch(f"/api/tickets/{t['id']}", json={"category_id": 4},
+                     headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 200
+    got = r.get_json()["ticket"]
+    assert got["team_id"] != it_team
+    assert got["sla"] is not None and got["sla"]["policy_name"] == "HR - normal"
+
+
+def test_edit_requires_subject(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf).get_json()["ticket"]
+    r = client.patch(f"/api/tickets/{t['id']}", json={"subject": "   "},
+                     headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Followers / watchers + @mentions
+# ---------------------------------------------------------------------------
+def _make_team_ticket(client):
+    """sam's ticket routed to IT (category 1) so the IT agent can act on it."""
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Broken laptop", "description": "Won't turn on",
+                                          "category_id": 1},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    return t
+
+
+def test_follow_unfollow_lifecycle(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/follow",
+                       headers={"X-CSRF-Token": csrf}).get_json()["following"] is True
+    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    assert any(f["name"] == "IT Agent" for f in followers)
+    assert client.delete(f"/api/tickets/{t['id']}/follow",
+                         headers={"X-CSRF-Token": csrf}).get_json()["following"] is False
+    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    assert followers == []
+
+
+def test_follower_notified_on_public_comment(client):
+    t = _make_team_ticket(client)
+    _login(client, "hragent@opsdesk.local")
+    csrf = _csrf(client)
+    # HR agent cannot see IT tickets; use manager instead as a follower
+    _login(client, "manager@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/follow", headers={"X-CSRF-Token": csrf})
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/comments",
+                json={"body": "Working on it now.", "visibility": "public"},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "manager@opsdesk.local")
+    d = client.get("/api/notifications").get_json()
+    assert any(n["kind"] == "comment" and "commented" in n["message"] for n in d["notifications"])
+
+
+def test_comment_auto_follows(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/comments", json={"body": "Noted."},
+                headers={"X-CSRF-Token": csrf})
+    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    assert any(f["name"] == "IT Agent" for f in followers)
+
+
+def test_assignee_auto_follows(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": csrf})
+    followers = client.get(f"/api/tickets/{t['id']}/followers").get_json()["followers"]
+    assert any(f["name"] == "IT Agent" for f in followers)
+
+
+def test_mention_notifies_named_user(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/comments",
+                json={"body": "@Sam Requester please confirm."},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    d = client.get("/api/notifications").get_json()
+    assert any(n["kind"] == "mention" and "mentioned you" in n["message"] for n in d["notifications"])
+
+
+def test_mention_requires_full_name(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post(f"/api/tickets/{t['id']}/comments",
+                json={"body": "@Sam please confirm, and @Sammy too."},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    d = client.get("/api/notifications").get_json()
+    assert all(n["kind"] != "mention" for n in d["notifications"])
+
+
+# ---------------------------------------------------------------------------
+# Bulk queue actions
+# ---------------------------------------------------------------------------
+def _bulk(client, ids, action, extra=None):
+    payload = dict(extra or {})
+    payload.update(ticket_ids=ids, action=action)
+    return client.post("/api/tickets/bulk", json=payload,
+                       headers={"X-CSRF-Token": _csrf(client)})
+
+
+def test_bulk_assign_and_status(client):
+    t1 = _make_team_ticket(client)
+    t2 = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    r = _bulk(client, [t1["id"], t2["id"]], "assign", {"assignee_id": 3})
+    assert r.status_code == 200
+    assert r.get_json()["processed"] == 2
+    r = _bulk(client, [t1["id"], t2["id"]], "status", {"status": "in_progress"})
+    assert r.get_json()["processed"] == 2
+    r = _bulk(client, [t1["id"]], "status", {"status": "resolved"})
+    assert r.get_json()["processed"] == 1
+    d = client.get(f"/api/tickets/{t1['id']}").get_json()["ticket"]
+    assert d["status"] == "resolved" and d["assignee_id"] == 3
+
+
+def test_bulk_skips_invalid_transitions(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    # new -> resolved is NOT a valid transition (must be assigned first)
+    r = _bulk(client, [t["id"]], "status", {"status": "resolved"})
+    assert r.get_json()["processed"] == 0
+    assert r.get_json()["skipped"][0]["error"].startswith("cannot move")
+    # close IS valid from new (manager/admin may close without work)
+    r = _bulk(client, [t["id"]], "close")
+    assert r.get_json()["processed"] == 1
+
+
+def test_bulk_blocked_requires_reason(client):
+    t = _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    client.post(f"/api/tickets/{t['id']}/assign", json={"self": True},
+                headers={"X-CSRF-Token": _csrf(client)})
+    r = _bulk(client, [t["id"]], "blocked", {"note": "waiting on vendor"})
+    assert r.get_json()["processed"] == 1
+    d = client.get(f"/api/tickets/{t['id']}").get_json()["ticket"]
+    assert d["status"] == "blocked" and d["blocked_reason"] == "waiting on vendor"
+
+
+def test_bulk_requester_forbidden_and_validation(client):
+    _login(client, "sam@opsdesk.local")
+    r = _bulk(client, [1], "close")
+    assert r.status_code == 403
+    # id validation needs a staff actor (the role check runs first)
+    _login(client, "agent@opsdesk.local")
+    r = client.post("/api/tickets/bulk", json={"action": "close"},
+                    headers={"X-CSRF-Token": _csrf(client)})
+    assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# SLA transparency: due dates in serialization
+# ---------------------------------------------------------------------------
+def test_sla_due_dates_in_serialization(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "SLA due", "description": "x",
+                                          "category_id": 1, "priority": "urgent"},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    sla = t["sla"]
+    assert sla["response_hours"] == 1 and sla["resolution_hours"] == 8
+    assert sla["response_due_at"] and sla["resolution_due_at"]
+    assert sla["response_due_at"] < sla["resolution_due_at"]
+
+
+def test_queue_rows_include_sla_due_dates(client):
+    _make_team_ticket(client)
+    _login(client, "agent@opsdesk.local")
+    rows = client.get("/api/tickets?status=new").get_json()["tickets"]
+    assert any(r["sla"] and r["sla"]["response_due_at"] for r in rows)
+
+
+# ---------------------------------------------------------------------------
+# Pre-submit KB suggestions
+# ---------------------------------------------------------------------------
+def test_kb_suggest_ranks_and_hides_drafts(client):
+    _publish_kb(client, "VPN config guide", "Set up the OpenVPN client on your laptop.", 1)
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    client.post("/api/kb", json={"title": "Draft VPN draft", "body": "VPN unhelpful", "category_id": 1},
+                headers={"X-CSRF-Token": csrf})
+    _login(client, "sam@opsdesk.local")
+    r = client.get("/api/kb/suggest?q=VPN client laptop setup")
+    assert r.status_code == 200
+    titles = [s["title"] for s in r.get_json()["suggestions"]]
+    assert "VPN config guide" in titles
+    assert "Draft VPN draft" not in titles
+    assert r.get_json()["suggestions"][0]["title"] == "VPN config guide"
+    # empty query -> empty suggestions
+    assert client.get("/api/kb/suggest?q=").get_json()["suggestions"] == []

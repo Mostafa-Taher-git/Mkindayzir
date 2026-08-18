@@ -36,6 +36,40 @@ def _author_name(user_id):
     return u["name"] if u else None
 
 
+@kb.route("/api/kb/suggest", methods=["GET"])
+@helpers.login_required
+def suggest_articles():
+    """Top published articles by keyword overlap with a free-text query.
+
+    Powers the pre-submit "does this already answer your request?" card on the
+    New Request form. Published-only, ranked, top 5.
+    """
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify(suggestions=[])
+    from .routes_tickets import _keyword_terms
+    terms = _keyword_terms(q)
+    if not terms:
+        return jsonify(suggestions=[])
+    rows = db.get_db().execute(
+        "SELECT a.*, c.name AS category_name FROM kb_articles a "
+        "LEFT JOIN categories c ON c.id = a.category_id "
+        "WHERE a.status='published'",
+    ).fetchall()
+    scored = []
+    for r in rows:
+        hay = _keyword_terms(r["title"] + " " + r["body"])
+        if not hay:
+            continue
+        score = sum(terms.get(w, 0) * hay.get(w, 0) for w in terms)
+        if score > 0:
+            scored.append((score, r))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    out = [{"id": r["id"], "title": r["title"], "category_name": r["category_name"], "score": s}
+           for s, r in scored[:5]]
+    return jsonify(suggestions=out)
+
+
 @kb.route("/api/kb", methods=["GET"])
 @helpers.login_required
 def list_articles():
