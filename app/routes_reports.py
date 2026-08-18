@@ -223,18 +223,20 @@ def workload():
     ).fetchall()
     out = []
     for a in agents:
+        open_where, open_params = _extend_where(where, where_params, "t.assignee_id=? AND t.status IN ('assigned','in_progress','blocked','reopened')", [a["id"]])
         open_n = conn.execute(
-            f"SELECT COUNT(*) c FROM tickets t {where} AND t.assignee_id=? AND t.status IN ('assigned','in_progress','blocked','reopened')",
-            where_params + [a["id"]],
+            f"SELECT COUNT(*) c FROM tickets t {open_where}",
+            open_params,
         ).fetchone()["c"]
+        res_where, res_params = _extend_where(where, where_params, "t.assignee_id=? AND t.resolved_at IS NOT NULL", [a["id"]])
         resolved = conn.execute(
-            f"SELECT COUNT(*) c FROM tickets t {where} AND t.assignee_id=? AND t.resolved_at IS NOT NULL",
-            where_params + [a["id"]],
+            f"SELECT COUNT(*) c FROM tickets t {res_where}",
+            res_params,
         ).fetchone()["c"]
         avg = None
         rows = conn.execute(
-            f"SELECT created_at, resolved_at FROM tickets t {where} AND t.assignee_id=? AND t.resolved_at IS NOT NULL",
-            where_params + [a["id"]],
+            f"SELECT created_at, resolved_at FROM tickets t {res_where}",
+            res_params,
         ).fetchall()
         if rows:
             tot = 0
