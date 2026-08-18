@@ -307,9 +307,9 @@ def action_center():
             "subject": row["subject"],
             "status": row["status"],
             "priority": row["priority"],
-            "created_at": row.get("created_at"),
-            "updated_at": row.get("updated_at"),
-            "breach_at": row.get("breach_at"),
+            "created_at": row["created_at"] if "created_at" in row.keys() else None,
+            "updated_at": row["updated_at"] if "updated_at" in row.keys() else None,
+            "breach_at": row["breach_at"] if "breach_at" in row.keys() else None,
         }
     return jsonify(
         unassigned=[_serialize_ticket(r) for r in unassigned],
