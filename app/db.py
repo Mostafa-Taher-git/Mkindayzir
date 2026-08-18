@@ -331,6 +331,18 @@ def _migrate(db):
                 created_at TEXT NOT NULL
             )
         """)
+    link_table = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kb_article_links'").fetchone()
+    if not link_table:
+        db.execute("""
+            CREATE TABLE kb_article_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+                target_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+                created_by INTEGER REFERENCES users(id),
+                created_at TEXT NOT NULL
+            )
+        """)
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS kb_article_link_unique ON kb_article_links(source_id, target_id)")
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}

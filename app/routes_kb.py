@@ -373,6 +373,65 @@ def list_versions(aid):
     return jsonify(versions=[dict(r) for r in rows])
 
 
+@kb.route("/api/kb/<int:aid>/links", methods=["GET"])
+@helpers.login_required
+def list_links(aid):
+    a = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Not found"), 404
+    outbound = db.get_db().execute(
+        "SELECT a.*, l.created_at AS linked_at FROM kb_article_links l "
+        "JOIN kb_articles a ON a.id = l.target_id WHERE l.source_id=?",
+        (aid,),
+    ).fetchall()
+    inbound = db.get_db().execute(
+        "SELECT a.*, l.created_at AS linked_at FROM kb_article_links l "
+        "JOIN kb_articles a ON a.id = l.source_id WHERE l.target_id=?",
+        (aid,),
+    ).fetchall()
+    return jsonify(outbound=[dict(r) for r in outbound], inbound=[dict(r) for r in inbound])
+
+
+@kb.route("/api/kb/<int:aid>/links", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def add_link(aid):
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    src = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not src:
+        return jsonify(error="Not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    target_id = data.get("target_id")
+    if not target_id:
+        return jsonify(error="target_id is required"), 400
+    tgt = db.get_db().execute("SELECT id FROM kb_articles WHERE id=?", (target_id,)).fetchone()
+    if not tgt:
+        return jsonify(error="Target not found"), 404
+    try:
+        db.get_db().execute(
+            "INSERT INTO kb_article_links (source_id, target_id, created_by, created_at) VALUES (?,?,?,?)",
+            (aid, target_id, user["id"], db.now_iso()))
+        db.get_db().commit()
+    except Exception:
+        db.get_db().execute("ROLLBACK")
+        return jsonify(error="Already linked"), 409
+    return jsonify(ok=True), 201
+
+
+@kb.route("/api/kb/<int:aid>/links/<int:target_id>", methods=["DELETE"])
+@helpers.login_required
+@helpers.csrf_protect
+def remove_link(aid, target_id):
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    db.get_db().execute("DELETE FROM kb_article_links WHERE source_id=? AND target_id=?", (aid, target_id))
+    db.get_db().commit()
+    return jsonify(ok=True)
+
+
 @kb.route("/api/kb/<int:aid>/draft-from-ticket", methods=["POST"])
 @helpers.login_required
 @helpers.csrf_protect

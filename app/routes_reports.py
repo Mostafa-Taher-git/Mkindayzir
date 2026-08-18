@@ -422,3 +422,34 @@ def rate_ticket(tid):
     db.get_db().commit()
     helpers.log_activity(tid, user["id"], "rated", note=f"CSAT {score}/5")
     return jsonify(ok=True, csat=score)
+
+
+@reports.route("/api/reports/knowledge", methods=["GET"])
+@helpers.login_required
+def knowledge_report():
+    if not _mgr_only(request.current_user):
+        return jsonify(error="Forbidden"), 403
+    where, where_params, _ = _combined_where()
+    conn = db.get_db()
+    stats = conn.execute("""
+        SELECT
+          (SELECT COALESCE(SUM(views),0) FROM kb_articles) AS views,
+          (SELECT COUNT(*) FROM kb_articles) AS articles,
+          (SELECT COALESCE(SUM(helpful),0) FROM kb_feedback) AS helpful,
+          (SELECT COUNT(*) FROM kb_feedback) AS feedbacks,
+          (SELECT COUNT(DISTINCT ticket_id) FROM ticket_kb_links) AS linked_tickets,
+          (SELECT COUNT(*) FROM kb_articles) -
+          (SELECT COUNT(DISTINCT article_id) FROM ticket_kb_links) AS orphan_articles
+    """).fetchone()
+    no_result_searches = 0
+    top_gaps = []
+    return jsonify(
+        article_views=stats["views"],
+        articles=stats["articles"],
+        helpful_count=stats["helpful"],
+        feedback_count=stats["feedbacks"],
+        ticket_usage_count=stats["linked_tickets"],
+        orphan_count=stats["orphan_articles"],
+        no_result_searches=no_result_searches,
+        top_gaps=top_gaps,
+    )

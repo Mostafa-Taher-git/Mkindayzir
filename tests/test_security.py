@@ -1376,3 +1376,34 @@ def test_kb_versions_and_draft_from_ticket(client):
                         headers={"X-CSRF-Token": csrf}).get_json()
     assert draft["title"] == "T"
     assert "body" in draft
+
+
+def test_kb_article_links(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    a1 = client.post("/api/kb", json={"title": "A1", "body": "b1", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    a2 = client.post("/api/kb", json={"title": "A2", "body": "b2", "category_id": 1},
+                     headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    r = client.post(f"/api/kb/{a1['id']}/links", json={"target_id": a2["id"]},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    links = client.get(f"/api/kb/{a1['id']}/links").get_json()
+    assert any(x["id"] == a2["id"] for x in links["outbound"])
+    r2 = client.post(f"/api/kb/{a1['id']}/links", json={"target_id": a2["id"]},
+                     headers={"X-CSRF-Token": csrf})
+    assert r2.status_code == 409
+    r3 = client.delete(f"/api/kb/{a1['id']}/links/{a2['id']}",
+                       headers={"X-CSRF-Token": csrf})
+    assert r3.status_code == 200
+    after = client.get(f"/api/kb/{a1['id']}/links").get_json()
+    assert not any(x["id"] == a2["id"] for x in after["outbound"])
+
+
+def test_reports_knowledge_for_manager(client):
+    _login(client, "manager@opsdesk.local")
+    r = client.get("/api/reports/knowledge")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "articles" in data
+    assert "orphan_count" in data

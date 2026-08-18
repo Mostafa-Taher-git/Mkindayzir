@@ -109,6 +109,9 @@ const API = (() => {
     addCollectionArticle: (cid, payload) => req("POST", `/api/kb/collections/${cid}/articles`, payload),
     removeCollectionArticle: (cid, aid) => req("DELETE", `/api/kb/collections/${cid}/articles/${aid}`),
     listKbVersions: (aid) => req("GET", `/api/kb/${aid}/versions`),
+    listKbLinks: (aid) => req("GET", `/api/kb/${aid}/links`),
+    addKbLink: (aid, payload) => req("POST", `/api/kb/${aid}/links`, payload),
+    removeKbLink: (aid, targetId) => req("DELETE", `/api/kb/${aid}/links/${targetId}`),
     draftKbFromTicket: (aid, payload) => req("POST", `/api/kb/${aid}/draft-from-ticket`, payload),
 
     listTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge`),
