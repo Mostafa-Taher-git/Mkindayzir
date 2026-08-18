@@ -584,6 +584,72 @@ def download_attachment(tid, att_id):
 
 
 # ---------------------------------------------------------------------------
+# Ticket <-> Knowledge links
+# ---------------------------------------------------------------------------
+@tickets.route("/api/tickets/<int:tid>/knowledge", methods=["GET"])
+@login_required
+def list_ticket_knowledge(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    rows = db.get_db().execute(
+        "SELECT a.*, u.name AS author_name, tkl.note, tkl.created_at AS linked_at "
+        "FROM ticket_kb_links tkl "
+        "JOIN kb_articles a ON a.id = tkl.article_id "
+        "LEFT JOIN users u ON u.id = a.author_id "
+        "WHERE tkl.ticket_id=? ORDER BY tkl.created_at DESC",
+        (tid,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        out.append(dict(r))
+    return jsonify(articles=out)
+
+
+@tickets.route("/api/tickets/<int:tid>/knowledge", methods=["POST"])
+@login_required
+@csrf_protect
+def link_ticket_knowledge(tid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    if not is_agent_or_manager(request.current_user):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(force=True, silent=True) or {}
+    article_id = data.get("article_id")
+    if not article_id:
+        return jsonify(error="article_id is required"), 400
+    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (article_id,)).fetchone()
+    if not a:
+        return jsonify(error="Article not found"), 404
+    note = (data.get("note") or "")[:1000] or None
+    try:
+        db.get_db().execute(
+            "INSERT INTO ticket_kb_links (ticket_id, article_id, linked_by_id, note, created_at) VALUES (?,?,?,?,?)",
+            (tid, article_id, request.current_user["id"], note, db.now_iso()),
+        )
+        db.get_db().commit()
+    except Exception:
+        db.get_db().execute("ROLLBACK")
+        return jsonify(error="Already linked"), 409
+    return jsonify(ok=True), 201
+
+
+@tickets.route("/api/tickets/<int:tid>/knowledge/<int:aid>", methods=["DELETE"])
+@login_required
+@csrf_protect
+def unlink_ticket_knowledge(tid, aid):
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    if not is_agent_or_manager(request.current_user):
+        return jsonify(error="Forbidden"), 403
+    db.get_db().execute("DELETE FROM ticket_kb_links WHERE ticket_id=? AND article_id=?", (tid, aid))
+    db.get_db().commit()
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------------------
 # Dashboard aggregates (FR-16, FR-17)
 # ---------------------------------------------------------------------------
 @tickets.route("/api/dashboard")

@@ -103,6 +103,10 @@ const API = (() => {
     deleteKb: (id) => req("DELETE", `/api/kb/${id}`),
     kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
 
+    listTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge`),
+    linkTicketKnowledge: (tid, payload) => req("POST", `/api/tickets/${tid}/knowledge`, payload),
+    unlinkTicketKnowledge: (tid, aid) => req("DELETE", `/api/tickets/${tid}/knowledge/${aid}`),
+
     // Phase 4 — Reports & CSAT
     reportsSummary: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/summary" + (q ? "?" + q : "")); },
     reportsWorkload: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/workload" + (q ? "?" + q : "")); },

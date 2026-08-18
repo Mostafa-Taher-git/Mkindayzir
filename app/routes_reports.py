@@ -284,20 +284,21 @@ def action_center():
         return jsonify(error="Forbidden"), 403
     where, where_params, _ = _combined_where()
     conn = db.get_db()
+    unassigned_where, unassigned_params = _extend_where(where, where_params, "t.assignee_id IS NULL AND t.status NOT IN ('resolved','closed')", [])
     unassigned = conn.execute(
-        f"SELECT id, subject, status, priority, created_at FROM tickets t {where} AND t.assignee_id IS NULL AND t.status NOT IN ('resolved','closed') ORDER BY created_at ASC",
-        where_params,
+        f"SELECT id, subject, status, priority, created_at FROM tickets t {unassigned_where} ORDER BY created_at ASC",
+        unassigned_params,
     ).fetchall()
+    breached_where, breached_params = _extend_where(where, where_params, "ts.breached=1", [])
     breached = conn.execute(
         f"SELECT t.id, t.subject, t.status, t.priority, ts.breach_at FROM ticket_sla ts "
-        f"JOIN tickets t ON t.id=ts.ticket_id {where} AND ts.breached=1 ORDER BY ts.breach_at ASC",
-        where_params,
+        f"JOIN tickets t ON t.id=ts.ticket_id {breached_where} ORDER BY ts.breach_at ASC",
+        breached_params,
     ).fetchall()
+    stale_where, stale_params = _extend_where(where, where_params, "t.status IN ('assigned','in_progress') AND t.updated_at <= datetime('now','-24 hours','utc')", [])
     stale = conn.execute(
-        f"SELECT t.id, t.subject, t.status, t.priority, t.updated_at FROM tickets t {where} "
-        f"AND t.status IN ('assigned','in_progress') AND t.updated_at <= datetime('now','-24 hours','utc') "
-        f"ORDER BY t.updated_at ASC",
-        where_params,
+        f"SELECT t.id, t.subject, t.status, t.priority, t.updated_at FROM tickets t {stale_where} ORDER BY t.updated_at ASC",
+        stale_params,
     ).fetchall()
 
     def _serialize_ticket(row):

@@ -40,9 +40,8 @@ def _author_name(user_id):
 @helpers.login_required
 def list_articles():
     user = request.current_user
-    params = []
     sql = "SELECT * FROM kb_articles WHERE 1=1"
-    # Requesters only ever see published content.
+    params = []
     if user["role"] == "requester":
         sql += " AND status='published'"
     q = (request.args.get("q") or "").strip()
@@ -50,8 +49,8 @@ def list_articles():
     if user["role"] == "requester" or published_only:
         sql += " AND status='published'"
     if q:
-        sql += " AND (title LIKE ? OR body LIKE ?)"
         like = f"%{q}%"
+        sql += " AND (title LIKE ? OR body LIKE ?)"
         params += [like, like]
     cat = request.args.get("category_id")
     if cat:
@@ -62,12 +61,40 @@ def list_articles():
         if cat is not None:
             sql += " AND category_id=?"
             params.append(cat)
-    sql += " ORDER BY updated_at DESC"
+    status = request.args.get("status")
+    if status in ("draft", "published"):
+        sql += " AND status=?"
+        params.append(status)
+    author_id = request.args.get("author_id", type=int)
+    if author_id:
+        sql += " AND author_id=?"
+        params.append(author_id)
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+    if date_from:
+        sql += " AND created_at >= ?"
+        params.append(date_from + " 00:00:00")
+    if date_to:
+        sql += " AND created_at <= ?"
+        params.append(date_to + " 23:59:59")
+    sort = request.args.get("sort")
+    if sort == "views":
+        sql += " ORDER BY views DESC"
+    elif sort == "helpful":
+        sql += " ORDER BY (SELECT COALESCE(SUM(helpful),0) FROM kb_feedback WHERE kb_feedback.article_id=kb_articles.id) DESC"
+    else:
+        sql += " ORDER BY updated_at DESC"
     rows = db.get_db().execute(sql, params).fetchall()
     out = []
     for r in rows:
         a = _serialize(r)
         a["author_name"] = _author_name(a["author_id"])
+        a["helpful_count"] = db.get_db().execute(
+            "SELECT COALESCE(SUM(helpful),0) AS c FROM kb_feedback WHERE article_id=?", (a["id"],)
+        ).fetchone()["c"]
+        a["feedback_count"] = db.get_db().execute(
+            "SELECT COUNT(*) AS c FROM kb_feedback WHERE article_id=?", (a["id"],)
+        ).fetchone()["c"]
         out.append(a)
     return jsonify(articles=out)
 

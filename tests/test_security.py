@@ -494,7 +494,11 @@ def test_reports_summary_ok_for_manager(client):
     _login(client, "manager@opsdesk.local")
     r = client.get("/api/reports/summary")
     assert r.status_code == 200
-    assert "total" in r.get_json()
+    data = r.get_json()
+    assert "total" in data
+    assert "open" in data
+    assert "backlog" in data
+    assert "csat_distribution" in data
 
 
 def test_reports_csv_export_forbidden_for_requester(client):
@@ -506,7 +510,7 @@ def test_reports_trend_days_validation(client):
     _login(client, "manager@opsdesk.local")
     r = client.get("/api/reports/trend?days=abc")
     assert r.status_code == 200
-    assert r.get_json()["days"] == 30  # coerced to default
+    assert r.get_json()["days"] == 30
 
 
 # ---------------------------------------------------------------------------
@@ -1266,3 +1270,54 @@ def test_dashboard_agent_shape(client):
     assert "my_rated_tickets" in data
     assert "aged" in data
     assert "counts" in data
+
+
+# ---------------------------------------------------------------------------
+# Action Center + KB ticket links
+# ---------------------------------------------------------------------------
+def test_action_center_manager_only(client):
+    _login(client, "agent@opsdesk.local")
+    assert client.get("/api/dashboard/action-center").status_code == 403
+
+
+def test_action_center_shape(client):
+    _login(client, "manager@opsdesk.local")
+    r = client.get("/api/dashboard/action-center")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "unassigned" in data
+    assert "breached" in data
+    assert "stale" in data
+
+
+def test_kb_list_filters_for_agent(client):
+    _login(client, "agent@opsdesk.local")
+    r = client.get("/api/kb?status=published&sort=views")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "articles" in data
+
+
+def test_ticket_kb_link_lifecycle(client):
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    ticket = client.post("/api/tickets", json={"subject": "KB link", "description": "x", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    article = client.post("/api/kb", json={"title": "Link me", "body": "body", "category_id": 1},
+                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    r = client.post(f"/api/tickets/{ticket['id']}/knowledge", json={"article_id": article["id"]},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    linked = client.get(f"/api/tickets/{ticket['id']}/knowledge").get_json()["articles"]
+    assert any(x["id"] == article["id"] for x in linked)
+    r2 = client.post(f"/api/tickets/{ticket['id']}/knowledge",
+                     json={"article_id": article["id"]},
+                     headers={"X-CSRF-Token": csrf})
+    assert r2.status_code == 409
+    r3 = client.delete(f"/api/tickets/{ticket['id']}/knowledge/{article['id']}",
+                       headers={"X-CSRF-Token": csrf})
+    assert r3.status_code == 200
+    final = client.get(f"/api/tickets/{ticket['id']}/knowledge").get_json()["articles"]
+    assert not any(x["id"] == article["id"] for x in final)

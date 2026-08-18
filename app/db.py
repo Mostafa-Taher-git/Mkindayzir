@@ -280,11 +280,22 @@ def _migrate(db):
         db.execute("ALTER TABLE tickets ADD COLUMN csat INTEGER")
     u_cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
     if "ai_key" not in u_cols:
-        # Encrypted (Fernet) user-supplied OpenRouter key, at rest only.
         db.execute("ALTER TABLE users ADD COLUMN ai_key TEXT")
     if "ai_model" not in u_cols:
-        # Per-user model override (defaults to the free model in config).
         db.execute("ALTER TABLE users ADD COLUMN ai_model TEXT")
+    link_table = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ticket_kb_links'").fetchone()
+    if not link_table:
+        db.execute("""
+            CREATE TABLE ticket_kb_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+                article_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+                linked_by_id INTEGER REFERENCES users(id),
+                note TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS ticket_kb_unique ON ticket_kb_links(ticket_id, article_id)")
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}
