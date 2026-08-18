@@ -1147,11 +1147,11 @@
           const r = await API.saveAiSettings({ api_key: key, model: mdl });
           if (r.ok) {
             toast("Settings saved", "info");
-            hasKey = r.has_key; model = r.model;
-            // Refresh models list for the newly saved key.
+            // Refresh local state and reload so AI enablement/dropdown update.
             const s = await API.getAiSettings();
-            models = s.models || [];
-            $("#ai-model").replaceChildren(...models.map(m => el("option", { value: m.id, selected: m.id === model }, m.label)));
+            state.user.ai_model = s.model;
+            state.aiEnabled = s.has_key;
+            location.reload();
           }
         }}, "Save"),
         hasKey ? el("button", { class: "btn danger sm", onclick: async () => {
