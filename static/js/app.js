@@ -1116,7 +1116,7 @@
       const s = await API.getAiSettings();
       hasKey = s.has_key;
       model = s.model;
-      models = s.free_models || [];
+      models = s.models || [];
     } catch (e) { toast(e.message, "error"); }
 
     const card = el("div", { class: "card" },

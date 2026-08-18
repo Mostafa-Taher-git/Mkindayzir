@@ -20,17 +20,18 @@ settingsbp = Blueprint("settings", __name__)
 @helpers.login_required
 def get_ai_settings():
     user = request.current_user
-    # Use the live OpenRouter free-model list (cached 1h). Falls back to the
-    # hardcoded config list if the API call fails.
-    from app.ai.client import get_openrouter_free_models
+    # Use the live OpenRouter model list available to this user's key (cached 1h).
+    # Falls back to the curated config list on any failure.
+    from app.ai.client import get_openrouter_models
+
     api_key = decrypt_secret(user.get("ai_key")) or __import__("os").environ.get("OPERADESK_OPENROUTER_KEY")
-    free_models = get_openrouter_free_models(api_key) or config.AI_FREE_MODELS
+    models = get_openrouter_models(api_key) or config.AI_FREE_MODELS
     # Return the user's stored model (or empty string if unset). The frontend
     # is responsible for selecting a sensible default in the dropdown.
     return jsonify(
         has_key=bool(user.get("ai_key")),
         model=user.get("ai_model") or "",
-        free_models=free_models,
+        models=models,
     )
 
 

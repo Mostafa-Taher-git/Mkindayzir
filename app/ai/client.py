@@ -41,12 +41,12 @@ def ai_enabled():
     return bool(os.environ.get("OPERADESK_OPENROUTER_KEY"))
 
 
-def get_openrouter_free_models(api_key, force_refresh=False):
-    """Return a list of free model descriptors from OpenRouter, cached for 1h.
+def get_openrouter_models(api_key, force_refresh=False):
+    """Return all models available to the given OpenRouter API key.
 
     Returns [{"id": "...", "label": "..."}, ...] or the hardcoded config fallback
-    on any failure (never raises). A model is free when both prompt and completion
-    pricing are 0.
+    on any failure (never raises). This exposes the full model catalog that the
+    key has access to, not just free models.
     """
     import time as _time
     now = _time.time()
@@ -64,10 +64,8 @@ def get_openrouter_free_models(api_key, force_refresh=False):
             data = json.loads(resp.read().decode("utf-8"))
         out = []
         for m in data.get("data", []):
-            p_ = m.get("pricing", {})
-            if p_.get("prompt") == "0" and p_.get("completion") == "0":
-                label = (m.get("name") or m.get("id", "")).split("/")[-1]
-                out.append({"id": m["id"], "label": label})
+            label = m.get("name") or m.get("id", "").split("/")[-1]
+            out.append({"id": m["id"], "label": label})
         if out:
             _FREE_MODELS_CACHE["models"] = out
             _FREE_MODELS_CACHE["ts"] = now
@@ -76,6 +74,10 @@ def get_openrouter_free_models(api_key, force_refresh=False):
         pass
     # Fallback: hardcoded list (best-effort).
     return config.AI_FREE_MODELS
+
+
+# Backward-compatible alias used by older settings code/tests.
+get_openrouter_free_models = get_openrouter_models
 
 
 def _complete(user_prompt, temperature=0.3, max_tokens=400,

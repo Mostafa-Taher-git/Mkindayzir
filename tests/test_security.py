@@ -725,7 +725,7 @@ def test_ai_fail_closed_when_content_is_null():
 
 
 # ---------------------------------------------------------------------------
-# v2 AI — per-user settings: save key + model + list free models
+# v2 AI — per-user settings: save key + model + list available models
 # ---------------------------------------------------------------------------
 def test_settings_ai_save_and_list(client):
     _login(client, "agent@opsdesk.local")
@@ -737,7 +737,7 @@ def test_settings_ai_save_and_list(client):
     body = r.get_json()
     assert body["has_key"] is False
     assert body["model"] == config.AI_MODEL_DEFAULT
-    assert isinstance(body["free_models"], list)
+    assert isinstance(body["models"], list)
     # save key + model
     r = client.post("/api/settings/ai", json={"api_key": "sk-or-abc123", "model": "x/y:free"}, headers=h)
     assert r.status_code == 200
