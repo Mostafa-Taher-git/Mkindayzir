@@ -1321,3 +1321,33 @@ def test_ticket_kb_link_lifecycle(client):
     assert r3.status_code == 200
     final = client.get(f"/api/tickets/{ticket['id']}/knowledge").get_json()["articles"]
     assert not any(x["id"] == article["id"] for x in final)
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Collections
+# ---------------------------------------------------------------------------
+def test_collection_crud_and_membership(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    article = client.post("/api/kb", json={"title": "Coll", "body": "body", "category_id": 1},
+                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    c = client.post("/api/kb/collections", json={"name": "Ops", "description": "Ops stuff"},
+                    headers={"X-CSRF-Token": csrf}).get_json()["collection"]
+    assert c["name"] == "Ops"
+    listed = client.get("/api/kb/collections").get_json()["collections"]
+    assert any(x["id"] == c["id"] for x in listed)
+    r = client.post(f"/api/kb/collections/{c['id']}/articles",
+                    json={"article_id": article["id"]},
+                    headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 201
+    arts = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["articles"]
+    assert any(x["id"] == article["id"] for x in arts)
+    r2 = client.post(f"/api/kb/collections/{c['id']}/articles",
+                     json={"article_id": article["id"]},
+                     headers={"X-CSRF-Token": csrf})
+    assert r2.status_code == 409
+    r3 = client.delete(f"/api/kb/collections/{c['id']}/articles/{article['id']}",
+                       headers={"X-CSRF-Token": csrf})
+    assert r3.status_code == 200
+    after = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["articles"]
+    assert not any(x["id"] == article["id"] for x in after)

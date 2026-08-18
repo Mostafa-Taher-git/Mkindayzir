@@ -189,6 +189,52 @@
     }
   }
 
+  async function viewKbCollections() {
+    if (state.user.role === "requester") { navigate("/kb"); return; }
+    const main = el("div", {},
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Collections"), el("div", { class: "spacer" }),
+        el("button", { class: "btn primary sm", onclick: () => navigate("/kb/collections/new") }, "New Collection")),
+      el("div", { class: "mt-4", id: "coll-list" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
+    shell(main);
+    try {
+      const { collections } = await API.listCollections();
+      const list = $("#coll-list");
+      if (!collections.length) { list.replaceChildren(el("div", { class: "empty" }, "No collections yet.")); return; }
+      list.replaceChildren(el("div", { class: "kb-list" },
+        ...collections.map((c) => el("a", { class: "card kb-card", href: `#/kb/collections/${c.id}`,
+          onclick: () => navigate(`/kb/collections/${c.id}`) },
+          el("div", { class: "kb-title" }, c.name),
+          el("div", { class: "muted", style: "font-size:13px" }, c.description || "No description")))));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  async function viewKbCollection() {
+    const id = parseInt(location.hash.split("/")[3], 10);
+    const main = el("div", {},
+      el("div", { class: "page-head" }, el("h1", { class: "h2" }, "Collection"), el("div", { class: "spacer" })),
+      el("div", { class: "mt-4", id: "coll-detail" }, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading...")));
+    shell(main);
+    try {
+      const [col, { articles }] = await Promise.all([
+        API.listCollections().then(x => x.collections.find(c => c.id === id)).catch(() => null),
+        API.listCollectionArticles(id).catch(() => ({ articles: [] })),
+      ]);
+      if (!col) { toast("Collection not found", "error"); navigate("/kb/collections"); return; }
+      const wrap = $("#coll-detail");
+      wrap.replaceChildren(
+        el("div", { class: "card" },
+          el("div", { class: "kb-title" }, col.name),
+          el("div", { class: "muted mt-2" }, col.description || "No description")),
+        el("div", { class: "mt-4" },
+          el("div", { class: "label mb-2" }, "Articles"),
+          articles.length ? el("div", { class: "kb-list" },
+            ...articles.map((a) => el("a", { class: "card kb-card", href: `#/kb/${a.id}`, onclick: () => navigate(`/kb/${a.id}`) },
+              el("div", { class: "kb-title" }, a.title),
+              el("div", { class: "muted", style: "font-size:13px" }, categoryName(a.category_id)))))
+            : el("div", { class: "empty muted" }, "No articles yet.")));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
 
   async function viewReports() {
     if (state.user.role !== "manager" && state.user.role !== "admin") { navigate("/dashboard"); return; }
@@ -383,6 +429,8 @@
     "/kb/manage": viewKbManage,
     "/kb/new": viewKbEdit,
     "/kb/:id": viewKbArticle,
+    "/kb/collections": viewKbCollections,
+    "/kb/collections/:id": viewKbCollection,
     "/reports": viewReports,
     "/settings": viewSettings,
   };
@@ -432,9 +480,12 @@
       navItems.push(["/queue", "Queue", "🗂️"]);
       if (state.user.role === "requester") navItems.push(["/my", "My Requests", "📥"]);
     }
-// Knowledge Base: Help Center for everyone; Manage KB for staff.
+// Knowledge Base: Help Center for everyone; Manage KB and Collections for staff.
     navItems.push(["/kb", "Help Center", "📚"]);
-    if (state.user.role !== "requester") navItems.push(["/kb/manage", "Manage KB", "✍️"]);
+    if (state.user.role !== "requester") {
+      navItems.push(["/kb/manage", "Manage KB", "✍️"]);
+      navItems.push(["/kb/collections", "Collections", "🗂️"]);
+    }
     if (state.user.role === "manager" || state.user.role === "admin") navItems.push(["/reports", "Reports", "📈"]);
     if (isAdmin()) navItems.push(["/admin", "Admin", "⚙️"]);
     navItems.push(["/settings", "Settings", "🔑"]);
