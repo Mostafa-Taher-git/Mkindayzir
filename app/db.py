@@ -260,13 +260,12 @@ def _seed(db):
                 ("HR - normal", "normal", _cat_id(db, "HR Request"), 4, 48),
                 ("Finance - normal", "normal", _cat_id(db, "Finance"), 4, 48),
             ])
-        db.commit()
+    db.commit()
 
 
 def _cat_id(db, name):
     row = db.execute("SELECT id FROM categories WHERE name=?", (name,)).fetchone()
     return row["id"] if row else None
-
 
 def _migrate(db):
     cols = [r[1] for r in db.execute("PRAGMA table_info(categories)").fetchall()]
@@ -296,6 +295,28 @@ def _migrate(db):
             )
         """)
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS ticket_kb_unique ON ticket_kb_links(ticket_id, article_id)")
+    coll_table = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kb_collections'").fetchone()
+    if not coll_table:
+        db.execute("""
+            CREATE TABLE kb_collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                owner_id INTEGER REFERENCES users(id),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE kb_collection_articles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                collection_id INTEGER NOT NULL REFERENCES kb_collections(id) ON DELETE CASCADE,
+                article_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS kb_collection_article_unique ON kb_collection_articles(collection_id, article_id)")
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}

@@ -252,3 +252,95 @@ def feedback(aid):
         (aid, user["id"], helpful, (data.get("comment") or "")[:1000] or None, db.now_iso()))
     db.get_db().commit()
     return jsonify(ok=True)
+
+
+@kb.route("/api/kb/collections", methods=["GET"])
+@helpers.login_required
+def list_collections():
+    user = request.current_user
+    rows = db.get_db().execute(
+        "SELECT * FROM kb_collections ORDER BY updated_at DESC"
+    ).fetchall()
+    out = []
+    for c in rows:
+        d = dict(c)
+        d["owner_name"] = _author_name(d.get("owner_id"))
+        out.append(d)
+    return jsonify(collections=out)
+
+
+@kb.route("/api/kb/collections", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def create_collection():
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get("name") or "").strip()
+    description = (data.get("description") or "").strip() or None
+    if not name:
+        return jsonify(error="name is required"), 400
+    now = db.now_iso()
+    cur = db.get_db().execute(
+        "INSERT INTO kb_collections (name, description, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)",
+        (name, description, user["id"], now, now))
+    db.get_db().commit()
+    return jsonify(collection=dict(db.get_db().execute(
+        "SELECT * FROM kb_collections WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+
+
+@kb.route("/api/kb/collections/<int:cid>/articles", methods=["GET"])
+@helpers.login_required
+def list_collection_articles(cid):
+    rows = db.get_db().execute(
+        "SELECT a.*, ca.position FROM kb_collection_articles ca "
+        "JOIN kb_articles a ON a.id = ca.article_id WHERE ca.collection_id=? ORDER BY ca.position ASC, a.updated_at DESC",
+        (cid,)
+    ).fetchall()
+    out = []
+    for r in rows:
+        a = dict(r)
+        a["author_name"] = _author_name(a.get("author_id"))
+        out.append(a)
+    return jsonify(articles=out)
+
+
+@kb.route("/api/kb/collections/<int:cid>/articles", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def add_collection_article(cid):
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    c = db.get_db().execute("SELECT * FROM kb_collections WHERE id=?", (cid,)).fetchone()
+    if not c:
+        return jsonify(error="Collection not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    article_id = data.get("article_id")
+    if not article_id:
+        return jsonify(error="article_id is required"), 400
+    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (article_id,)).fetchone()
+    if not a:
+        return jsonify(error="Article not found"), 404
+    try:
+        db.get_db().execute(
+            "INSERT INTO kb_collection_articles (collection_id, article_id, position, created_at) VALUES (?,?,?,?)",
+            (cid, article_id, 0, db.now_iso()))
+        db.get_db().commit()
+    except Exception:
+        db.get_db().execute("ROLLBACK")
+        return jsonify(error="Already in collection"), 409
+    return jsonify(ok=True), 201
+
+
+@kb.route("/api/kb/collections/<int:cid>/articles/<int:aid>", methods=["DELETE"])
+@helpers.login_required
+@helpers.csrf_protect
+def remove_collection_article(cid, aid):
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    db.get_db().execute("DELETE FROM kb_collection_articles WHERE collection_id=? AND article_id=?", (cid, aid))
+    db.get_db().commit()
+    return jsonify(ok=True)
