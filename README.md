@@ -21,7 +21,8 @@ to submit, assign, track, and resolve requests fast and with minimal friction.
 ## Quick start
 
 ```bash
-cd "/media/dell/New Volume/Projects/OpsDesk"
+git clone https://github.com/Mostafa-Taher-git/OpsDesk.git
+cd OpsDesk
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -29,7 +30,8 @@ cp .env.example .env
 python run.py
 ```
 
-Open **http://127.0.0.1:5000**.
+Open **http://127.0.0.1:5000**. The database (with demo accounts and sample
+data) is created and seeded automatically on first run.
 
 **Important:** `.env.example` documents every configuration variable. Copying it
 to `.env` and setting `OPERADESK_SECRET` to a random value
