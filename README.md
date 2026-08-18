@@ -41,10 +41,10 @@ startup warning in that case).
 ## Tests
 
 ```bash
-venv/bin/python -m pytest          # backend suite (93 tests)
+venv/bin/python -m pytest          # backend suite (96 tests)
 npm install                        # once: jsdom for the frontend test
 python run.py &                    # server must be running
-npm run test:frontend              # headless SPA render test (9 checks)
+npm run test:frontend              # headless SPA render test (11 checks)
 ```
 
 ## Demo accounts

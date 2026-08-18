@@ -15,6 +15,7 @@ Endpoints:
   GET  /api/meta               -> teams, categories, statuses, priorities (for forms)
 """
 import os
+import re
 from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, request, jsonify, send_file, abort
@@ -649,6 +650,40 @@ def unlink_ticket_knowledge(tid, aid):
     return jsonify(ok=True)
 
 
+@tickets.route("/api/tickets/<int:tid>/knowledge/suggested", methods=["GET"])
+@login_required
+def suggested_ticket_knowledge(tid):
+    """Published KB articles ranked by keyword overlap with the ticket's
+    subject + description; already-linked articles are excluded."""
+    t = _fetch(tid)
+    if not t or not can_view_ticket(request.current_user, t):
+        return jsonify(error="Not found"), 404
+    terms = _keyword_terms(t["subject"] + " " + (t["description"] or ""))
+    if not terms:
+        return jsonify(suggestions=[])
+    linked = {r["article_id"] for r in db.get_db().execute(
+        "SELECT article_id FROM ticket_kb_links WHERE ticket_id=?", (tid,)).fetchall()}
+    rows = db.get_db().execute(
+        "SELECT a.*, c.name AS category_name FROM kb_articles a "
+        "LEFT JOIN categories c ON c.id = a.category_id "
+        "WHERE a.status='published'",
+    ).fetchall()
+    scored = []
+    for r in rows:
+        if r["id"] in linked:
+            continue
+        hay = _keyword_terms(r["title"] + " " + r["body"])
+        if not hay:
+            continue
+        score = sum(terms.get(w, 0) * hay.get(w, 0) for w in terms)
+        if score > 0:
+            scored.append((score, r))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    out = [{"id": r["id"], "title": r["title"], "category_name": r["category_name"], "score": s}
+           for s, r in scored[:5]]
+    return jsonify(suggestions=out)
+
+
 @tickets.route("/api/tickets/<int:tid>/promote-kb", methods=["POST"])
 @login_required
 @csrf_protect
@@ -973,3 +1008,29 @@ def _serialize_attachment(a):
         "id": a["id"], "ticket_id": a["ticket_id"], "filename": a["filename"],
         "file_size": a["file_size"], "created_at": a["created_at"],
     }
+
+
+# Common English noise words excluded from keyword-overlap matching.
+_KEYWORD_STOP = {
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her",
+    "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "man",
+    "new", "now", "old", "see", "two", "way", "who", "boy", "did", "its", "let",
+    "put", "say", "she", "too", "use", "that", "with", "have", "this", "will",
+    "your", "from", "they", "know", "want", "been", "good", "much", "some",
+    "time", "very", "when", "come", "here", "just", "like", "long", "make",
+    "many", "more", "only", "over", "such", "take", "than", "them", "well",
+    "were", "what", "would", "about", "could", "other", "which", "these",
+    "there", "where", "after", "before", "please", "thanks", "need", "also",
+    "into", "any", "else", "even", "ever", "every", "first", "last", "next",
+    "then", "while", "should", "might", "must", "does", "done", "down", "back",
+    "still", "work", "team", "issue", "problem", "question", "request", "help",
+    "happen", "something", "anything", "everything", "nothing", "thing",
+}
+
+def _keyword_terms(text):
+    """Lowercased word -> frequency map, dropping stopwords and 1-2 char words."""
+    terms = {}
+    for w in re.findall(r"[a-z0-9]+", (text or "").lower()):
+        if len(w) > 2 and w not in _KEYWORD_STOP:
+            terms[w] = terms.get(w, 0) + 1
+    return terms

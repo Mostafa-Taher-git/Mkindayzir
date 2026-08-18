@@ -117,6 +117,7 @@ const API = (() => {
     listTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge`),
     linkTicketKnowledge: (tid, payload) => req("POST", `/api/tickets/${tid}/knowledge`, payload),
     unlinkTicketKnowledge: (tid, aid) => req("DELETE", `/api/tickets/${tid}/knowledge/${aid}`),
+    suggestTicketKnowledge: (tid) => req("GET", `/api/tickets/${tid}/knowledge/suggested`),
     promoteTicketToKb: (tid) => req("POST", `/api/tickets/${tid}/promote-kb`),
 
     // Phase 4 — Reports & CSAT

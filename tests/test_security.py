@@ -1585,3 +1585,69 @@ def test_admin_can_reset_existing_user_password(client):
     assert _login(client, "temp@opsdesk.local", "newpass1234").status_code == 200
     r = _login(client, "temp@opsdesk.local", "password")
     assert r.status_code == 401  # old password no longer works
+
+
+# ---------------------------------------------------------------------------
+# Ticket -> KB suggested articles
+# ---------------------------------------------------------------------------
+def _publish_kb(client, title, body, category_id=1):
+    # Agent-authored article, published so requesters can see it too.
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    r = client.post("/api/kb", json={"title": title, "body": body, "category_id": category_id},
+                    headers={"X-CSRF-Token": csrf})
+    aid = r.get_json()["article"]["id"]
+    assert client.post(f"/api/kb/{aid}/publish", headers={"X-CSRF-Token": _csrf(client)}).status_code == 200
+    return aid
+
+
+def test_suggested_articles_ranked_by_keyword_overlap(client):
+    _publish_kb(client, "Printer jam troubleshooting", "Pull the jammed paper out gently.", 1)
+    _publish_kb(client, "Onboarding checklist", "Welcome kit and laptop setup.", 1)
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, subject="Printer jammed again", desc="paper jam in tray").get_json()["ticket"]
+    r = client.get(f"/api/tickets/{t['id']}/knowledge/suggested")
+    assert r.status_code == 200
+    titles = [s["title"] for s in r.get_json()["suggestions"]]
+    assert "Printer jam troubleshooting" in titles          # strong overlap
+    assert "Onboarding checklist" not in titles             # no shared terms
+    assert titles[0] == "Printer jam troubleshooting"       # ranked first
+    assert r.get_json()["suggestions"][0]["score"] > 0
+
+
+def test_suggested_articles_exclude_already_linked(client):
+    aid = _publish_kb(client, "VPN setup guide", "Install the client and connect.", 1)
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = _create_ticket(client, csrf, subject="VPN broken", desc="VPN setup fails").get_json()["ticket"]
+    # agent links the article
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    assert client.post(f"/api/tickets/{t['id']}/knowledge", json={"article_id": aid},
+                       headers={"X-CSRF-Token": csrf}).status_code == 201
+    r = client.get(f"/api/tickets/{t['id']}/knowledge/suggested")
+    titles = [s["title"] for s in r.get_json()["suggestions"]]
+    assert "VPN setup guide" not in titles
+
+
+def test_suggested_articles_require_ticket_access(client):
+    # category 2 (Hardware) routes to IT, so other teams can't peek.
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    t = client.post("/api/tickets", json={"subject": "Router down", "description": "no network",
+                                          "category_id": 2},
+                    headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    assert t["team_id"] is not None
+    # A different-team agent cannot see sam's suggestions.
+    _login(client, "hragent@opsdesk.local")
+    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 404
+    # Anonymous is rejected outright.
+    client.post("/api/auth/logout", headers={"X-CSRF-Token": _csrf(client)})
+    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 401
+    # The owner can.
+    _login(client, "sam@opsdesk.local")
+    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 200
+    # A same-team agent can (they handle the ticket).
+    _login(client, "agent@opsdesk.local")
+    assert client.get(f"/api/tickets/{t['id']}/knowledge/suggested").status_code == 200

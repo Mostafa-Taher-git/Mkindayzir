@@ -176,9 +176,55 @@
             "#" + (versions.length - i) + " · " + fmtDate(v.created_at) +
             (v.created_by ? " · by " + nameOf(v.created_by) : "") +
             (v.status ? " · " + v.status : "")),
-          el("div", { class: "mt-2", style: "white-space:pre-wrap;font-size:13px" },
-            el("div", { class: "muted", style: "font-size:12px" }, "Title: " + (v.title || "")),
-            v.body)))));
+          el("div", { class: "mt-2" },
+            el("button", { class: "btn ghost sm", onclick: () => showVersionDiff(versions, i) },
+              "Diff vs previous"),
+            el("div", { class: "mt-2", style: "white-space:pre-wrap;font-size:13px" },
+              el("div", { class: "muted", style: "font-size:12px" }, "Title: " + (v.title || "")),
+              v.body))))));
+  }
+
+  // Simple line-level diff (LCS) for KB version snapshots.
+  function diffLines(oldText, newText) {
+    const a = (oldText || "").split("\n");
+    const b = (newText || "").split("\n");
+    const n = a.length, m = b.length;
+    const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+    for (let i = n - 1; i >= 0; i--)
+      for (let j = m - 1; j >= 0; j--)
+        dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const out = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { out.push({ t: "same", line: a[i] }); i++; j++; }
+      else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push({ t: "del", line: a[i] }); i++; }
+      else { out.push({ t: "add", line: b[j] }); j++; }
+    }
+    while (i < n) { out.push({ t: "del", line: a[i] }); i++; }
+    while (j < m) { out.push({ t: "add", line: b[j] }); j++; }
+    return out;
+  }
+
+  // Modal showing what changed in a snapshot vs the previous one
+  // (versions are newest-first; the oldest diff is "everything added").
+  function showVersionDiff(versions, idx) {
+    const v = versions[idx];
+    const prev = idx + 1 < versions.length ? versions[idx + 1] : { title: "", body: "" };
+    const lines = [
+      { t: "meta", line: "Title: " + (prev.title || "—") + " → " + (v.title || "—") },
+      ...diffLines(prev.body, v.body),
+    ];
+    const legend = el("div", { class: "row muted", style: "font-size:12px;gap:16px;margin-bottom:8px" },
+      el("span", { style: "color:var(--danger)" }, "+ added"),
+      el("span", { style: "color:var(--ok)" }, "− removed"),
+      el("span", { style: "color:var(--muted)" }, "· unchanged"));
+    const rows = lines.map((l) => {
+      const mark = l.t === "add" ? "+" : (l.t === "del" ? "−" : " ");
+      return el("div", { class: "diff-line " + l.t, role: "listitem" },
+        el("span", { class: "diff-mark" }, mark), l.line);
+    });
+    openModal("Changes in #" + (versions.length - idx) + " (" + fmtDate(v.created_at) + ")",
+      el("div", {}, legend, el("div", { class: "diff-view", role: "list" }, ...rows)));
   }
 
   async function sendKbFeedback(id, helpful, btn) {
@@ -1056,9 +1102,10 @@
     shell(el("div", {}, el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading ticket…")));
     try {
       const isStaff = isAgent();
-      const [{ ticket }, kbRes] = await Promise.all([
+      const [{ ticket }, kbRes, suggRes] = await Promise.all([
         API.getTicket(id),
         isStaff ? API.listTicketKnowledge(id).catch(() => ({ articles: [] })) : Promise.resolve({ articles: [] }),
+        API.suggestTicketKnowledge(id).catch(() => ({ suggestions: [] })),
       ]);
       const t = ticket;
       const canHandle = isStaff;
@@ -1126,7 +1173,22 @@
             : el("div", { class: "muted" }, "No linked articles yet."),
         canHandle ? await kbLinkControl(t, linkedKb.map((a) => a.id)) : null);
 
-      const left = el("div", { class: "flex1" }, detailCard, commentThread, attachSection, kbSection);
+      // Suggested articles: keyword overlap with this ticket's subject/description.
+      const suggestions = (suggRes && suggRes.suggestions) || [];
+      const suggestedSection = suggestions.length ? el("div", { class: "mt-6" },
+        el("h3", { class: "h3 mb-4" }, "Suggested articles"),
+        el("div", { class: "muted", style: "font-size:13px;margin-bottom:8px" }, "Articles that may answer this ticket:"),
+        ...suggestions.map((a) => el("div", { class: "row between mt-2" },
+          el("a", { class: "btn ghost sm", href: `#/kb/${a.id}`, onclick: () => navigate(`/kb/${a.id}`) }, a.title),
+          el("div", { class: "row" },
+            a.category_name ? el("span", { class: "pill muted" }, a.category_name) : null,
+            canHandle ? el("button", { class: "btn ghost sm", onclick: async () => {
+              try { await API.linkTicketKnowledge(t.id, { article_id: a.id }); toast("Linked."); viewTicket(t.id); }
+              catch (e) { toast(e.message, "error"); }
+            } }, "Link") : null))))
+        : null;
+
+      const left = el("div", { class: "flex1" }, detailCard, commentThread, attachSection, kbSection, suggestedSection);
 
       // Right column: actions + activity
       const actions = el("div", { class: "card compact mb-4" },

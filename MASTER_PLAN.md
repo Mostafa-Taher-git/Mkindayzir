@@ -11,17 +11,14 @@ Increments are ordered by value and dependency.
 - Increment 1: Unified Reporting Engine + Manager Action Center
   - Filterable `/api/reports/{summary,workload,sla,trend,export.csv}`; `GET /api/dashboard/action-center`; backlog reconciliation + median/P90 in summary
 - Increment 2: KB search/filters + Ticket ↔ KB bridge
-  - `GET /api/kb` filters (`category_id`, `status`, `author_id`, `sort`); `ticket_kb_links` schema; `GET/POST/DELETE /api/tickets/<id>/knowledge`; ticket detail "Knowledge Base" card (link/unlink) + "Promote to KB Article" on resolved tickets
-  - **Not built:** `GET /api/tickets/<id>/knowledge/suggested` (keyword-overlap suggestions) — still open
+  - `GET /api/kb` filters (`category_id`, `status`, `author_id`, `sort`); `ticket_kb_links` schema; `GET/POST/DELETE /api/tickets/<id>/knowledge`; `GET /api/tickets/<id>/knowledge/suggested` (keyword-overlap ranking, excludes already-linked); ticket detail "Knowledge Base" card (link/unlink) + "Suggested articles" rail + "Promote to KB Article" on resolved tickets
 - Increment 3: Reports UI polish + CSAT breakdown (filter bar, KPI cards, SLA box, workload table, CSAT distribution, KB health panel)
 - Increment 4: AI-assisted KB drafting
-  - `POST /api/kb/<id>/draft-from-ticket` (AI via user's own key, plain fallback without) + `POST /api/tickets/<id>/promote-kb` (creates linked draft); KB editor "Draft from ticket" button
-  - **Not built:** print stylesheet (`@media print`) — still open
+  - `POST /api/kb/<id>/draft-from-ticket` (AI via user's own key, plain fallback without) + `POST /api/tickets/<id>/promote-kb` (creates linked draft); KB editor "Draft from ticket" button; `@media print` stylesheet for browser PDF export
 - Increment 5: Knowledge health dashboard (`/api/reports/knowledge` + Reports "Knowledge Analytics" tab)
 - Increment 6: KB versioning + backlinks
-  - `kb_article_versions` snapshots on edit/publish; `GET /api/kb/<id>/versions` + article-view "Version history" panel
+  - `kb_article_versions` snapshots on edit/publish; `GET /api/kb/<id>/versions` + article-view "Version history" panel with line-level diff modal ("Diff vs previous")
   - Article ↔ article links (`GET/POST/DELETE /api/kb/<id>/links`, self-link guarded, inbound/outbound shown, add/remove UI)
-  - **Not built:** full diff view (versions shown as snapshots only) — still open
 
 ## Master Increment Order
 
@@ -169,7 +166,7 @@ Increments are ordered by value and dependency.
 - Channels & Customers Reports
 - Obsidian-style `[[Title]]` Wikilinks syntax (plain backlinks are shipped; wikilink markup is not)
 - Article Collections Hierarchy (flat collections are shipped; nested hierarchy is not)
-- Full Article Version Diffing Engine (snapshots + history are shipped; side-by-side diff is not)
+- Full Article Version Diffing Engine (snapshot + line-diff is shipped; side-by-side rich diff is not)
 - PDF Generation Backend Libraries
 - Semantic / Vector Search
 - Real-time collaboration
@@ -177,7 +174,6 @@ Increments are ordered by value and dependency.
 - Scheduled email reports
 - Heatmaps, Cohort analysis, Forecasting
 - Root-cause analysis
-- Ticket → KB "suggested articles" rail (`/api/tickets/<id>/knowledge/suggested`)
 
 ---
 
@@ -185,11 +181,11 @@ Increments are ordered by value and dependency.
 | Increment | Name | Effort | Prereq | Status |
 |-----------|------|--------|--------|--------|
 | 1 | Unified Reporting + Manager Action Center | 1–2 days | None | ✅ Shipped |
-| 2 | KB Search + Ticket ↔ KB Bridge | 2–3 days | Increment 1 | ✅ Shipped (suggested-articles rail deferred) |
+| 2 | KB Search + Ticket ↔ KB Bridge | 2–3 days | Increment 1 | ✅ Shipped |
 | 3 | Reports UI Polish + CSAT | 1–2 days | Increment 1 | ✅ Shipped |
-| 4 | AI-Assisted KB Drafting + Polish | 1–2 days | Increments 2, 3 | ✅ Shipped (print CSS deferred) |
+| 4 | AI-Assisted KB Drafting + Polish | 1–2 days | Increments 2, 3 | ✅ Shipped |
 | 5 | Knowledge Health Dashboard | 2 days | Increments 2, 3 | ✅ Shipped |
-| 6 | Versioning + Advanced KB | 3–4 days | Increment 5 | ✅ Shipped (diff view deferred) |
+| 6 | Versioning + Advanced KB | 3–4 days | Increment 5 | ✅ Shipped |
 
 ---
 

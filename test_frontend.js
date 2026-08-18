@@ -92,6 +92,21 @@ async function login(email, password) {
   await go("#/admin");
   assert(/Teams/.test(appHTML()) && /Users/.test(appHTML()) && /Categories/.test(appHTML()), "admin renders teams/categories/users");
 
+  // KB version diff: create + publish + edit an article, then open the diff modal
+  const API2 = window.eval("API"); // top-level const, not on window
+  const art = await API2.createKb({ title: "Frontend diff test", body: "line one\nline two", category_id: 1 });
+  const aid = art.article.id;
+  await API2.publishKb(aid);
+  await API2.updateKb(aid, { title: "Frontend diff test", body: "line one\nline two\nline three" });
+  await go("#/kb/" + aid, 1200);
+  assert(/Version history/.test(appHTML()), "KB article shows version history");
+  const diffBtn = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Diff vs previous");
+  if (diffBtn) { diffBtn.click(); await wait(300); }
+  const modal = document.getElementById("modal-back");
+  assert(modal && /diff-view/.test(modal.innerHTML), "version diff modal opens");
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+  await wait(100);
+
   // requester perspective: login as sam
   const cookie2 = await login("sam@opsdesk.local", "password");
   window.fetch = (url, opts = {}) => fetch(resolve(url), withCookie(opts, cookie2));

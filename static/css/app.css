@@ -269,6 +269,27 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 a.kb-card { display: block; text-decoration: none; color: inherit; }
 a.kb-card:hover { border-color: var(--accent); }
 
+/* KB version diff view */
+.diff-view { max-height: 50vh; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; background: var(--surface-low); border-radius: var(--r-sm); padding: 8px 0; }
+.diff-line { padding: 1px 12px; white-space: pre-wrap; word-break: break-word; }
+.diff-line.same { color: var(--muted); }
+.diff-line.add { background: var(--ok-container); color: var(--ok); }
+.diff-line.del { background: rgba(197,38,38,.12); color: #c52626; }
+.diff-line.meta { font-weight: 600; color: var(--on-surface); border-bottom: var(--border-card); margin-bottom: 4px; }
+.diff-mark { display: inline-block; width: 1.2em; font-weight: 700; }
+
+/* Print: strip chrome, keep content readable */
+@media print {
+  body { background: #fff !important; }
+  .topbar, .nav, .toast-root, .modal-backdrop, .fab, form, button, input, select, textarea,
+  .btn, .spinner, .empty, .comment-actions, #kb-feedback-btns { display: none !important; }
+  #app { max-width: none !important; margin: 0 !important; padding: 0 !important; }
+  .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #d0d0d0 !important; }
+  a { color: #000; text-decoration: underline; }
+  .pill, .sla-badge, .status-badge { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .tbl th, .tbl td { break-inside: avoid; }
+}
+
 /* ---------- Reports (Phase 4) ---------- */
 .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .report-card { text-align: center; padding: 16px; }
