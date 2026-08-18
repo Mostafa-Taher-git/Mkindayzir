@@ -90,8 +90,72 @@ const API = (() => {
     },
     attachmentUrl: (iid, aid) => `${base}/api/jira/issues/${iid}/attachments/${aid}`,
 
+    // Phase 1A — Jira projects & sprints
+    listProjects: () => req("GET", "/api/jira/projects"),
+    createProject: (payload) => req("POST", "/api/jira/projects", payload),
+    getProject: (id) => req("GET", `/api/jira/projects/${id}`),
+    updateProject: (id, payload) => req("PATCH", `/api/jira/projects/${id}`, payload),
+    listSprints: (projectId) => req("GET", `/api/jira/sprints?project_id=${projectId}`),
+    createSprint: (payload) => req("POST", "/api/jira/sprints", payload),
+    startSprint: (id) => req("POST", `/api/jira/sprints/${id}/start`),
+    completeSprint: (id) => req("POST", `/api/jira/sprints/${id}/complete`),
+
+    // Phase 1B — Goals / OKRs
+    listGoals: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return req("GET", "/api/jira/goals" + (q ? "?" + q : ""));
+    },
+    createGoal: (payload) => req("POST", "/api/jira/goals", payload),
+    updateGoal: (id, payload) => req("PATCH", `/api/jira/goals/${id}`, payload),
+    goalProgress: (id) => req("GET", `/api/jira/goals/${id}/progress`),
+
+    // Phase 1B — admin: workflow scheme builder + custom field defs
+    adminWorkflows: () => req("GET", "/api/jira/admin/workflows"),
+    saveWorkflow: (payload) => req("POST", "/api/jira/admin/workflows", payload),
+    deleteWorkflow: (payload) => req("DELETE", "/api/jira/admin/workflows", payload),
+    adminCustomFields: () => req("GET", "/api/jira/admin/custom-fields"),
+    createCustomField: (payload) => req("POST", "/api/jira/admin/custom-fields", payload),
+    deleteCustomField: (id) => req("DELETE", `/api/jira/admin/custom-fields/${id}`),
+
     dashboard: () => req("GET", "/api/dashboard"),
     meta:      () => req("GET", "/api/meta"),
+
+    // Phase 2A — Trello workspaces & boards
+    listWorkspaces: () => req("GET", "/api/trello/workspaces"),
+    createWorkspace: (payload) => req("POST", "/api/trello/workspaces", payload),
+    updateWorkspace: (id, payload) => req("PATCH", `/api/trello/workspaces/${id}`, payload),
+    workspaceMembers: (id) => req("GET", `/api/trello/workspaces/${id}/members`),
+    addWorkspaceMember: (id, payload) => req("POST", `/api/trello/workspaces/${id}/members`, payload),
+    removeWorkspaceMember: (id, uid) => req("DELETE", `/api/trello/workspaces/${id}/members/${uid}`),
+    listBoards: (workspaceId, starred) =>
+      req("GET", `/api/trello/boards?workspace_id=${workspaceId}` + (starred ? "&starred=1" : "")),
+    createBoard: (payload) => req("POST", "/api/trello/boards", payload),
+    getBoard: (id) => req("GET", `/api/trello/boards/${id}`),
+    updateBoard: (id, payload) => req("PATCH", `/api/trello/boards/${id}`, payload),
+    createList: (boardId, payload) => req("POST", `/api/trello/boards/${boardId}/lists`, payload),
+    updateList: (id, payload) => req("PATCH", `/api/trello/lists/${id}`, payload),
+    createCard: (payload) => req("POST", "/api/trello/cards", payload),
+    updateCard: (id, payload) => req("PATCH", `/api/trello/cards/${id}`, payload),
+    moveCard: (id, payload) => req("POST", `/api/trello/cards/${id}/move`, payload),
+    deleteCard: (id) => req("DELETE", `/api/trello/cards/${id}`),
+    cardComments: (id) => req("GET", `/api/trello/cards/${id}/activity`),
+    addCardComment: (id, body) => req("POST", `/api/trello/cards/${id}/comments`, { body }),
+    addCardMember: (id, userId) => req("POST", `/api/trello/cards/${id}/members`, { user_id: userId }),
+    removeCardMember: (id, userId) => req("DELETE", `/api/trello/cards/${id}/members/${userId}`),
+    addChecklist: (id, title) => req("POST", `/api/trello/cards/${id}/checklists`, { title }),
+    updateChecklist: (id, title) => req("PATCH", `/api/trello/checklists/${id}`, { title }),
+    addChecklistItem: (id, content) => req("POST", `/api/trello/checklists/${id}/items`, { content }),
+    updateChecklistItem: (id, content, checked) =>
+      req("PATCH", `/api/trello/checklist-items/${id}`, { content, is_checked: checked }),
+    createLabel: (boardId, payload) => req("POST", `/api/trello/boards/${boardId}/labels`, payload),
+    attachLabel: (cardId, labelId) => req("POST", `/api/trello/cards/${cardId}/labels`, { label_id: labelId }),
+    detachLabel: (cardId, labelId) => req("DELETE", `/api/trello/cards/${cardId}/labels/${labelId}`),
+
+    // Phase 2B — calendar, bulk edits, board activity
+    boardCalendar: (boardId, month) =>
+      req("GET", `/api/trello/boards/${boardId}/calendar` + (month ? `?month=${month}` : "")),
+    bulkCards: (payload) => req("POST", "/api/trello/cards/bulk", payload),
+    boardActivity: (boardId) => req("GET", `/api/trello/boards/${boardId}/activity`),
 
     // Phase 1 — notifications
     notifications: (params) => {

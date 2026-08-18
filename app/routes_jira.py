@@ -19,6 +19,11 @@ Endpoints:
   GET  /api/jira/issues/<id>/knowledge        (+ POST/DELETE, suggested)
   POST /api/jira/issues/<id>/promote-kb
   POST /api/jira/issues/bulk
+  GET  /api/jira/projects        (+ POST, GET/PATCH /<id>)
+  GET  /api/jira/sprints         (+ POST, POST /<id>/start|complete)
+  GET  /api/jira/goals           (+ POST, PATCH /<id>, GET /<id>/progress)
+  GET  /api/jira/admin/workflows (+ POST upsert, DELETE)  [admin]
+  GET  /api/jira/admin/custom-fields (+ POST, DELETE /<id>)  [admin]
   GET  /api/dashboard          -> manager/agent aggregates
   GET  /api/meta               -> teams, categories, statuses, priorities (for forms)
 
@@ -28,6 +33,7 @@ and jira_issues / issue_sla / jira_projects for the issues themselves.
 """
 import os
 import re
+import json
 from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, request, jsonify, send_file, abort
@@ -122,6 +128,18 @@ def list_issues():
             where.append(f"t.{col} = ?")
             params.append(val)
 
+    project_id = request.args.get("project_id")
+    if project_id:
+        where.append("t.project_id = ?")
+        params.append(project_id)
+
+    sprint_filter = request.args.get("sprint_id")
+    if sprint_filter == "none":
+        where.append("t.sprint_id IS NULL")
+    elif sprint_filter:
+        where.append("t.sprint_id = ?")
+        params.append(sprint_filter)
+
     assignee_filter = request.args.get("assignee_id")
     if assignee_filter == "me":
         where.append("t.assignee_id = ?")
@@ -155,18 +173,27 @@ def list_issues():
     )
 
 
-@jira.route("/api/jira/issues/<int:iid>")
+@jira.route("/api/jira/issues/<path:ref>")
 @login_required
-def get_issue(iid):
-    t = _fetch(iid)
+def get_issue(ref):
+    # <id_or_key>: numeric ids and issue keys (OPS-0001) both resolve.
+    dbc = db.get_db()
+    if ref.isdigit():
+        t = dbc.execute("SELECT * FROM jira_issues WHERE id=?", (int(ref),)).fetchone()
+    else:
+        t = dbc.execute("SELECT * FROM jira_issues WHERE issue_key=?",
+                        (ref.upper(),)).fetchone()
     if not t or not can_view_ticket(request.current_user, t):
         return jsonify(error="Not found"), 404
+    iid = t["id"]
     user = request.current_user
     out = _serialize(t)
     out["comments"] = _comments_for(iid, user)
     out["attachments"] = _attachments_for(iid)
     out["activity"] = _activity_for(iid)
-    out["allowed_transitions"] = lifecycle.next_statuses(t["status"])
+    out["custom_fields"] = _serialize_custom_fields(t)
+    out["allowed_transitions"] = lifecycle.next_statuses(
+        t["status"], db.get_db(), t["project_id"], user["role"])
     return jsonify(issue=out)
 
 
@@ -219,10 +246,23 @@ def create_issue():
     else:
         requester_id = request.current_user["id"]
 
-    project = db.get_db().execute(
-        "SELECT id FROM jira_projects WHERE key='OPS'").fetchone()
-    project_id = project["id"] if project else _ensure_project()
-    key, seq = _next_key()
+    # Staff may create into any project; requesters always land in OPS.
+    project = None
+    if helpers.is_agent_or_manager(request.current_user) and data.get("project_id"):
+        project = db.get_db().execute(
+            "SELECT id, key, next_seq FROM jira_projects WHERE id=?",
+            (data.get("project_id"),)).fetchone()
+        if not project:
+            return jsonify(error="Unknown project"), 400
+    if not project:
+        project = db.get_db().execute(
+            "SELECT id, key, next_seq FROM jira_projects WHERE key='OPS'").fetchone()
+    if not project:
+        project = db.get_db().execute(
+            "SELECT id, key, next_seq FROM jira_projects WHERE id=?",
+            (_ensure_project(),)).fetchone()
+    project_id = project["id"]
+    key, seq = _next_key(project)
     now = db.now_iso()
     cur = db.get_db().execute(
         """INSERT INTO jira_issues
@@ -267,6 +307,74 @@ def update_issue(iid):
     category_id = data.get("category_id", t["category_id"])
     team_id = data.get("team_id", t["team_id"])
 
+    # Sprint-planning fields are staff-only (requesters may only touch the
+    # summary/description/category of their own unassigned issue).
+    if is_agent_or_manager(user):
+        issue_type = data.get("issue_type") or t["issue_type"]
+        if issue_type not in ("Epic", "Story", "Task", "Bug", "Subtask"):
+            return jsonify(error="Unknown issue type"), 400
+
+        sp = data.get("story_points", t["story_points"])
+        if sp in ("", None):
+            sp = None
+        else:
+            try:
+                if isinstance(sp, float) and not sp.is_integer():
+                    raise ValueError
+                sp = int(sp)
+            except (TypeError, ValueError):
+                return jsonify(error="Story points must be a whole number"), 400
+            if not 0 <= sp <= 999:
+                return jsonify(error="Story points must be between 0 and 999"), 400
+
+        due_date = data.get("due_date", t["due_date"]) or None
+        if due_date is not None:
+            try:
+                datetime.strptime(due_date, "%Y-%m-%d")
+            except ValueError:
+                return jsonify(error="due_date must be YYYY-MM-DD"), 400
+
+        sprint_id = data.get("sprint_id", t["sprint_id"])
+        if sprint_id in ("", None):
+            sprint_id = None
+        else:
+            try:
+                sprint_id = int(sprint_id)
+            except (TypeError, ValueError):
+                return jsonify(error="Invalid sprint"), 400
+            if not db.get_db().execute(
+                    "SELECT 1 FROM jira_sprints WHERE id=?", (sprint_id,)).fetchone():
+                return jsonify(error="Unknown sprint"), 400
+
+        goal_id = data.get("goal_id", t["goal_id"])
+        if goal_id in ("", None):
+            goal_id = None
+        else:
+            try:
+                goal_id = int(goal_id)
+            except (TypeError, ValueError):
+                return jsonify(error="Invalid goal"), 400
+            if not db.get_db().execute(
+                    "SELECT 1 FROM jira_goals WHERE id=?", (goal_id,)).fetchone():
+                return jsonify(error="Unknown goal"), 400
+
+        # EAV custom fields: {field_id: value} — validated + typed per def.
+        if data.get("custom_fields"):
+            if not isinstance(data["custom_fields"], dict):
+                return jsonify(error="custom_fields must be an object"), 400
+            for fid, val in data["custom_fields"].items():
+                try:
+                    fid = int(fid)
+                except (TypeError, ValueError):
+                    return jsonify(error="Invalid custom field id"), 400
+                err = _set_custom_field_value(iid, fid, val)
+                if err:
+                    return jsonify(error=err), 400
+    else:
+        issue_type, sp, due_date, sprint_id, goal_id = (
+            t["issue_type"], t["story_points"], t["due_date"], t["sprint_id"],
+            t["goal_id"])
+
     if not summary:
         return jsonify(error="Summary is required"), 400
     if len(summary) > config.MAX_SUBJECT:
@@ -292,8 +400,10 @@ def update_issue(iid):
 
     db.get_db().execute(
         """UPDATE jira_issues SET summary=?, description=?, category_id=?,
-           team_id=?, updated_at=? WHERE id=?""",
-        (summary, description, category_id, effective_team, db.now_iso(), iid),
+           team_id=?, issue_type=?, story_points=?, due_date=?, sprint_id=?,
+           goal_id=?, updated_at=? WHERE id=?""",
+        (summary, description, category_id, effective_team, issue_type, sp,
+         due_date, sprint_id, goal_id, db.now_iso(), iid),
     )
     db.get_db().commit()
     _log(iid, user["id"], "updated", note=f"Issue edited by {user['name']}")
@@ -391,7 +501,8 @@ def change_status(iid):
     to = data.get("status")
     note = data.get("note") or data.get("blocked_reason") or ""
 
-    allowed, reason_required = lifecycle.can_transition(t["status"], to)
+    allowed, reason_required = lifecycle.can_transition(
+        t["status"], to, db.get_db(), t["project_id"], user["role"])
     if not allowed:
         return jsonify(error=f"Cannot move from {t['status']} to {to}"), 400
     if reason_required and not note:
@@ -682,6 +793,792 @@ def download_attachment(iid, att_id):
     if not os.path.exists(a["storage_path"]):
         return jsonify(error="Attachment file is missing on the server"), 410
     return send_file(a["storage_path"], download_name=a["filename"])
+
+
+# ---------------------------------------------------------------------------
+# Projects
+# ---------------------------------------------------------------------------
+def _project_stats(dbc, pid):
+    row = dbc.execute(
+        "SELECT COUNT(*) AS total, "
+        "SUM(CASE WHEN status IN ('resolved','closed') THEN 1 ELSE 0 END) AS closed, "
+        "SUM(CASE WHEN sprint_id IS NULL AND status NOT IN ('resolved','closed') "
+        "     THEN 1 ELSE 0 END) AS backlog "
+        "FROM jira_issues WHERE project_id=?", (pid,)).fetchone()
+    return {"total_issues": row["total"],
+            "open_issues": row["total"] - (row["closed"] or 0),
+            "backlog_issues": row["backlog"] or 0}
+
+
+def _serialize_project(p):
+    dbc = db.get_db()
+    lead = None
+    if p["lead_id"]:
+        lr = dbc.execute("SELECT name FROM users WHERE id=?", (p["lead_id"],)).fetchone()
+        lead = lr["name"] if lr else None
+    active = dbc.execute(
+        "SELECT id, name FROM jira_sprints WHERE project_id=? AND status='active'",
+        (p["id"],)).fetchone()
+    return {
+        "id": p["id"], "key": p["key"], "name": p["name"],
+        "description": p["description"], "category": p["category"],
+        "lead_id": p["lead_id"], "lead_name": lead,
+        "created_at": p["created_at"],
+        "stats": _project_stats(dbc, p["id"]),
+        "active_sprint": {"id": active["id"], "name": active["name"]} if active else None,
+    }
+
+
+def _can_view_project(user, p):
+    """Staff see every project; requesters only projects that have their issues."""
+    if user["role"] != config.ROLE_REQUESTER:
+        return True
+    return bool(db.get_db().execute(
+        "SELECT 1 FROM jira_issues WHERE project_id=? AND requester_id=? LIMIT 1",
+        (p["id"], user["id"])).fetchone())
+
+
+@jira.route("/api/jira/projects", methods=["GET"])
+@login_required
+def list_projects():
+    user = request.current_user
+    rows = db.get_db().execute("SELECT * FROM jira_projects ORDER BY name").fetchall()
+    return jsonify(projects=[_serialize_project(p) for p in rows
+                             if _can_view_project(user, p)])
+
+
+@jira.route("/api/jira/projects", methods=["POST"])
+@login_required
+@csrf_protect
+def create_project():
+    user = request.current_user
+    if user["role"] != config.ROLE_ADMIN:
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    key = (data.get("key") or "").strip().upper()
+    name = (data.get("name") or "").strip()
+    if not re.fullmatch(r"[A-Z][A-Z0-9]{1,9}", key):
+        return jsonify(error="Project key must be 2-10 letters/digits, all caps, starting with a letter"), 400
+    if not name:
+        return jsonify(error="Project name is required"), 400
+    dbc = db.get_db()
+    if dbc.execute("SELECT 1 FROM jira_projects WHERE key=?", (key,)).fetchone():
+        return jsonify(error="Project key already exists"), 409
+    lead_id = data.get("lead_id")
+    if lead_id is not None and not dbc.execute(
+            "SELECT 1 FROM users WHERE id=?", (lead_id,)).fetchone():
+        return jsonify(error="Unknown lead user"), 400
+    category = (data.get("category") or "Software").strip()
+    if not category:
+        return jsonify(error="Category is required"), 400
+    cur = dbc.execute(
+        "INSERT INTO jira_projects (key, name, description, lead_id, category, next_seq, created_at) "
+        "VALUES (?,?,?,?,?,1,?)",
+        (key, name, data.get("description"), lead_id, category, db.now_iso()))
+    dbc.commit()
+    helpers.audit(user["id"], "project.create", entity_type="jira_project",
+                  entity_id=cur.lastrowid, details={"key": key, "name": name})
+    p = dbc.execute("SELECT * FROM jira_projects WHERE id=?", (cur.lastrowid,)).fetchone()
+    return jsonify(project=_serialize_project(p)), 201
+
+
+@jira.route("/api/jira/projects/<int:pid>", methods=["GET"])
+@login_required
+def get_project(pid):
+    p = db.get_db().execute("SELECT * FROM jira_projects WHERE id=?", (pid,)).fetchone()
+    if not p:
+        return jsonify(error="Not found"), 404
+    if not _can_view_project(request.current_user, p):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(project=_serialize_project(p))
+
+
+@jira.route("/api/jira/projects/<int:pid>", methods=["PATCH"])
+@login_required
+@csrf_protect
+def update_project(pid):
+    user = request.current_user
+    dbc = db.get_db()
+    p = dbc.execute("SELECT * FROM jira_projects WHERE id=?", (pid,)).fetchone()
+    if not p:
+        return jsonify(error="Not found"), 404
+    if user["role"] != config.ROLE_ADMIN and p["lead_id"] != user["id"]:
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") if "name" in data else p["name"] or "").strip()
+    if not name:
+        return jsonify(error="Project name is required"), 400
+    lead_id = data.get("lead_id", p["lead_id"])
+    if lead_id is not None and not dbc.execute(
+            "SELECT 1 FROM users WHERE id=?", (lead_id,)).fetchone():
+        return jsonify(error="Unknown lead user"), 400
+    category = (data.get("category") if "category" in data else p["category"] or "Software").strip()
+    if not category:
+        return jsonify(error="Category is required"), 400
+    dbc.execute(
+        "UPDATE jira_projects SET name=?, description=?, lead_id=?, category=? WHERE id=?",
+        (name, data.get("description", p["description"]), lead_id, category, pid))
+    dbc.commit()
+    helpers.audit(user["id"], "project.update", entity_type="jira_project",
+                  entity_id=pid, details={"name": name})
+    return jsonify(project=_serialize_project(dbc.execute(
+        "SELECT * FROM jira_projects WHERE id=?", (pid,)).fetchone()))
+
+
+# ---------------------------------------------------------------------------
+# Sprints
+# ---------------------------------------------------------------------------
+def _serialize_sprint(s):
+    dbc = db.get_db()
+    totals = dbc.execute(
+        "SELECT COUNT(*) AS total, "
+        "COALESCE(SUM(story_points),0) AS points, "
+        "SUM(CASE WHEN status IN ('resolved','closed') THEN 1 ELSE 0 END) AS done "
+        "FROM jira_issues WHERE sprint_id=?", (s["id"],)).fetchone()
+    return {
+        "id": s["id"], "project_id": s["project_id"], "name": s["name"],
+        "goal": s["goal"], "start_date": s["start_date"], "end_date": s["end_date"],
+        "status": s["status"], "velocity": s["velocity"],
+        "created_at": s["created_at"],
+        "stats": {"issue_count": totals["total"],
+                  "completed_issues": totals["done"] or 0,
+                  "points": totals["points"] or 0},
+    }
+
+
+@jira.route("/api/jira/sprints", methods=["GET"])
+@login_required
+def list_sprints():
+    project_id = request.args.get("project_id", type=int)
+    if not project_id:
+        return jsonify(error="project_id is required"), 400
+    dbc = db.get_db()
+    if not dbc.execute("SELECT 1 FROM jira_projects WHERE id=?",
+                       (project_id,)).fetchone():
+        return jsonify(error="Not found"), 404
+    rows = dbc.execute("SELECT * FROM jira_sprints WHERE project_id=? ORDER BY id DESC",
+                       (project_id,)).fetchall()
+    return jsonify(sprints=[_serialize_sprint(s) for s in rows])
+
+
+@jira.route("/api/jira/sprints", methods=["POST"])
+@login_required
+@csrf_protect
+def create_sprint():
+    user = request.current_user
+    if user["role"] not in (config.ROLE_MANAGER, config.ROLE_ADMIN):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    project_id = data.get("project_id")
+    name = (data.get("name") or "").strip()
+    dbc = db.get_db()
+    if not dbc.execute("SELECT 1 FROM jira_projects WHERE id=?",
+                       (project_id,)).fetchone():
+        return jsonify(error="Unknown project"), 400
+    if not name:
+        return jsonify(error="Sprint name is required"), 400
+    if len(name) > 120:
+        return jsonify(error="Sprint name is too long"), 400
+    cur = dbc.execute(
+        "INSERT INTO jira_sprints (project_id, name, goal, start_date, end_date, status, created_at) "
+        "VALUES (?,?,?,?,?,'future',?)",
+        (project_id, name, data.get("goal"), data.get("start_date"),
+         data.get("end_date"), db.now_iso()))
+    dbc.commit()
+    helpers.audit(user["id"], "sprint.create", entity_type="jira_sprint",
+                  entity_id=cur.lastrowid, details={"project_id": project_id, "name": name})
+    return jsonify(sprint=_serialize_sprint(dbc.execute(
+        "SELECT * FROM jira_sprints WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+
+
+@jira.route("/api/jira/sprints/<int:sid>/start", methods=["POST"])
+@login_required
+@csrf_protect
+def start_sprint(sid):
+    user = request.current_user
+    if user["role"] not in (config.ROLE_MANAGER, config.ROLE_ADMIN):
+        return jsonify(error="Forbidden"), 403
+    dbc = db.get_db()
+    s = dbc.execute("SELECT * FROM jira_sprints WHERE id=?", (sid,)).fetchone()
+    if not s:
+        return jsonify(error="Not found"), 404
+    if s["status"] != "future":
+        return jsonify(error=f"Sprint is already {s['status']}"), 400
+    other = dbc.execute(
+        "SELECT name FROM jira_sprints WHERE project_id=? AND status='active' AND id<>?",
+        (s["project_id"], sid)).fetchone()
+    if other:
+        return jsonify(
+            error=f"Only one active sprint per project — complete “{other['name']}” first"), 409
+    dbc.execute(
+        "UPDATE jira_sprints SET status='active', start_date=COALESCE(start_date, ?) WHERE id=?",
+        (db.now_iso(), sid))
+    dbc.commit()
+    helpers.audit(user["id"], "sprint.start", entity_type="jira_sprint", entity_id=sid,
+                  details={"project_id": s["project_id"], "name": s["name"]})
+    return jsonify(sprint=_serialize_sprint(dbc.execute(
+        "SELECT * FROM jira_sprints WHERE id=?", (sid,)).fetchone()))
+
+
+@jira.route("/api/jira/sprints/<int:sid>/complete", methods=["POST"])
+@login_required
+@csrf_protect
+def complete_sprint(sid):
+    user = request.current_user
+    if user["role"] not in (config.ROLE_MANAGER, config.ROLE_ADMIN):
+        return jsonify(error="Forbidden"), 403
+    dbc = db.get_db()
+    s = dbc.execute("SELECT * FROM jira_sprints WHERE id=?", (sid,)).fetchone()
+    if not s:
+        return jsonify(error="Not found"), 404
+    if s["status"] == "closed":
+        return jsonify(error="Sprint is already closed"), 400
+    done = dbc.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(story_points),0) AS pts "
+        "FROM jira_issues WHERE sprint_id=? AND status IN ('resolved','closed')",
+        (sid,)).fetchone()
+    moved = dbc.execute(
+        "SELECT COUNT(*) AS n FROM jira_issues WHERE sprint_id=? "
+        "AND status NOT IN ('resolved','closed')", (sid,)).fetchone()
+    dbc.execute(
+        "UPDATE jira_sprints SET status='closed', end_date=?, velocity=? WHERE id=?",
+        (db.now_iso(), done["pts"], sid))
+    if moved["n"]:
+        dbc.execute(
+            "UPDATE jira_issues SET sprint_id=NULL, updated_at=? WHERE sprint_id=? "
+            "AND status NOT IN ('resolved','closed')",
+            (db.now_iso(), sid))
+    dbc.commit()
+    helpers.audit(user["id"], "sprint.complete", entity_type="jira_sprint", entity_id=sid,
+                  details={"project_id": s["project_id"], "name": s["name"],
+                           "velocity": done["pts"], "moved_back": moved["n"]})
+    return jsonify(sprint=_serialize_sprint(dbc.execute(
+        "SELECT * FROM jira_sprints WHERE id=?", (sid,)).fetchone()),
+        completed_issues=done["n"], issues_moved_back=moved["n"])
+
+
+# ---------------------------------------------------------------------------
+# Goals / OKRs (Phase 1B)
+# ---------------------------------------------------------------------------
+GOAL_STATUSES = ("on_track", "at_risk", "behind", "achieved")
+
+
+def _goal_progress(goal_id):
+    """Auto-calculated progress for a goal: share of linked story points that
+    are resolved/closed. Returns (progress, done_points, total_points, n)."""
+    row = db.get_db().execute(
+        """SELECT COALESCE(SUM(CASE WHEN status IN ('resolved','closed')
+                                   THEN COALESCE(story_points,0) ELSE 0 END), 0) done,
+                  COALESCE(SUM(COALESCE(story_points,0)), 0) total,
+                  COUNT(*) n
+           FROM jira_issues WHERE goal_id=?""", (goal_id,)).fetchone()
+    total = row["total"]
+    progress = round(row["done"] * 100.0 / total) if total else 0
+    return progress, row["done"], total, row["n"]
+
+
+def _serialize_goal(g):
+    """Goal row -> API dict with live progress + linked issue stats."""
+    progress, done, total, n = _goal_progress(g["id"])
+    owner = db.get_db().execute(
+        "SELECT name FROM users WHERE id=?", (g["owner_id"],)).fetchone() if g["owner_id"] else None
+    child_count = db.get_db().execute(
+        "SELECT COUNT(*) c FROM jira_goals WHERE parent_id=?", (g["id"],)).fetchone()["c"]
+    return {
+        "id": g["id"],
+        "title": g["title"],
+        "description": g["description"],
+        "owner_id": g["owner_id"],
+        "owner_name": owner["name"] if owner else None,
+        "target_date": g["target_date"],
+        "quarter": g["quarter"],
+        "status": g["status"],
+        "parent_id": g["parent_id"],
+        "child_count": child_count,
+        "progress": progress,
+        "done_points": done,
+        "total_points": total,
+        "issue_count": n,
+        "created_at": g["created_at"],
+        "updated_at": g["updated_at"],
+    }
+
+
+def _parse_quarter(raw):
+    if not raw:
+        return None
+    return raw if re.fullmatch(r"\d{4}-Q[1-4]", raw) else None
+
+
+def _validate_goal_fields(data, existing=None, partial=True):
+    """Shared validation for goal create/patch. Returns (clean, error)."""
+    clean = {}
+    if existing is None:
+        title = (data.get("title") or "").strip()
+        if not title:
+            return None, "title is required"
+        if len(title) > 200:
+            return None, "title is too long"
+        clean["title"] = title
+    else:
+        if data.get("title") is not None:
+            title = (data.get("title") or "").strip()
+            if not title:
+                return None, "title is required"
+            clean["title"] = title
+    if data.get("description") is not None:
+        clean["description"] = (data.get("description") or "").strip()
+    if data.get("owner_id") is not None:
+        try:
+            oid = int(data["owner_id"])
+        except (TypeError, ValueError):
+            return None, "Invalid owner"
+        if not db.get_db().execute(
+                "SELECT 1 FROM users WHERE id=? AND role IN ('agent','manager','admin')",
+                (oid,)).fetchone():
+            return None, "Owner must be a staff user"
+        clean["owner_id"] = oid
+    if data.get("target_date") is not None:
+        td = data["target_date"] or None
+        if td:
+            try:
+                datetime.strptime(td, "%Y-%m-%d")
+            except ValueError:
+                return None, "target_date must be YYYY-MM-DD"
+        clean["target_date"] = td
+    if data.get("quarter") is not None:
+        q = _parse_quarter(data["quarter"] or "")
+        if data["quarter"] and not q:
+            return None, "quarter must look like 2026-Q3"
+        clean["quarter"] = q
+    if data.get("status") is not None:
+        st = (data.get("status") or "").strip()
+        if st not in GOAL_STATUSES:
+            return None, "Unknown goal status"
+        clean["status"] = st
+    if data.get("parent_id") is not None:
+        pid = data["parent_id"]
+        if pid in ("", None):
+            clean["parent_id"] = None
+        else:
+            try:
+                pid = int(pid)
+            except (TypeError, ValueError):
+                return None, "Invalid parent"
+            if not db.get_db().execute("SELECT 1 FROM jira_goals WHERE id=?", (pid,)).fetchone():
+                return None, "Parent goal not found"
+            clean["parent_id"] = pid
+    return clean, None
+
+
+@jira.route("/api/jira/goals", methods=["GET"])
+@login_required
+def list_goals():
+    """List goals with live progress. Requesters only see goals their own
+    issues are linked to; staff see everything."""
+    user = request.current_user
+    where, params = "", []
+    if not is_agent_or_manager(user):
+        where = (" WHERE EXISTS (SELECT 1 FROM jira_issues i "
+                 "WHERE i.goal_id = g.id AND i.requester_id = ?)")
+        params = [user["id"]]
+    extra = []
+    for key in ("quarter", "status"):
+        v = request.args.get(key)
+        if v:
+            extra.append(f"g.{key} = ?")
+            params.append(v)
+    if extra:
+        where += (" AND " if where else " WHERE ") + " AND ".join(extra)
+    rows = db.get_db().execute(
+        f"SELECT * FROM jira_goals g{where} ORDER BY g.status, g.target_date IS NULL, g.target_date, g.id",
+        params).fetchall()
+    return jsonify(goals=[_serialize_goal(r) for r in rows])
+
+
+@jira.route("/api/jira/goals", methods=["POST"])
+@login_required
+@csrf_protect
+def create_goal():
+    user = request.current_user
+    if user["role"] not in ("manager", "admin"):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    clean, err = _validate_goal_fields(data, existing=None)
+    if err:
+        return jsonify(error=err), 400
+    now = db.now_iso()
+    cur = db.get_db().execute(
+        """INSERT INTO jira_goals
+           (title, description, owner_id, target_date, quarter, status, parent_id, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (clean["title"], clean.get("description"), clean.get("owner_id"),
+         clean.get("target_date"), clean.get("quarter"),
+         clean.get("status", "on_track"), clean.get("parent_id"), now, now))
+    db.get_db().commit()
+    helpers.audit(user["id"], "goal.create", entity_type="jira_goal",
+                  entity_id=cur.lastrowid, details={"title": clean["title"]})
+    return jsonify(goal=_serialize_goal(db.get_db().execute(
+        "SELECT * FROM jira_goals WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+
+
+@jira.route("/api/jira/goals/<int:gid>", methods=["PATCH"])
+@login_required
+@csrf_protect
+def update_goal(gid):
+    user = request.current_user
+    g = db.get_db().execute("SELECT * FROM jira_goals WHERE id=?", (gid,)).fetchone()
+    if not g:
+        return jsonify(error="Not found"), 404
+    if user["role"] != "admin" and g["owner_id"] != user["id"]:
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    clean, err = _validate_goal_fields(data, existing=g)
+    if err:
+        return jsonify(error=err), 400
+    if not clean:
+        return jsonify(error="Nothing to update"), 400
+    sets = ", ".join(f"{k}=?" for k in clean)
+    db.get_db().execute(
+        f"UPDATE jira_goals SET {sets}, updated_at=? WHERE id=?",
+        (*clean.values(), db.now_iso(), gid))
+    db.get_db().commit()
+    helpers.audit(user["id"], "goal.update", entity_type="jira_goal", entity_id=gid,
+                  details=clean)
+    return jsonify(goal=_serialize_goal(db.get_db().execute(
+        "SELECT * FROM jira_goals WHERE id=?", (gid,)).fetchone()))
+
+
+@jira.route("/api/jira/goals/<int:gid>/progress", methods=["GET"])
+@login_required
+def goal_progress(gid):
+    """Auto-calculated progress from linked issues (plan §4.2):
+    SUM(points of resolved/closed) * 100 / SUM(all points)."""
+    user = request.current_user
+    g = db.get_db().execute("SELECT * FROM jira_goals WHERE id=?", (gid,)).fetchone()
+    if not g:
+        return jsonify(error="Not found"), 404
+    if not is_agent_or_manager(user):
+        mine = db.get_db().execute(
+            "SELECT 1 FROM jira_issues WHERE goal_id=? AND requester_id=?",
+            (gid, user["id"])).fetchone()
+        if not mine:
+            return jsonify(error="Not found"), 404
+    progress, done, total, n = _goal_progress(gid)
+    issues = [dict(r) for r in db.get_db().execute(
+        """SELECT id, issue_key, summary, status, story_points
+           FROM jira_issues WHERE goal_id=? ORDER BY id""", (gid,)).fetchall()]
+    return jsonify(goal_id=gid, progress=progress, done_points=done,
+                   total_points=total, issue_count=n, issues=issues)
+
+
+# ---------------------------------------------------------------------------
+# Workflow scheme builder (admin, Phase 1B). Operates on
+# jira_workflow_transitions: project-level overrides layered on the default
+# scheme (see lifecycle._effective). A row with project_id NULL is a default.
+# ---------------------------------------------------------------------------
+def _is_admin(user):
+    return user["role"] == "admin"
+
+
+@jira.route("/api/jira/admin/workflows", methods=["GET"])
+@login_required
+def admin_workflows():
+    """Full picture for the builder UI: projects, the default scheme, and
+    every stored override (default + project-specific)."""
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    dbc = db.get_db()
+    projects = [dict(r) for r in dbc.execute(
+        "SELECT id, key, name FROM jira_projects ORDER BY key")]
+    defaults = {frm: {to: {"reason_required": bool(rr), "roles": None}
+                      for to, rr in scheme.items()}
+                for frm, scheme in lifecycle.ALLOWED.items()}
+    rows = dbc.execute(
+        "SELECT * FROM jira_workflow_transitions "
+        "ORDER BY project_id IS NOT NULL, project_id, from_status, to_status").fetchall()
+    transitions = [{
+        "id": r["id"],
+        "project_id": r["project_id"],
+        "from_status": r["from_status"],
+        "to_status": r["to_status"],
+        "allowed_roles": lifecycle._parse_roles(r["allowed_roles"]),
+        "reason_required": bool(r["reason_required"]),
+    } for r in rows]
+    return jsonify(projects=projects, defaults=defaults, transitions=transitions)
+
+
+@jira.route("/api/jira/admin/workflows", methods=["POST"])
+@login_required
+@csrf_protect
+def admin_workflow_upsert():
+    """Create/update one transition rule. project_id may be omitted (default
+    scheme) or a project id (project override). allowed_roles: array of
+    roles, or null/empty for any role."""
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    frm = (data.get("from_status") or "").strip()
+    to = (data.get("to_status") or "").strip()
+    if frm not in config.STATUSES or to not in config.STATUSES:
+        return jsonify(error="Unknown status"), 400
+    if frm == to:
+        return jsonify(error="from and to must differ"), 400
+    pid = data.get("project_id")
+    if pid in ("", None):
+        pid = None
+    else:
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            return jsonify(error="Invalid project"), 400
+        if not db.get_db().execute(
+                "SELECT 1 FROM jira_projects WHERE id=?", (pid,)).fetchone():
+            return jsonify(error="Unknown project"), 400
+    roles = data.get("allowed_roles")
+    if not isinstance(roles, list) or not roles:
+        # Empty string = any role (lifecycle._parse_roles -> None); the
+        # column is NOT NULL, so we cannot store NULL.
+        roles_json = ""
+    else:
+        if any(r not in ("agent", "manager", "admin") for r in roles):
+            return jsonify(error="allowed_roles must be staff roles"), 400
+        roles_json = json.dumps(roles)
+    reason_required = bool(data.get("reason_required"))
+    dbc = db.get_db()
+    dbc.execute(
+        """INSERT INTO jira_workflow_transitions
+           (project_id, from_status, to_status, allowed_roles, reason_required)
+           VALUES (?,?,?,?,?)
+           ON CONFLICT(project_id, from_status, to_status)
+           DO UPDATE SET allowed_roles=excluded.allowed_roles,
+                         reason_required=excluded.reason_required""",
+        (pid, frm, to, roles_json, 1 if reason_required else 0))
+    dbc.commit()
+    helpers.audit(user["id"], "workflow.upsert", entity_type="jira_workflow_transition",
+                  details={"project_id": pid, "from": frm, "to": to,
+                           "roles": roles, "reason_required": reason_required})
+    return jsonify(ok=True)
+
+
+@jira.route("/api/jira/admin/workflows", methods=["DELETE"])
+@login_required
+@csrf_protect
+def admin_workflow_delete():
+    """Remove an override (or a stored default row), restoring the built-in
+    default scheme for that pair."""
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    frm = (data.get("from_status") or "").strip()
+    to = (data.get("to_status") or "").strip()
+    pid = data.get("project_id")
+    if pid in ("", None):
+        pid = None
+    else:
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            return jsonify(error="Invalid project"), 400
+    cur = db.get_db().execute(
+        "DELETE FROM jira_workflow_transitions WHERE project_id IS ? AND from_status=? AND to_status=?",
+        (pid, frm, to))
+    db.get_db().commit()
+    if not cur.rowcount:
+        return jsonify(error="No such transition"), 404
+    helpers.audit(user["id"], "workflow.delete",
+                  entity_type="jira_workflow_transition",
+                  details={"project_id": pid, "from": frm, "to": to})
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Custom fields (EAV, Phase 1B). Definitions are per-project or global
+# (project_id NULL); values live in jira_custom_field_values with a typed
+# column per field type.
+# ---------------------------------------------------------------------------
+CUSTOM_FIELD_TYPES = ("text", "number", "date", "select", "user")
+
+
+@jira.route("/api/jira/admin/custom-fields", methods=["GET"])
+@login_required
+def admin_custom_fields():
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    rows = db.get_db().execute(
+        """SELECT d.*, p.key AS project_key, p.name AS project_name,
+                  COUNT(v.id) AS value_count
+           FROM jira_custom_field_defs d
+           LEFT JOIN jira_projects p ON p.id = d.project_id
+           LEFT JOIN jira_custom_field_values v ON v.field_id = d.id
+           GROUP BY d.id ORDER BY d.project_id IS NOT NULL, d.project_id, d.position, d.id""").fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["options"] = json.loads(d["options"]) if d["options"] else None
+        out.append(d)
+    return jsonify(fields=out)
+
+
+@jira.route("/api/jira/admin/custom-fields", methods=["POST"])
+@login_required
+@csrf_protect
+def admin_create_custom_field():
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name or len(name) > 100:
+        return jsonify(error="name is required (max 100 chars)"), 400
+    ftype = (data.get("field_type") or "").strip()
+    if ftype not in CUSTOM_FIELD_TYPES:
+        return jsonify(error="Unknown field_type"), 400
+    pid = data.get("project_id")
+    if pid in ("", None):
+        pid = None
+    else:
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            return jsonify(error="Invalid project"), 400
+        if not db.get_db().execute(
+                "SELECT 1 FROM jira_projects WHERE id=?", (pid,)).fetchone():
+            return jsonify(error="Unknown project"), 400
+    if ftype == "select":
+        options = data.get("options")
+        if not isinstance(options, list) or not options or \
+                not all(isinstance(o, str) and o for o in options):
+            return jsonify(error="select fields need a non-empty options array"), 400
+        options_json = json.dumps(options)
+    else:
+        options_json = None
+    required = bool(data.get("required"))
+    try:
+        position = int(data.get("position", 0))
+    except (TypeError, ValueError):
+        return jsonify(error="Invalid position"), 400
+    cur = db.get_db().execute(
+        """INSERT INTO jira_custom_field_defs
+           (project_id, name, field_type, options, required, position)
+           VALUES (?,?,?,?,?,?)""",
+        (pid, name, ftype, options_json, 1 if required else 0, position))
+    db.get_db().commit()
+    helpers.audit(user["id"], "custom_field.create",
+                  entity_type="jira_custom_field_def", entity_id=cur.lastrowid,
+                  details={"name": name, "field_type": ftype, "project_id": pid})
+    return jsonify(field=dict(db.get_db().execute(
+        "SELECT * FROM jira_custom_field_defs WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+
+
+@jira.route("/api/jira/admin/custom-fields/<int:fid>", methods=["DELETE"])
+@login_required
+@csrf_protect
+def admin_delete_custom_field(fid):
+    user = request.current_user
+    if not _is_admin(user):
+        return jsonify(error="Forbidden"), 403
+    f = db.get_db().execute(
+        "SELECT * FROM jira_custom_field_defs WHERE id=?", (fid,)).fetchone()
+    if not f:
+        return jsonify(error="Not found"), 404
+    db.get_db().execute("DELETE FROM jira_custom_field_defs WHERE id=?", (fid,))
+    db.get_db().commit()
+    helpers.audit(user["id"], "custom_field.delete",
+                  entity_type="jira_custom_field_def", entity_id=fid,
+                  details={"name": f["name"]})
+    return jsonify(ok=True)
+
+
+def _serialize_custom_fields(issue):
+    """EAV readout for one issue: every applicable definition plus the
+    issue's typed value (None when unset)."""
+    rows = db.get_db().execute(
+        """SELECT d.*, v.value_text, v.value_num, v.value_date
+           FROM jira_custom_field_defs d
+           LEFT JOIN jira_custom_field_values v
+                  ON v.field_id = d.id AND v.issue_id = ?
+           WHERE d.project_id IS NULL OR d.project_id = ?
+           ORDER BY d.project_id IS NOT NULL, d.position, d.id""",
+        (issue["id"], issue["project_id"])).fetchall()
+    out = []
+    for r in rows:
+        if r["field_type"] == "number":
+            value = r["value_num"]
+        elif r["field_type"] == "date":
+            value = r["value_date"]
+        elif r["field_type"] == "user":
+            value = r["value_num"]
+        else:
+            value = r["value_text"]
+        out.append({
+            "id": r["id"],
+            "name": r["name"],
+            "field_type": r["field_type"],
+            "options": json.loads(r["options"]) if r["options"] else None,
+            "required": bool(r["required"]),
+            "value": value,
+        })
+    return out
+
+
+def _set_custom_field_value(iid, field_id, value):
+    """Validate + write one custom field value (typed column by field type).
+    Returns an error string or None on success."""
+    f = db.get_db().execute(
+        "SELECT * FROM jira_custom_field_defs WHERE id=?", (field_id,)).fetchone()
+    if not f:
+        return "Unknown custom field"
+    if value in ("", None):
+        if f["required"]:
+            return f"Custom field '{f['name']}' is required"
+        db.get_db().execute(
+            "DELETE FROM jira_custom_field_values WHERE issue_id=? AND field_id=?",
+            (iid, field_id))
+        return None
+    col, typed = None, None
+    if f["field_type"] == "number":
+        try:
+            typed = float(value)
+        except (TypeError, ValueError):
+            return f"'{f['name']}' must be a number"
+        col = "value_num"
+    elif f["field_type"] == "date":
+        try:
+            datetime.strptime(str(value), "%Y-%m-%d")
+        except ValueError:
+            return f"'{f['name']}' must be YYYY-MM-DD"
+        typed = str(value)
+        col = "value_date"
+    elif f["field_type"] == "select":
+        options = json.loads(f["options"]) if f["options"] else []
+        if str(value) not in options:
+            return f"'{f['name']}' must be one of: " + ", ".join(options)
+        typed = str(value)
+        col = "value_text"
+    elif f["field_type"] == "user":
+        try:
+            uid = int(value)
+        except (TypeError, ValueError):
+            return f"'{f['name']}' must be a user id"
+        if not db.get_db().execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
+            return "Unknown user"
+        typed = uid
+        col = "value_num"
+    else:  # text
+        typed = str(value)
+        col = "value_text"
+    db.get_db().execute(
+        f"""INSERT INTO jira_custom_field_values (issue_id, field_id, {col})
+            VALUES (?,?,?)
+            ON CONFLICT(issue_id, field_id)
+            DO UPDATE SET {col}=excluded.{col}""",
+        (iid, field_id, typed))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1009,12 +1906,16 @@ def _ensure_project():
     return cur.lastrowid
 
 
-def _next_key():
-    """Allocate the next issue key from the project sequence (OPS-0001 style)."""
-    row = db.get_db().execute(
-        "SELECT next_seq FROM jira_projects WHERE key='OPS'").fetchone()
-    seq = row["next_seq"] if row else 1
-    return f"OPS-{seq:04d}", seq
+def _next_key(project=None):
+    """Allocate the next issue key from the project's sequence (OPS-0001 style).
+    Pass the project row (id, key, next_seq) for multi-project key generation;
+    without one it falls back to the OPS project."""
+    if project is None:
+        project = db.get_db().execute(
+            "SELECT id, next_seq FROM jira_projects WHERE key='OPS'").fetchone()
+    if not project:
+        return "OPS-0001", 1
+    return f"{project['key']}-{project['next_seq']:04d}", project["next_seq"]
 
 
 def _within_reopen_window(t):
@@ -1100,10 +2001,33 @@ def _serialize(t, sla_row=None):
     ).fetchone()
     requester_name = name_row(t["requester_id"])["name"] if t["requester_id"] else None
     assignee_name = name_row(t["assignee_id"])["name"] if t["assignee_id"] else None
+    sprint_name = sprint_status = None
+    if t["sprint_id"]:
+        spr = db.get_db().execute(
+            "SELECT name, status FROM jira_sprints WHERE id=?", (t["sprint_id"],)
+        ).fetchone()
+        if spr:
+            sprint_name, sprint_status = spr["name"], spr["status"]
+    goal_title = goal_status = None
+    if t["goal_id"]:
+        goal = db.get_db().execute(
+            "SELECT title, status FROM jira_goals WHERE id=?", (t["goal_id"],)
+        ).fetchone()
+        if goal:
+            goal_title, goal_status = goal["title"], goal["status"]
     return {
         "id": t["id"],
         "issue_key": t["issue_key"],
         "ticket_ref": t["issue_key"],
+        "project_id": t["project_id"],
+        "sprint_id": t["sprint_id"],
+        "sprint_name": sprint_name,
+        "sprint_status": sprint_status,
+        "goal_id": t["goal_id"],
+        "goal_title": goal_title,
+        "goal_status": goal_status,
+        "story_points": t["story_points"],
+        "due_date": t["due_date"],
         "summary": t["summary"],
         "subject": t["summary"],
         "description": t["description"],
@@ -1324,7 +2248,8 @@ def _bulk_one(iid, action, data, user):
             to = data.get("status")
         if not to:
             return False, "status is required"
-        allowed, reason_required = lifecycle.can_transition(t["status"], to)
+        allowed, reason_required = lifecycle.can_transition(
+            t["status"], to, db.get_db(), t["project_id"], user["role"])
         if not allowed:
             return False, f"cannot move from {t['status']} to {to}"
         if reason_required and not (data.get("note") or data.get("blocked_reason")):

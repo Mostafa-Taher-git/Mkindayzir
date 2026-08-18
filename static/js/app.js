@@ -27,7 +27,8 @@
       if (k === "class") node.className = v;
       else if (k === "html") node.innerHTML = v;
       else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
-      else if (v !== null && v !== undefined) node.setAttribute(k, v);
+      else if (v === true) node.setAttribute(k, k);
+      else if (v !== null && v !== undefined && v !== false) node.setAttribute(k, v);
     }
     for (const c of children.flat()) {
       if (c === null || c === undefined || c === false) continue;
@@ -81,6 +82,7 @@
 
   const isAgent = () => ["agent", "manager", "admin"].includes(state.user.role);
   const isAdmin = () => state.user.role === "admin";
+  const isManager = () => state.user.role === "manager" || state.user.role === "admin";
   const isStaffRole = (role) => role === "agent" || role === "manager" || role === "admin";
 
   async function loadMeta() {
@@ -155,6 +157,17 @@
     "/kb/collections/:id": views.viewKbCollection,
     "/reports": views.viewReports,
     "/settings": views.viewSettings,
+    // Phase 1A — Jira suite (views/jira.js loads before this file)
+    "/jira/projects": views.jiraProjects,
+    "/jira/backlog": views.jiraBacklog,
+    "/jira/board": views.jiraBoard,
+    "/jira/issue": views.jiraIssue,
+    "/jira/sprints": views.jiraSprints,
+    "/jira/goals": views.jiraGoals,
+    // Phase 2A — Trello suite (views/trello.js loads before this file)
+    "/trello": views.trelloHome,
+    "/trello/starred": views.trelloHome,
+    "/trello/board": views.trelloBoard,
   };
 
   function navigate(hash) {
@@ -175,6 +188,19 @@
       const nested = "/" + parts.join("/");
       if (routes[nested]) render = routes[nested];
       else if (parts.length >= 2) render = views.viewKbArticle;
+    }
+    // Jira suite: #/jira/<view>/<id> resolves to the registered sub-view
+    // (the trailing id is read by the view from location.hash).
+    if (path === "jira") {
+      const nested = "/" + parts.slice(0, 2).join("/");
+      if (routes[nested]) render = routes[nested];
+      else render = views.jiraProjects;
+    }
+    // Trello suite: #/trello/board/<id>, #/trello/starred
+    if (path === "trello") {
+      const nested = "/" + parts.slice(0, 2).join("/");
+      if (routes[nested]) render = routes[nested];
+      else render = views.trelloHome;
     }
     try {
       render(param);
@@ -201,6 +227,19 @@
       items.push(["/kb/collections", "Collections", "🗂️"]);
     }
     if (state.user.role === "manager" || state.user.role === "admin") items.push(["/reports", "Reports", "📈"]);
+    // Phase 1A — Jira Workflows (staff only)
+    if (state.user.role !== "requester") {
+      items.push(["", "Jira Workflows", ""]);
+      items.push(["/jira/projects", "Projects", "📁"]);
+      items.push(["/jira/backlog", "Backlog", "📋"]);
+      items.push(["/jira/board", "Board", "🗂️"]);
+      items.push(["/jira/sprints", "Sprints", "🏃"]);
+      items.push(["/jira/goals", "Goals & OKRs", "🎯"]);
+    }
+    // Phase 2A — Trello Boards (all logged-in users)
+    items.push(["", "Trello Boards", ""]);
+    items.push(["/trello", "My Boards", "🗂️"]);
+    items.push(["/trello/starred", "Starred Boards", "★"]);
     if (isAdmin()) items.push(["/admin", "Admin", "⚙️"]);
     items.push(["/settings", "Settings", "🔑"]);
     return items;
@@ -215,6 +254,7 @@
   function shell(inner) {
     const sidebar = el("nav", { class: "sidebar", "aria-label": "Primary" },
       ...navItems().map(([href, label, icon]) => {
+          if (!href) return el("div", { class: "nav-sep" }, label);
           const active = location.hash.includes(href);
           return el("a", { href: "#" + href, class: "nav-item" + (active ? " active" : ""),
                            "aria-current": active ? "page" : undefined,
@@ -241,6 +281,7 @@
   function openMobileDrawer() {
     const drawer = el("nav", { class: "sidebar mobile-drawer", "aria-label": "Mobile" },
       ...navItems().map(([href, label, icon]) => {
+        if (!href) return el("div", { class: "nav-sep" }, label);
         const active = location.hash.includes(href);
         return el("a", { href: "#" + href, class: "nav-item" + (active ? " active" : ""),
                          "aria-current": active ? "page" : undefined,
@@ -404,7 +445,8 @@
     $, el, esc,
     STATUS_LABELS, slaBadge, statusBadge, priorityLabel, priorityPill,
     toast, fmtDate, ago,
-    isAgent, isAdmin, isStaffRole,
+    isAgent, isAdmin, isManager, isStaffRole,
+    currentUser: () => state.user,
     loadMeta, nameOf, teamName, catName, categoryName,
     brandEl, shell, navigate, openModal, closeModal, confirmModal,
     refreshBell, startNotifPolling,

@@ -1074,8 +1074,26 @@
         el("label", { class: "field mb-2" }, el("span", { class: "label" }, "Search users"),
           el("input", { type: "text", id: "user-search", placeholder: "Search by name or email…", oninput: renderUsers })),
         el("div", { id: "users-list" }, el("span", { class: "spinner" })),
-        el("button", { class: "btn secondary sm mt-4", onclick: () => openUserModal() }, "+ New User"))));
+        el("button", { class: "btn secondary sm mt-4", onclick: () => openUserModal() }, "+ New User")),
+      el("div", { class: "card mt-6" },
+        el("h3", { class: "h3 mb-4" }, "Jira Workflows"),
+        el("p", { class: "muted small mb-4" }, "Project-level transition overrides layered on the default scheme. Restrict who may use a transition, require a reason, or add custom transitions."),
+        el("div", { id: "wf-scope", class: "row gap mb-4" },
+          el("label", { class: "field grow" }, el("span", { class: "label" }, "Scope"),
+            el("select", { id: "wf-project", onchange: renderWorkflows }, el("option", { value: "" }, "Default scheme"))),
+          el("button", { class: "btn primary sm", style: "margin-top:22px", onclick: workflowModal }, "+ Add Transition")),
+        el("div", { id: "wf-list" }, el("span", { class: "spinner" })),
+        el("h4", { class: "h4 mt-5 mb-3" }, "Default scheme (read-only)"),
+        el("div", { id: "wf-defaults", class: "muted small" })),
+      el("div", { class: "card mt-6" },
+        el("h3", { class: "h3 mb-4" }, "Custom Fields"),
+        el("p", { class: "muted small mb-4" }, "Extra fields shown on issue detail. Types: text, number, date, select (with options), user."),
+        el("div", { class: "row gap mb-4" },
+          el("button", { class: "btn primary sm", onclick: customFieldModal }, "+ New Field")),
+        el("div", { id: "cf-list" }, el("span", { class: "spinner" })))));
     await refreshAdmin();
+    renderWorkflows();
+    renderCustomFields();
   }
 
   async function refreshAdmin() {
@@ -1126,6 +1144,118 @@
         )
       ))
     ));
+  }
+
+  /* ---------------- Phase 1B: workflow scheme builder ---------------- */
+  let wfData = null;
+  async function renderWorkflows() {
+    const scope = $("#wf-project") ? $("#wf-project").value : "";
+    try {
+      if (!wfData) wfData = await API.adminWorkflows();
+      const list = $("#wf-list");
+      if (!list) return;
+      const scoped = wfData.transitions.filter((t) => String(t.project_id || "") === scope);
+      const scopeLabel = scope ? (wfData.projects.find((p) => String(p.id) === scope) || {}).name || "" : "Default scheme";
+      list.replaceChildren(
+        el("div", { class: "muted small mb-3" }, scopeLabel, " — ", String(scoped.length), " rule(s)"),
+        ...scoped.map((t) => el("div", { class: "row between", style: "padding:6px 0;border-bottom:1px solid var(--surface-low)" },
+          el("span", {},
+            el("b", {}, t.from_status, " → ", t.to_status),
+            t.allowed_roles ? " · " + t.allowed_roles.join(", ") : " · any role",
+            t.reason_required ? " · reason required" : ""),
+          el("button", { class: "btn ghost sm", onclick: async () => {
+            if (!await confirmModal("Remove this transition rule?", "Remove", "btn danger sm")) return;
+            try {
+              await API.deleteWorkflow({ project_id: t.project_id, from_status: t.from_status, to_status: t.to_status });
+              wfData = null; renderWorkflows();
+            } catch (e) { toast(e.message, "error"); }
+          } }, "Remove"))));
+      const defaults = $("#wf-defaults");
+      if (defaults) {
+        defaults.replaceChildren(...Object.entries(wfData.defaults).map(([frm, tos]) =>
+          el("div", {}, el("b", {}, frm, ": "), Object.keys(tos).join(", "))));
+      }
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  function workflowModal() {
+    const scope = $("#wf-project") ? $("#wf-project").value : "";
+    const statuses = ["new", "assigned", "in_progress", "blocked", "resolved", "closed", "reopened"];
+    const body = el("div", {},
+      el("label", { class: "field" }, el("span", { class: "label" }, "From status"),
+        el("select", { id: "wf-from" }, ...statuses.map((s) => el("option", { value: s }, s)))),
+      el("label", { class: "field" }, el("span", { class: "label" }, "To status"),
+        el("select", { id: "wf-to" }, ...statuses.map((s) => el("option", { value: s }, s)))),
+      el("div", { class: "field" }, el("span", { class: "label" }, "Allowed roles"),
+        el("div", { class: "row wrap gap" },
+          ...["agent", "manager", "admin"].map((r) =>
+            el("label", { class: "row gap", style: "align-items:center" },
+              el("input", { type: "checkbox", id: "wf-role-" + r, checked: true }), r))),
+        el("span", { class: "muted small" }, "Uncheck all for any role")),
+      el("label", { class: "row gap mt-3", style: "align-items:center" },
+        el("input", { type: "checkbox", id: "wf-reason" }), "Require a reason"));
+    openModal("Add Transition", body, async () => {
+      const from = $("#wf-from").value, to = $("#wf-to").value;
+      if (!from || !to || from === to) { toast("Pick different from/to statuses", "error"); return false; }
+      const roles = ["agent", "manager", "admin"].filter((r) => $("#wf-role-" + r).checked);
+      try {
+        await API.saveWorkflow({ project_id: scope || null, from_status: from, to_status: to, allowed_roles: roles.length ? roles : null, reason_required: $("#wf-reason").checked });
+        wfData = null; renderWorkflows();
+        toast("Transition saved");
+        return true;
+      } catch (e) { toast(e.message, "error"); return false; }
+    });
+  }
+
+  /* ---------------- Phase 1B: custom field definitions ---------------- */
+  async function renderCustomFields() {
+    try {
+      const data = await API.adminCustomFields();
+      const list = $("#cf-list");
+      if (!list) return;
+      list.replaceChildren(...(data.fields || []).map((f) =>
+        el("div", { class: "row between", style: "padding:6px 0;border-bottom:1px solid var(--surface-low)" },
+          el("span", {},
+            el("b", {}, esc(f.name)),
+            el("span", { class: "muted small" }, " · ", f.field_type,
+              f.project_name ? " · " + esc(f.project_name) : "",
+              f.required ? " · required" : "",
+              f.field_type === "select" && f.options ? " · " + f.options.join(" / ") : ""),
+            el("span", { class: "muted small" }, " · ", String(f.value_count), " value(s)")),
+          el("button", { class: "btn ghost sm", onclick: async () => {
+            if (!await confirmModal("Delete this field and all its values?", "Delete", "btn danger sm")) return;
+            try { await API.deleteCustomField(f.id); renderCustomFields(); }
+            catch (e) { toast(e.message, "error"); }
+          } }, "Delete"))));
+    } catch (e) { toast(e.message, "error"); }
+  }
+
+  function customFieldModal() {
+    const body = el("div", {},
+      el("label", { class: "field" }, el("span", { class: "label" }, "Name"), el("input", { id: "cf-name", placeholder: "e.g. Severity" })),
+      el("div", { class: "row gap" },
+        el("label", { class: "field grow" }, el("span", { class: "label" }, "Type"),
+          el("select", { id: "cf-type" }, ...["text", "number", "date", "select", "user"].map((t) => el("option", { value: t }, t)))),
+        el("label", { class: "field grow" }, el("span", { class: "label" }, "Project"),
+          el("select", { id: "cf-project" }, el("option", { value: "" }, "All projects"),
+            ...(wfData ? wfData.projects : []).map((p) => el("option", { value: p.id }, esc(p.name)))))),
+      el("label", { class: "field" }, el("span", { class: "label" }, "Options (select type, comma separated)"),
+        el("input", { id: "cf-options", placeholder: "low, medium, high" })),
+      el("label", { class: "row gap mt-3", style: "align-items:center" },
+        el("input", { type: "checkbox", id: "cf-required" }), "Required on issues"));
+    openModal("New Custom Field", body, async () => {
+      const name = $("#cf-name").value.trim();
+      if (!name) { toast("Name is required", "error"); return false; }
+      const type = $("#cf-type").value;
+      try {
+        const payload = { name, field_type: type, required: $("#cf-required").checked, project_id: $("#cf-project").value || null };
+        if (type === "select") payload.options = $("#cf-options").value.split(",").map((s) => s.trim()).filter(Boolean);
+        await API.createCustomField(payload);
+        renderCustomFields();
+        toast("Field created");
+        return true;
+      } catch (e) { toast(e.message, "error"); return false; }
+    });
   }
 
   async function addTeam() {

@@ -74,6 +74,8 @@ def init_db():
     db.executescript(NEW_SCHEMA)
     db.commit()
     _migrate_v2(db)
+    _seed_workflow(db)
+    _seed_default_project(db)
 
 
 LEGACY_SCHEMA = """
@@ -287,6 +289,21 @@ CREATE TABLE IF NOT EXISTS jira_sprints (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sprint_project ON jira_sprints(project_id);
+
+-- Configurable workflow transitions. project_id NULL = the default scheme
+-- (seeded from lifecycle.ALLOWED); a project-level row overrides the default
+-- for the same (from_status, to_status) pair. Phase 1B builds the admin
+-- "workflow scheme builder" UI on top of this table.
+CREATE TABLE IF NOT EXISTS jira_workflow_transitions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id      INTEGER REFERENCES jira_projects(id) ON DELETE CASCADE,
+    from_status     TEXT NOT NULL,
+    to_status       TEXT NOT NULL,
+    allowed_roles   TEXT NOT NULL DEFAULT '["agent","manager","admin"]', -- JSON array
+    reason_required INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(project_id, from_status, to_status)
+);
+CREATE INDEX IF NOT EXISTS idx_wf_trans_project ON jira_workflow_transitions(project_id, from_status);
 
 CREATE TABLE IF NOT EXISTS jira_goals (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1093,6 +1110,38 @@ def _migrate_v2(db):
     except Exception:
         db.rollback()
         raise
+
+
+def _seed_workflow(db):
+    """Seed the default workflow scheme (lifecycle.ALLOWED) into
+    jira_workflow_transitions. Idempotent: project-level overrides created
+    later by admins are never clobbered."""
+    from . import lifecycle
+    import json as _json
+    for from_status, dests in lifecycle.ALLOWED.items():
+        for to_status, reason_required in dests.items():
+            db.execute(
+                "INSERT OR IGNORE INTO jira_workflow_transitions "
+                "(project_id, from_status, to_status, allowed_roles, reason_required) "
+                "VALUES (NULL, ?, ?, ?, ?)",
+                (from_status, to_status,
+                 _json.dumps(["agent", "manager", "admin"]),
+                 int(bool(reason_required))))
+    db.commit()
+
+
+def _seed_default_project(db):
+    """Fresh installs get the OPS project so the Jira suite has a home
+    (migrated DBs already have it from _migrate_v2; idempotent either way)."""
+    if db.execute("SELECT 1 FROM jira_projects WHERE key='OPS'").fetchone():
+        return
+    admin = db.execute(
+        "SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").fetchone()
+    db.execute(
+        "INSERT INTO jira_projects (key, name, description, lead_id, category, created_at) "
+        "VALUES ('OPS', 'Operations Desk', 'Default operational queue', ?, 'Service Desk', ?)",
+        (admin["id"] if admin else None, now_iso()))
+    db.commit()
 
 
 def _hash(plain):

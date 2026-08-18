@@ -60,6 +60,8 @@ async function login(email, password) {
   };
   inject("api.js");
   inject("views/core.js");
+  inject("views/jira.js");
+  inject("views/trello.js");
   inject("app.js");
 
   const results = [];
@@ -94,6 +96,97 @@ async function login(email, password) {
 
   await go("#/admin");
   assert(/Teams/.test(appHTML()) && /Users/.test(appHTML()) && /Categories/.test(appHTML()), "admin renders teams/categories/users");
+  assert(/Jira Workflows/.test(appHTML()) && /Custom Fields/.test(appHTML()), "admin renders workflow builder + custom fields");
+  assert(/Default scheme/.test(appHTML()), "admin shows default workflow scheme");
+
+  // Phase 1A — Jira suite
+  await go("#/jira/projects");
+  const projHTML = appHTML();
+  assert(/Projects/.test(projHTML) && /Backlog/.test(projHTML) && /Board/.test(projHTML), "jira projects view renders");
+  assert(/OPS/.test(projHTML), "jira projects shows the OPS project");
+
+  await go("#/jira/backlog/1", 1500);
+  const backlogHTML = appHTML();
+  assert(/Backlog/.test(backlogHTML) && /Sprints/.test(backlogHTML), "jira backlog renders sprint buckets");
+  assert(/jira-card/.test(backlogHTML), "jira backlog shows draggable issue cards");
+
+  await go("#/jira/board/1", 1500);
+  const boardHTML = appHTML();
+  assert(/kanban/.test(boardHTML) && /In Progress/.test(boardHTML), "jira board renders kanban columns");
+
+  await go("#/jira/sprints/1", 1500);
+  assert(/Sprints/.test(appHTML()), "jira sprints view renders");
+
+  await go("#/jira/goals", 1500);
+  const goalsHTML = appHTML();
+  assert(/Goals &amp; OKRs|Goals & OKRs/.test(goalsHTML), "jira goals view renders");
+  assert(/progress-track/.test(goalsHTML) || /No goals yet/.test(goalsHTML), "jira goals shows progress bars");
+
+  await go("#/jira/issue/1", 1500);
+  const issueHTML = appHTML();
+  assert(/Conversation/.test(issueHTML) && /Activity/.test(issueHTML), "jira issue detail renders conversation + activity");
+  assert(/Allowed transition buttons|→ /.test(issueHTML) || /blocked/.test(issueHTML), "jira issue detail shows transition buttons");
+
+  // Phase 2A — Trello suite (create real workspace/board/list/card via API)
+  const trelloFlow = await window.eval(`(async () => {
+    const ws = (await API.createWorkspace({ name: "Frontend WS " + Date.now() })).workspace;
+    const b = (await API.createBoard({ workspace_id: ws.id, title: "FE Board" })).board;
+    const l1 = (await API.createList(b.id, { title: "To Do" })).list;
+    const l2 = (await API.createList(b.id, { title: "Done" })).list;
+    const c1 = (await API.createCard({ list_id: l1.id, title: "Card One" })).card;
+    const c2 = (await API.createCard({ list_id: l1.id, title: "Card Two" })).card;
+    const lbl = (await API.createLabel(b.id, { name: "urgent", color: "#EB5A46" })).label;
+    await API.attachLabel(c1.id, lbl.id);
+    const cl = (await API.addChecklist(c1.id, "Steps")).checklist;
+    await API.addChecklistItem(cl.id, "Step A");
+    const moved = (await API.moveCard(c1.id, { list_id: l2.id, before_id: null, after_id: null })).card;
+    await API.addCardComment(c1.id, "moving along");
+    return { ws, b, l1, l2, movedList: moved.list_id };
+  })()`);
+  await go("#/trello");
+  const trelloHomeHTML = appHTML();
+  assert(/Trello Boards/.test(trelloHomeHTML), "trello home renders");
+  assert(/board-tile/.test(trelloHomeHTML), "trello home shows board tiles");
+  assert(/ws-switcher/.test(trelloHomeHTML), "trello home shows workspace switcher");
+
+  await go("#/trello/board/" + trelloFlow.b.id, 1800);
+  const boardHTML2 = appHTML();
+  assert(/board-cols/.test(boardHTML2) && /tlist/.test(boardHTML2), "trello board renders columns");
+  assert(/trello-card/.test(boardHTML2), "trello board renders card tiles");
+  assert(/draggable="true"/.test(boardHTML2), "trello cards are drag-enabled");
+  assert(trelloFlow.movedList === trelloFlow.l2.id, "trello card move API works across lists");
+  assert(/urgent/.test(boardHTML2), "trello card shows attached label");
+  assert(/Done/.test(boardHTML2) && /To Do/.test(boardHTML2), "trello board shows both lists");
+
+  // card modal opens with checklists + members + comments sections
+  const cardNode = document.querySelector(".trello-card");
+  if (cardNode) { cardNode.click(); await wait(400); }
+  const modalBack = document.getElementById("modal-back");
+  assert(modalBack && /card-modal/.test(modalBack.innerHTML), "trello card modal opens");
+  assert(modalBack && /Checklists/.test(modalBack.innerHTML), "trello card modal shows checklists");
+  assert(modalBack && /Activity/.test(modalBack.innerHTML), "trello card modal shows activity");
+  assert(modalBack && /Add label/.test(modalBack.innerHTML), "trello card modal shows label picker");
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+  await wait(100);
+
+  await go("#/trello/starred", 1200);
+  assert(/Trello Boards/.test(appHTML()), "trello starred view renders");
+
+  // create a sprint + move an issue into it via the API (exercise the backend)
+  const sprFlow = await window.eval(`(async () => {
+    const proj = (await API.listProjects()).projects.find((p) => p.key === "OPS");
+    const spr = await API.createSprint({ project_id: proj.id, name: "Frontend Sprint " + Date.now() });
+    await API.startSprint(spr.sprint.id);
+    const afterStart = await API.listSprints(proj.id);
+    await API.completeSprint(spr.sprint.id);
+    const afterClose = await API.listSprints(proj.id);
+    return {
+      started: afterStart.sprints.some((s) => s.id === spr.sprint.id && s.status === "active"),
+      closed: afterClose.sprints.find((s) => s.id === spr.sprint.id).status === "closed",
+    };
+  })()`);
+  assert(sprFlow.started, "jira sprint starts");
+  assert(sprFlow.closed, "jira sprint completes");
 
   // KB version diff: create + publish + edit an article, then open the diff modal.
   // Title is unique per run because kb_notes enforces UNIQUE(folder_id, title).

@@ -219,8 +219,59 @@ def create_policy():
         (name, data.get("priority", "normal"), data.get("category_id") or None,
          response_hours, resolution_hours))
     db.get_db().commit()
+    helpers.audit(user["id"], "sla_policy.create", entity_type="sla_policy",
+                  entity_id=cur.lastrowid, details={"name": name})
     return jsonify(policy=dict(db.get_db().execute(
         "SELECT * FROM sla_policies WHERE id=?", (cur.lastrowid,)).fetchone())), 201
+
+
+@sla.route("/api/sla-policies/<int:pid>", methods=["PATCH"])
+@helpers.login_required
+@helpers.csrf_protect
+def update_policy(pid):
+    user = request.current_user
+    if user["role"] not in ("manager", "admin"):
+        return jsonify(error="Not allowed"), 403
+    p = db.get_db().execute("SELECT * FROM sla_policies WHERE id=?", (pid,)).fetchone()
+    if not p:
+        return jsonify(error="Not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get("name") or p["name"]).strip()
+    try:
+        response_hours = float(data.get("response_hours", p["response_hours"]))
+        resolution_hours = float(data.get("resolution_hours", p["resolution_hours"]))
+    except (TypeError, ValueError):
+        return jsonify(error="response_hours and resolution_hours must be numbers"), 400
+    if not name or response_hours <= 0 or resolution_hours <= 0:
+        return jsonify(error="Invalid policy fields"), 400
+    db.get_db().execute(
+        """UPDATE sla_policies SET name=?, priority=?, category_id=?,
+           response_hours=?, resolution_hours=? WHERE id=?""",
+        (name, data.get("priority", p["priority"]),
+         data.get("category_id", p["category_id"]),
+         response_hours, resolution_hours, pid))
+    db.get_db().commit()
+    helpers.audit(user["id"], "sla_policy.update", entity_type="sla_policy",
+                  entity_id=pid, details={"name": name})
+    return jsonify(policy=dict(db.get_db().execute(
+        "SELECT * FROM sla_policies WHERE id=?", (pid,)).fetchone()))
+
+
+@sla.route("/api/sla-policies/<int:pid>", methods=["DELETE"])
+@helpers.login_required
+@helpers.csrf_protect
+def delete_policy(pid):
+    user = request.current_user
+    if user["role"] != "admin":
+        return jsonify(error="Forbidden"), 403
+    p = db.get_db().execute("SELECT * FROM sla_policies WHERE id=?", (pid,)).fetchone()
+    if not p:
+        return jsonify(error="Not found"), 404
+    db.get_db().execute("DELETE FROM sla_policies WHERE id=?", (pid,))
+    db.get_db().commit()
+    helpers.audit(user["id"], "sla_policy.delete", entity_type="sla_policy",
+                  entity_id=pid, details={"name": p["name"]})
+    return jsonify(ok=True)
 
 
 @sla.route("/api/jira/issues/<int:iid>/sla", methods=["GET"])
