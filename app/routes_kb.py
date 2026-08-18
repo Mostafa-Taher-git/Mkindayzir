@@ -179,9 +179,15 @@ def edit_article(aid):
             "SELECT 1 FROM categories WHERE id=?", (cid,)).fetchone()
         if not cat:
             return jsonify(error="Unknown category"), 400
+    now = db.now_iso()
+    db.get_db().execute(
+        "INSERT INTO kb_article_versions (article_id, title, body, category_id, status, created_by, created_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (aid, a["title"], a["body"], a["category_id"], a["status"], user["id"], now),
+    )
     db.get_db().execute(
         "UPDATE kb_articles SET title=?, body=?, category_id=?, updated_at=? WHERE id=?",
-        (title, body, data.get("category_id", a["category_id"]), db.now_iso(), aid))
+        (title, body, data.get("category_id", a["category_id"]), now, aid))
     db.get_db().commit()
     return jsonify(article=dict(db.get_db().execute(
         "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()))
@@ -204,9 +210,15 @@ def publish_article(aid):
         "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
     if not a:
         return jsonify(error="Article not found"), 404
+    now = db.now_iso()
+    db.get_db().execute(
+        "INSERT INTO kb_article_versions (article_id, title, body, category_id, status, created_by, created_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (aid, a["title"], a["body"], a["category_id"], a["status"], user["id"], now),
+    )
     db.get_db().execute(
         "UPDATE kb_articles SET status='published', updated_at=? WHERE id=?",
-        (db.now_iso(), aid))
+        (now, aid))
     db.get_db().commit()
     return jsonify(ok=True, article=dict(db.get_db().execute(
         "SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()))
@@ -344,3 +356,57 @@ def remove_collection_article(cid, aid):
     db.get_db().execute("DELETE FROM kb_collection_articles WHERE collection_id=? AND article_id=?", (cid, aid))
     db.get_db().commit()
     return jsonify(ok=True)
+
+
+@kb.route("/api/kb/<int:aid>/versions", methods=["GET"])
+@helpers.login_required
+def list_versions(aid):
+    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Not found"), 404
+    if request.current_user["role"] == "requester" and a["status"] != "published":
+        return jsonify(error="Not found"), 404
+    rows = db.get_db().execute(
+        "SELECT * FROM kb_article_versions WHERE article_id=? ORDER BY created_at DESC",
+        (aid,),
+    ).fetchall()
+    return jsonify(versions=[dict(r) for r in rows])
+
+
+@kb.route("/api/kb/<int:aid>/draft-from-ticket", methods=["POST"])
+@helpers.login_required
+@helpers.csrf_protect
+def draft_from_ticket(aid):
+    user = request.current_user
+    if user["role"] == "requester":
+        return jsonify(error="Forbidden"), 403
+    a = db.get_db().execute("SELECT * FROM kb_articles WHERE id=?", (aid,)).fetchone()
+    if not a:
+        return jsonify(error="Not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    ticket_id = data.get("ticket_id")
+    if not ticket_id:
+        return jsonify(error="ticket_id is required"), 400
+    t = db.get_db().execute(
+        "SELECT id, subject, description, category_id, status FROM tickets WHERE id=?",
+        (ticket_id,),
+    ).fetchone()
+    if not t:
+        return jsonify(error="Ticket not found"), 404
+    # Use existing AI client if configured; otherwise return a plain draft.
+    try:
+        from app.ai import client as ai_client
+        if user.get("ai_key") and user.get("ai_model"):
+            prompt = (
+                "You are an internal helpdesk knowledge assistant. "
+                "Write a concise internal KB article draft from this ticket thread. "
+                "Return markdown only.\n\n"
+                f"Subject: {t['subject']}\nDescription: {t['description'] or ''}"
+            )
+            # Best-effort AI; never block drafting on AI failures.
+            body = ai_client.chat(user["ai_model"], [{"role": "user", "content": prompt}])
+        else:
+            body = f"# {t['subject']}\n\n{t['description'] or ''}\n\n<!-- TODO: expand from ticket {t['id']} -->"
+    except Exception:
+        body = f"# {t['subject']}\n\n{t['description'] or ''}\n\n<!-- AI draft unavailable; please edit before publishing. -->"
+    return jsonify(title=t["subject"], body=body, category_id=t["category_id"], source_ticket_id=ticket_id), 200

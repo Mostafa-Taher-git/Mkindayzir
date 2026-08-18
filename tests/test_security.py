@@ -1351,3 +1351,28 @@ def test_collection_crud_and_membership(client):
     assert r3.status_code == 200
     after = client.get(f"/api/kb/collections/{c['id']}/articles").get_json()["articles"]
     assert not any(x["id"] == article["id"] for x in after)
+
+
+def test_kb_versions_and_draft_from_ticket(client):
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    article = client.post("/api/kb", json={"title": "Ver", "body": "v1", "category_id": 1},
+                          headers={"X-CSRF-Token": csrf}).get_json()["article"]
+    r = client.get(f"/api/kb/{article['id']}/versions")
+    assert r.status_code == 200
+    assert r.get_json()["versions"] == []
+    client.patch(f"/api/kb/{article['id']}", json={"body": "v2"},
+                 headers={"X-CSRF-Token": csrf})
+    versions = client.get(f"/api/kb/{article['id']}/versions").get_json()["versions"]
+    assert len(versions) >= 1
+    _login(client, "sam@opsdesk.local")
+    csrf = _csrf(client)
+    ticket = client.post("/api/tickets", json={"subject": "T", "description": "D", "category_id": 1},
+                         headers={"X-CSRF-Token": csrf}).get_json()["ticket"]
+    _login(client, "agent@opsdesk.local")
+    csrf = _csrf(client)
+    draft = client.post(f"/api/kb/{article['id']}/draft-from-ticket",
+                        json={"ticket_id": ticket["id"]},
+                        headers={"X-CSRF-Token": csrf}).get_json()
+    assert draft["title"] == "T"
+    assert "body" in draft

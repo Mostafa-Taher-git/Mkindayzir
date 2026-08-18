@@ -317,6 +317,20 @@ def _migrate(db):
             )
         """)
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS kb_collection_article_unique ON kb_collection_articles(collection_id, article_id)")
+    version_table = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kb_article_versions'").fetchone()
+    if not version_table:
+        db.execute("""
+            CREATE TABLE kb_article_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                article_id INTEGER NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category_id INTEGER,
+                status TEXT NOT NULL,
+                created_by INTEGER REFERENCES users(id),
+                created_at TEXT NOT NULL
+            )
+        """)
     team_by_name = {r["name"]: r["id"] for r in db.execute("SELECT id, name FROM teams").fetchall()}
     cat_teams = {"Access & Accounts": "IT", "Hardware": "IT", "Software": "IT",
                  "HR Request": "HR", "Finance": "Finance", "Other": "Ops"}
