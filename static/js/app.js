@@ -1145,7 +1145,14 @@
           const key = $("#ai-key").value.trim();
           const mdl = $("#ai-model").value;
           const r = await API.saveAiSettings({ api_key: key, model: mdl });
-          if (r.ok) { toast("Settings saved", "info"); hasKey = r.has_key; model = r.model; }
+          if (r.ok) {
+            toast("Settings saved", "info");
+            hasKey = r.has_key; model = r.model;
+            // Refresh models list for the newly saved key.
+            const s = await API.getAiSettings();
+            models = s.models || [];
+            $("#ai-model").replaceChildren(...models.map(m => el("option", { value: m.id, selected: m.id === model }, m.label)));
+          }
         }}, "Save"),
         hasKey ? el("button", { class: "btn danger sm", onclick: async () => {
           const r = await API.saveAiSettings({ api_key: "", model: model });
