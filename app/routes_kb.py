@@ -46,6 +46,9 @@ def list_articles():
     if user["role"] == "requester":
         sql += " AND status='published'"
     q = (request.args.get("q") or "").strip()
+    published_only = request.args.get("published_only") == "1"
+    if user["role"] == "requester" or published_only:
+        sql += " AND status='published'"
     if q:
         sql += " AND (title LIKE ? OR body LIKE ?)"
         like = f"%{q}%"

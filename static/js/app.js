@@ -93,7 +93,7 @@
     const list = $("#kb-list"); if (!list) return;
     try {
       const q = $("#kb-q")?.value || "";
-      const { articles } = await API.listKb(q ? { q } : {});
+      const { articles } = await API.listKb(q ? { q, published_only: 1 } : { published_only: 1 });
       if (!articles.length) { list.replaceChildren(el("div", { class: "empty" }, "No articles yet.")); return; }
       list.replaceChildren(el("div", { class: "kb-list" },
         ...articles.map((a) => el("a", { class: "card kb-card", href: `#/kb/${a.id}`,
