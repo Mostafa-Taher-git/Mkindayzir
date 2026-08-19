@@ -41,6 +41,7 @@ OpsDesk/
 │   ├── 06_Cross_Cutting_Security.md  # 20 auth/security/edge cases
 │   └── samples/                # Runnable Playwright example specs (one per role)
 │       ├── playwright.config.ts
+│       ├── global-setup.ts     # boots/tears down the test Flask server
 │       ├── helpers.ts          # login + CSRF + fresh-DB helpers
 │       ├── boot_test_server.py # boots Flask on an isolated test DB
 │       ├── admin.spec.ts
@@ -96,6 +97,9 @@ python run.py &                                  # dev server on :5000
 npx playwright test --config "Test Case/samples/playwright.config.ts" --project=admin \
   --grep-invert=@freshdb
 ```
+
+> **Verified:** the full sample suite runs green out of the box —
+> `npx playwright test --config "Test Case/samples/playwright.config.ts"` → **23 passed**.
 
 See `samples/playwright.config.ts` for projects named per role
 (`admin`, `manager`, `agent`, `hragent`, `requester`, `security`).

@@ -148,6 +148,30 @@ node --check static/js/api.js static/js/app.js static/js/views/*.js static/js/gr
 - **Rate limit:** AI chat limited to 20 requests/minute per user
 
 ---
+---
+
+## Screenshots
+
+<!-- Replace the placeholders below with real images once captured. -->
+
+| View | Preview |
+|---|---|
+| Dashboard / Queue | `docs/screenshots/01-dashboard.png` |
+| Jira issue detail | `docs/screenshots/02-jira-issue.png` |
+| Jira sprint board | `docs/screenshots/03-jira-board.png` |
+| Trello board | `docs/screenshots/04-trello-board.png` |
+| Trello card modal | `docs/screenshots/05-trello-card.png` |
+| KB vault explorer | `docs/screenshots/06-kb-vault.png` |
+| KB note reader | `docs/screenshots/07-kb-note.png` |
+| KB graph view | `docs/screenshots/08-kb-graph.png` |
+| AI Copilot chat | `docs/screenshots/09-ai-chat.png` |
+| AI Copilot drawer | `docs/screenshots/10-ai-drawer.png` |
+| Help Center | `docs/screenshots/11-help-center.png` |
+| Omnisearch palette | `docs/screenshots/12-search.png` |
+
+> **Note:** Screenshots are placeholders. Run the app, capture each view per `docs/screenshots/README.md`, and replace the paths above with real images.
+
+---
 
 ## Key UX shortcuts
 
