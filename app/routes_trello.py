@@ -36,7 +36,7 @@ import json
 
 from flask import Blueprint, request, jsonify
 
-from . import db, config, helpers
+from . import db, config, helpers, notifications
 from .helpers import login_required, csrf_protect
 
 trello = Blueprint("trello", __name__)
@@ -734,6 +734,12 @@ def add_card_member(cid):
         (cid, uid))
     db.get_db().commit()
     _card_activity(cid, user["id"], "member_added", user_id=uid)
+    # Phase 6: tell the added member they were assigned to this card.
+    try:
+        notifications.notify(uid, CARD_TYPE, cid, "card_assigned",
+                             f"You were added to card '{c['title']}'")
+    except Exception:
+        pass
     return jsonify(ok=True)
 
 

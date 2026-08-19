@@ -280,15 +280,29 @@ a.kb-card:hover { border-color: var(--accent); }
 .diff-line.meta { font-weight: 600; color: var(--on-surface); border-bottom: var(--border-card); margin-bottom: 4px; }
 .diff-mark { display: inline-block; width: 1.2em; font-weight: 700; }
 
-/* Print: strip chrome, keep content readable */
+/* Print: strip chrome, keep content readable, force black-on-white */
 @media print {
-  body { background: #fff !important; }
-  .topbar, .nav, .toast-root, .modal-backdrop, .fab, form, button, input, select, textarea,
-  .btn, .spinner, .empty, .comment-actions, #kb-feedback-btns { display: none !important; }
+  html, body { background: #fff !important; color: #000 !important; }
+  /* chrome / controls / overlays */
+  .topbar, .sidebar, .nav, .nav-sep, .drawer, .drawer-backdrop, .mobile-drawer,
+  .toolbar, .app-nav, .no-print, [data-no-print],
+  .search-palette-backdrop, .tour-scrim, .tour-tooltip,
+  .ai-drawer, .ai-drawer-backdrop, .modal-backdrop, .toast-root,
+  .fab, form, button, input, select, textarea, .btn, .spinner,
+  .empty, .comment-actions, #kb-feedback-btns { display: none !important; }
   #app { max-width: none !important; margin: 0 !important; padding: 0 !important; }
-  .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #d0d0d0 !important; }
-  a { color: #000; text-decoration: underline; }
-  .pill, .sla-badge, .status-badge { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .layout { display: block !important; }
+  .main { max-width: none !important; width: auto !important; padding: 0 !important; color: #000 !important; background: #fff !important; }
+  /* collapse multi-column layouts into a single readable column */
+  .issue-layout, .ai-layout, .kb-vault, .kb-manage, .kb-collections, .help-wrap, .kb-editor, .board-cols, .kanban {
+    display: block !important; height: auto !important;
+  }
+  .card, .comment, .side-sec, .kb-reader, .ai-chat, .ai-thread, .kb-note, .issue-main, .issue-side {
+    background: #fff !important; color: #000 !important; border-color: #ccc !important; box-shadow: none !important;
+    break-inside: avoid;
+  }
+  a { color: #000 !important; text-decoration: underline; }
+  .pill, .sla-badge, .badge, .status-badge { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .tbl th, .tbl td { break-inside: avoid; }
 }
 
@@ -304,3 +318,12 @@ a.kb-card:hover { border-color: var(--accent); }
 .trend .bar { height: 8px; border-radius: 4px; min-width: 2px; }
 .trend .bar.created { background: var(--accent); }
 .trend .bar.resolved { background: var(--ok, #1a7f37); }
+
+/* ---------- Phase 6 — responsive (<=768px) ---------- */
+@media (max-width: 768px) {
+  .kb-vault, .kb-manage, .kb-collections, .help-wrap, .ai-layout, .board-cols { display: block !important; }
+  .kb-vault, .kb-manage, .kb-collections { height: auto !important; }
+  .board-cols { overflow-x: auto; }
+  .tlist { flex: 0 0 80vw; min-width: 260px; }
+  .help-notes, .help-progress { width: 100%; }
+}

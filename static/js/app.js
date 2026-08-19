@@ -172,6 +172,8 @@
     "/trello/board": views.trelloBoard,
     // Phase 4A — AI Chat Core (views/ai.js loads before this file)
     "/ai": views.aiChat,
+    // Phase 6 — Global search + entity links (views/search.js loads before this file)
+    "/search": views.search,
     // Phase 5 - Help Center (views/help.js loads before this file)
     "/help": views.helpCenter,
   };
@@ -261,6 +263,8 @@
     items.push(["", "Trello Boards", ""]);
     items.push(["/trello", "My Boards", "🗂️"]);
     items.push(["/trello/starred", "Starred Boards", "★"]);
+    // Phase 6 — Global search
+    items.push(["/search", "Search", "🔎"]);
     // Phase 4A — AI Chat Core
     items.push(["", "AI Copilot", ""]);
     items.push(["/ai", "AI Copilot", "🤖"]);
@@ -460,6 +464,11 @@
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
         if (OD.views.openAiDrawer) { e.preventDefault(); OD.views.openAiDrawer(); }
+      }
+      // Phase 6 — global search palette (Ctrl+K / Cmd+K). Opens even while
+      // typing, but not when a modal or palette is already on screen.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        if (OD.views.openSearchPalette) { e.preventDefault(); OD.views.openSearchPalette(); }
       }
       // Phase 5 - "?" opens the Help Center (ignore when typing in a field).
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {

@@ -1250,6 +1250,14 @@ def update_goal(gid):
     db.get_db().commit()
     helpers.audit(user["id"], "goal.update", entity_type="jira_goal", entity_id=gid,
                   details=clean)
+    # Phase 6: tell the goal owner when its status (or other fields) change.
+    try:
+        if g["owner_id"]:
+            new_status = clean.get("status", g["status"])
+            notifications.notify(g["owner_id"], "goal", gid, "goal_update",
+                                 f"Goal '{g['title']}' status changed to {new_status}")
+    except Exception:
+        pass
     return jsonify(goal=_serialize_goal(db.get_db().execute(
         "SELECT * FROM jira_goals WHERE id=?", (gid,)).fetchone()))
 

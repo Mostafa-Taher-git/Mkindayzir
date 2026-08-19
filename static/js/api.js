@@ -204,6 +204,14 @@ const API = (() => {
     suggestIssueKnowledge: (iid) => req("GET", `/api/jira/issues/${iid}/knowledge/suggested`),
     promoteIssueToKb: (iid) => req("POST", `/api/jira/issues/${iid}/promote-kb`),
 
+    // Phase 6 — Global search + cross-entity links
+    search: (q, scope = "all", limit = 5) =>
+      req("GET", `/api/search?q=${encodeURIComponent(q)}&scope=${scope}&limit=${limit}`),
+    listEntityLinks: (params = {}) =>
+      req("GET", `/api/entity-links?` + new URLSearchParams(params).toString()),
+    createEntityLink: (payload) => req("POST", "/api/entity-links", payload),
+    deleteEntityLink: (id) => req("DELETE", `/api/entity-links/${id}`),
+
     // Phase 4 — Reports & CSAT
     reportsSummary: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/summary" + (q ? "?" + q : "")); },
     reportsWorkload: (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/reports/workload" + (q ? "?" + q : "")); },

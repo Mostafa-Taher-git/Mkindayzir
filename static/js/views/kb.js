@@ -303,7 +303,8 @@
       el("div", { class: "mt-6" },
         el("button", { class: "btn ghost sm", onclick: () => versionModal(note) }, "🕑 Version history"),
         el("h3", { class: "h3 mt-4" }, "Backlinks"),
-        backlinksPanel(note, local)));
+        backlinksPanel(note, local),
+        OD.renderEntityLinks ? OD.renderEntityLinks("kb_note", note.id) : null));
 
     async function doPublish(n) {
       try { await API.publishKbNote(n.id); toast("Published."); kbNote(); }

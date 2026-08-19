@@ -643,7 +643,8 @@
           metaRow("Goal", i.goal_title ? el("a", { class: "link", href: "#/jira/goals" }, esc(i.goal_title)) : "—")),
         slaBadge(i) ? el("div", { class: "side-sec" }, el("div", { class: "side-label" }, "SLA"), slaBadge(i)) : null,
         customFieldsSec(i),
-        el("div", { class: "side-sec" }, followBtn));
+        el("div", { class: "side-sec" }, followBtn),
+        el("div", { class: "side-sec" }, OD.renderEntityLinks ? OD.renderEntityLinks("jira_issue", i.id) : null));
 
       const comments = el("div", { class: "issue-comments" },
         el("h3", { class: "h3" }, "Conversation"),

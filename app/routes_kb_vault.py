@@ -16,7 +16,7 @@ import json
 
 from flask import Blueprint, request, jsonify
 
-from . import db, config, helpers
+from . import db, config, helpers, notifications
 
 kb_vault = Blueprint("kb_vault", __name__)
 
@@ -554,6 +554,15 @@ def publish_note(nid):
         "UPDATE kb_notes SET status='published', updated_at=? WHERE id=?",
         (now, nid))
     db.get_db().commit()
+    # Phase 6: alert staff (agent/manager/admin) that a new article is live.
+    try:
+        staff = db.get_db().execute(
+            "SELECT id FROM users WHERE role IN ('agent','manager','admin')").fetchall()
+        for r in staff:
+            notifications.notify(r["id"], "kb_note", nid, "note_published",
+                                 f"New article published: {a['title']}")
+    except Exception:
+        pass
     return jsonify(ok=True, note=_serialize(db.get_db().execute(
         "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()))
 
@@ -1138,6 +1147,15 @@ def publish_note_v2(nid):
         "UPDATE kb_notes SET status='published', updated_at=? WHERE id=?",
         (now, nid))
     conn.commit()
+    # Phase 6: alert staff (agent/manager/admin) that a new article is live.
+    try:
+        staff = conn.execute(
+            "SELECT id FROM users WHERE role IN ('agent','manager','admin')").fetchall()
+        for r in staff:
+            notifications.notify(r["id"], "kb_note", nid, "note_published",
+                                 f"New article published: {a['title']}")
+    except Exception:
+        pass
     return jsonify(ok=True, note=_serialize_full(conn.execute(
         "SELECT * FROM kb_notes WHERE id=?", (nid,)).fetchone()))
 

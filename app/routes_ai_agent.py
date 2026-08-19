@@ -30,6 +30,7 @@ from . import db, config, helpers
 from .helpers import login_required, csrf_protect, decrypt_secret
 from . import ai
 from .ai import tools as ai_tools
+from . import notifications
 
 ai_agent = Blueprint("ai_agent", __name__)
 
@@ -48,6 +49,15 @@ CHAT_SYSTEM_PROMPT = (
 
 # Guard against a model that never stops emitting tool calls.
 MAX_TURNS = 5
+
+
+def _notify_tool_done(conv_id, tool_name, user):
+    """Phase 6: quietly tell the chat owner a tool just ran (once per exec)."""
+    try:
+        notifications.notify(user["id"], "ai_chat", conv_id, "ai_tool_done",
+                             f"AI ran tool: {tool_name}")
+    except Exception:
+        pass
 
 
 def _resolve_key_and_model(user):
@@ -389,6 +399,7 @@ def _chat_stream(conv_id, user, key, model, is_resume):
             if prow["tool_status"] == "approved":
                 result = ai_tools.execute_tool(prow["tool_name"], user, exec_args)
                 _store_tool_result(conv_id, prow["tool_name"], original_args, result)
+                _notify_tool_done(conv_id, prow["tool_name"], user)
             else:
                 # rejected (or still pending) -> report to the model.
                 result = {"error": "rejected by user"}
@@ -437,6 +448,7 @@ def _chat_stream(conv_id, user, key, model, is_resume):
                 else:
                     result = ai_tools.execute_tool(name, user, arguments)
                     _store_tool_result(conv_id, name, stored_args, result)
+                    _notify_tool_done(conv_id, name, user)
                     yield (
                         f"data: {json.dumps({'type': 'tool_result', 'id': mid})}\n\n"
                     )

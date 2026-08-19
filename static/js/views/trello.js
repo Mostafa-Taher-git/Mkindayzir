@@ -281,7 +281,7 @@
             el("button", { class: "view-tab" + (boardTab === t ? " active" : ""),
                            role: "tab", "aria-selected": boardTab === t ? "true" : "false",
                            onclick: () => { boardTab = t; loadBoard(id, true); } },
-              { board: "Board", calendar: "Calendar", table: "Table" }[t])),
+              { board: "Board", calendar: "Calendar", table: "Table" }[t]))),
         el("button", { class: "btn ghost sm", onclick: () => activityModal(id) }, "Activity"),
         isWriter ? el("button", { class: "btn ghost sm", onclick: () => boardSettingsModal(data) }, "Settings") : null),
       boardTab === "calendar" ? el("div", { id: "tab-content" }) :
@@ -450,7 +450,7 @@
         el("td", { onclick: () => openCardModal(c) }, c.due_date || "—"),
         el("td", { onclick: () => openCardModal(c) }, c.is_complete ? "✅" : "—"),
         el("td", {}, (c.card_members || []).map((m) => el("span", { class: "chip member sm", title: m.email }, esc(m.name)))),
-        el("td", {}, (c.labels || []).map((l) => el("span", { class: "tlabel", style: `background:${labelColor(l.color)}`, title: l.name })))))));
+        el("td", {}, (c.labels || []).map((l) => el("span", { class: "tlabel", style: `background:${labelColor(l.color)}`, title: l.name }))))));
     };
     const syncChecks = () => {
       const bar = $("#bulk-bar");
@@ -600,6 +600,7 @@
       el("h4", {}, "Labels"), labelChips, labelAdd,
       el("h4", {}, "Checklists"), ...clSections, clAdd,
       el("h4", {}, "Activity"), comments,
+      el("h4", {}, "Linked items"), OD.renderEntityLinks ? OD.renderEntityLinks("trello_card", card.id) : null,
       canEdit ? el("div", { class: "row" },
         el("input", { id: "card-comment-input", class: "sm grow", placeholder: "Write a comment…", "aria-label": "Comment",
           onkeydown: async (e) => {
