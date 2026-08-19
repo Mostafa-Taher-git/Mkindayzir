@@ -248,6 +248,29 @@ const API = (() => {
     aiSummarize: (id) => req("GET", `/api/ai/summarize/${id}`),
     aiSuggestPriority: (id) => req("GET", `/api/ai/suggest-priority/${id}`),
 
+    // Phase 4A — AI Chat Core (conversational assistant)
+    // Conversations
+    listAiConversations: (params = {}) =>
+      req("GET", "/api/ai/conversations?" + new URLSearchParams(params).toString()),
+    createAiConversation: (payload = {}) => req("POST", "/api/ai/conversations", payload),
+    deleteAiConversation: (id) => req("DELETE", `/api/ai/conversations/${id}`),
+    getAiMessages: (id) => req("GET", `/api/ai/conversations/${id}/messages`),
+    // Model picker + usage
+    aiModels: () => req("GET", "/api/ai/models"),
+    aiUsage: () => req("GET", "/api/ai/usage"),
+    // Streaming chat. Returns the RAW fetch Response so the view can read the
+    // SSE stream with a reader. A non-200 response (503 no-key, 429 rate-limit)
+    // is delivered as a normal JSON body — the view checks response.status.
+    aiChatStream: async (convId, message) => {
+      const token = await API.initCsrf();
+      return fetch("/api/ai/chat/" + convId, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
+        body: JSON.stringify({ message }),
+      });
+    },
+
     // Admin
     adminTeams:    () => req("GET", "/api/admin/teams"),
     adminCreateTeam: (name) => req("POST", "/api/admin/teams", { name }),

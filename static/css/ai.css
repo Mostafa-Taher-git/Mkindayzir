@@ -1,0 +1,228 @@
+/* ==========================================================================
+   OpsDesk AI Chat (Phase 4A) styles.
+   Built on tokens.css; all values reference var(--...). Dark theme is
+   supported automatically via [data-theme="dark"].
+   ========================================================================== */
+
+/* ---------- full page layout ---------- */
+.ai-page .ai-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: var(--sp-4);
+  align-items: stretch;
+  height: calc(100vh - 140px);
+}
+
+/* ---------- conversation list (left) ---------- */
+.ai-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-lowest);
+  border: var(--border-card);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  overflow: hidden;
+}
+.ai-list-box {
+  flex: 1;
+  overflow: auto;
+  margin-top: var(--sp-2);
+}
+.ai-conv {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r);
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: var(--sp-1);
+}
+.ai-conv:hover { background: var(--surface-low); }
+.ai-conv.active { background: var(--surface-low); border-color: var(--primary); }
+.ai-conv-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-conv-meta { font-size: var(--fs-label); flex: 0 0 auto; }
+.ai-conv .ai-del { opacity: 0; flex: 0 0 auto; }
+.ai-conv:hover .ai-del { opacity: 1; }
+
+/* ---------- thread (right) ---------- */
+.ai-thread-wrap {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-lowest);
+  border: var(--border-card);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  min-height: 0;
+}
+.ai-chat { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.ai-thread-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: var(--border-card);
+  background: var(--surface-low);
+}
+.ai-model-wrap { display: flex; align-items: center; gap: var(--sp-2); }
+.ai-model-wrap select { width: auto; }
+.ai-usage { font-size: var(--fs-label); }
+
+.ai-thread {
+  flex: 1;
+  overflow: auto;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ---------- empty state ---------- */
+.ai-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--on-surface-variant);
+  max-width: 360px;
+}
+.ai-empty-ic { font-size: 40px; }
+.ai-empty h3 { margin: var(--sp-3) 0 var(--sp-2); }
+.ai-empty p { margin: 0; }
+
+/* ---------- bubbles ---------- */
+.ai-bubble {
+  max-width: 85%;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-low);
+  font-size: var(--fs-body);
+}
+.ai-bubble.user {
+  align-self: flex-end;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  border-color: transparent;
+}
+.ai-bubble.assistant { align-self: flex-start; }
+.ai-bubble .md { line-height: var(--lh-body); }
+.ai-bubble .md p:first-child { margin-top: 0; }
+.ai-bubble .md p:last-child { margin-bottom: 0; }
+.ai-bubble.user .md code { background: rgba(255, 255, 255, 0.18); }
+.ai-bubble.user .md a { color: var(--on-primary-container); }
+
+/* markdown (reuse kb.css .md styling but scoped) */
+.ai-bubble .md code {
+  font-family: var(--font-mono);
+  background: var(--surface-dim);
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  font-size: 0.9em;
+}
+.ai-bubble .md pre.md-code {
+  background: var(--surface-dim);
+  color: var(--on-surface);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  overflow: auto;
+}
+.ai-bubble .md pre.md-code code { background: none; padding: 0; }
+.ai-bubble .md blockquote {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--primary);
+  color: var(--on-surface-variant);
+  background: var(--surface-low);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+.ai-bubble .md a { color: var(--primary); }
+
+.ai-system {
+  align-self: center;
+  font-size: var(--fs-sm);
+  color: var(--on-surface-variant);
+  background: var(--surface-low);
+  border: var(--border-card);
+  border-radius: var(--r-full);
+  padding: var(--sp-1) var(--sp-3);
+}
+.ai-system.error { color: var(--on-error); background: var(--error-container); border-color: var(--error); }
+
+/* ---------- composer ---------- */
+.ai-composer {
+  border-top: var(--border-card);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-low);
+}
+.ai-composer-row { display: flex; gap: var(--sp-3); align-items: flex-end; }
+.ai-input {
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  color: var(--on-surface);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  line-height: var(--lh-body);
+}
+.ai-composer .btn { height: 44px; align-self: stretch; }
+
+/* ---------- slide-over drawer ---------- */
+.ai-drawer-open { overflow: hidden; }
+.ai-drawer-backdrop {
+  position: fixed; inset: 0;
+  background: var(--backdrop);
+  z-index: 70;
+  opacity: 0;
+  animation: ai-fade .12s ease forwards;
+}
+.ai-drawer {
+  position: fixed;
+  top: 0; right: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: var(--surface-lowest);
+  border-left: var(--border-card);
+  box-shadow: var(--shadow-ambient);
+  z-index: 71;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  animation: ai-slide .18s ease forwards;
+}
+.ai-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: var(--border-card);
+  background: var(--surface-low);
+}
+.ai-drawer-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.ai-drawer-body .ai-thread.compact { flex: 1; }
+.ai-drawer-body .ai-composer { background: var(--surface-lowest); }
+
+@keyframes ai-slide { to { transform: translateX(0); } }
+@keyframes ai-fade { to { opacity: 1; } }
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ai-drawer, .ai-drawer-backdrop { animation: none; }
+  .ai-drawer { transform: translateX(0); }
+}
+
+/* ---------- responsive: stack on small screens ---------- */
+@media (max-width: 900px) {
+  .ai-page .ai-layout { grid-template-columns: 1fr; height: auto; }
+  .ai-list { max-height: 220px; }
+}

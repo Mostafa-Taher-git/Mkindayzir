@@ -21,6 +21,7 @@ from .routes_kb_vault import kb_vault as kb_bp
 from .routes_reports import reports as reports_bp
 from .routes_sla import sla as sla_bp
 from .routes_ai import aibp as ai_bp
+from .routes_ai_agent import ai_agent as ai_agent_bp
 from .routes_settings import settingsbp as settings_bp
 from .routes_trello import trello as trello_bp
 
@@ -60,6 +61,7 @@ def create_app():
     app.register_blueprint(reports_bp)
     app.register_blueprint(sla_bp)
     app.register_blueprint(ai_bp)
+    app.register_blueprint(ai_agent_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(trello_bp)
 

@@ -170,6 +170,8 @@
     "/trello": views.trelloHome,
     "/trello/starred": views.trelloHome,
     "/trello/board": views.trelloBoard,
+    // Phase 4A — AI Chat Core (views/ai.js loads before this file)
+    "/ai": views.aiChat,
   };
 
   function navigate(hash) {
@@ -213,6 +215,11 @@
       if (routes[nested]) render = routes[nested];
       else render = views.trelloHome;
     }
+    // AI Chat: #/ai/<id> opens the session directly; #/ai falls to aiChat().
+    if (path === "ai") {
+      if (/^\d+$/.test(param)) render = views.aiChatSession;
+      else render = views.aiChat;
+    }
     try {
       render(param);
     } catch (e) {
@@ -252,6 +259,9 @@
     items.push(["", "Trello Boards", ""]);
     items.push(["/trello", "My Boards", "🗂️"]);
     items.push(["/trello/starred", "Starred Boards", "★"]);
+    // Phase 4A — AI Chat Core
+    items.push(["", "AI Copilot", ""]);
+    items.push(["/ai", "AI Copilot", "🤖"]);
     if (isAdmin()) items.push(["/admin", "Admin", "⚙️"]);
     items.push(["/settings", "Settings", "🔑"]);
     return items;
@@ -442,6 +452,12 @@
       return;
     }
     window.addEventListener("hashchange", router);
+    // Phase 4A — AI Copilot slide-over drawer toggle (Ctrl+J / Cmd+J).
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        if (OD.views.openAiDrawer) { e.preventDefault(); OD.views.openAiDrawer(); }
+      }
+    });
     API.me().then(({ user, ai_enabled }) => {
       state.user = user;
       state.aiEnabled = !!ai_enabled;

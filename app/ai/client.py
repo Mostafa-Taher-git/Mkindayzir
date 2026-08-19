@@ -164,6 +164,76 @@ def chat(model, messages, api_key=None, temperature=0.3, max_tokens=400):
                      max_tokens=max_tokens, api_key=api_key, model=model)
 
 
+
+
+def stream_chat(model, messages, api_key=None, temperature=0.3, max_tokens=600):
+    """Stream completions from OpenRouter as a generator.
+
+    Mirrors _complete() for transport/headers and fails closed (no key or any
+    transport error -> the generator simply stops, yielding nothing).
+
+    Yields text chunk strings from each SSE `data:` line's
+    choices[0].delta.content. When OpenRouter reports `usage` on the final
+    chunk (we request stream_options.include_usage=true) it captures it and
+    yields a final sentinel dict {"__usage__": {"prompt_tokens": int,
+    "completion_tokens": int}} so the caller can record token usage.
+    """
+    key = api_key or os.environ.get("OPERADESK_OPENROUTER_KEY")
+    if not key:
+        return
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    body = {
+        "model": model or MODEL,
+        "messages": full_messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    req = urllib.request.Request(
+        OPENROUTER_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5000",
+            "X-Title": "OpsDesk",
+        },
+        method="POST",
+    )
+    usage = None
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            for raw in resp:
+                line = raw.decode("utf-8").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line[len("data:"):].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(payload)
+                except ValueError:
+                    continue
+                if chunk.get("usage"):
+                    u = chunk["usage"]
+                    usage = {
+                        "prompt_tokens": int(u.get("prompt_tokens", 0) or 0),
+                        "completion_tokens": int(u.get("completion_tokens", 0) or 0),
+                    }
+                choices = chunk.get("choices") or []
+                if choices:
+                    delta = choices[0].get("delta") or {}
+                    content = delta.get("content")
+                    if isinstance(content, str) and content:
+                        yield content
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError,
+            IndexError, ValueError, OSError, AttributeError, TypeError):
+        return
+    if usage:
+        yield {"__usage__": usage}
+
+
 def suggest_reply(ticket, comments=None, api_key=None, model=None):
     """Draft a polite, professional reply to the requester. Returns str or None."""
     prompt = (

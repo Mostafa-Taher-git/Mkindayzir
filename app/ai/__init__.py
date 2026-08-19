@@ -21,6 +21,8 @@ from .client import (
     suggest_reply,
     summarize_ticket,
     suggest_priority,
+    get_openrouter_models,
+    stream_chat,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "suggest_reply",
     "summarize_ticket",
     "suggest_priority",
+    "get_openrouter_models",
+    "stream_chat",
 ]
