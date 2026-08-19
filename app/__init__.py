@@ -17,7 +17,7 @@ from .routes_auth import auth as auth_bp
 from .routes_jira import jira as jira_bp
 from .routes_admin import admin as admin_bp
 from .routes_notif import notif as notif_bp
-from .routes_kb import kb as kb_bp
+from .routes_kb_vault import kb_vault as kb_bp
 from .routes_reports import reports as reports_bp
 from .routes_sla import sla as sla_bp
 from .routes_ai import aibp as ai_bp

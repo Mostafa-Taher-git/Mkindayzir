@@ -149,12 +149,14 @@
     "/new": views.viewCreate,
     "/ticket": views.viewTicket,
     "/admin": views.viewAdmin,
-    "/kb": views.viewKb,
-    "/kb/manage": views.viewKbManage,
-    "/kb/new": views.viewKbEdit,
-    "/kb/:id": views.viewKbArticle,
-    "/kb/collections": views.viewKbCollections,
-    "/kb/collections/:id": views.viewKbCollection,
+    "/kb": views.kbHome,
+    "/kb/vault": views.kbVault,
+    "/kb/note": views.kbNote,
+    "/kb/new": views.kbNew,
+    "/kb/edit": views.kbEdit,
+    "/kb/graph": views.kbGraph,
+    "/kb/manage": views.kbManage,
+    "/kb/collections": views.kbCollections,
     "/reports": views.viewReports,
     "/settings": views.viewSettings,
     // Phase 1A — Jira suite (views/jira.js loads before this file)
@@ -185,9 +187,18 @@
     // Nested KB routes (/kb/manage, /kb/new, /kb/<id>) key to /kb in the flat
     // map, so resolve the full path when a nested route is registered.
     if (path === "kb") {
-      const nested = "/" + parts.join("/");
-      if (routes[nested]) render = routes[nested];
-      else if (parts.length >= 2) render = views.viewKbArticle;
+      const sub = parts[1];
+      if (sub) {
+        const nested = "/" + parts.slice(0, 2).join("/");
+        if (routes[nested]) render = routes[nested];
+        else if (sub === "note") render = views.kbNote;
+        else if (sub === "edit") render = views.kbEdit;
+        else if (sub === "collections" && parts[2]) render = views.kbCollections;
+        else if (/^\d+$/.test(sub)) render = views.kbNote; // /kb/<id> -> note
+        else render = views.kbHome;
+      } else {
+        render = views.kbHome;
+      }
     }
     // Jira suite: #/jira/<view>/<id> resolves to the registered sub-view
     // (the trailing id is read by the view from location.hash).
@@ -220,12 +231,13 @@
       items.push(["/dashboard", "Dashboard", "📊"]);
       items.push(["/queue", "Queue", "🗂️"]);
     }
-    // Knowledge Base: Help Center for everyone; Manage KB and Collections for staff.
-    items.push(["/kb", "Help Center", "📚"]);
-    if (state.user.role !== "requester") {
-      items.push(["/kb/manage", "Manage KB", "✍️"]);
-      items.push(["/kb/collections", "Collections", "🗂️"]);
-    }
+    // Knowledge Base section (Obsidian-style vault)
+    items.push(["", "Knowledge Base", ""]);
+    items.push(["/kb", "KB Home", "🏠"]);
+    items.push(["/kb/vault", "Vault Explorer", "📂"]);
+    items.push(["/kb/graph", "Graph View", "🕸️"]);
+    items.push(["/kb/manage", "Manage Notes", "✍️"]);
+    items.push(["/kb/collections", "Collections", "📚"]);
     if (state.user.role === "manager" || state.user.role === "admin") items.push(["/reports", "Reports", "📈"]);
     // Phase 1A — Jira Workflows (staff only)
     if (state.user.role !== "requester") {

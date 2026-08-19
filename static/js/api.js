@@ -170,24 +170,33 @@ const API = (() => {
     resetPassword: (token, password) => req("POST", "/api/auth/reset-password", { token, password }),
 
     // Phase 2 — Knowledge Base
-    listKb:   (params = {}) => { const q = new URLSearchParams(params).toString(); return req("GET", "/api/kb" + (q ? "?" + q : "")); },
-    getKb:    (id) => req("GET", `/api/kb/${id}`),
-    createKb: (payload) => req("POST", "/api/kb", payload),
-    updateKb: (id, payload) => req("PATCH", `/api/kb/${id}`, payload),
-    publishKb:(id) => req("POST", `/api/kb/${id}/publish`),
-    deleteKb: (id) => req("DELETE", `/api/kb/${id}`),
-    kbFeedback:(id, helpful, comment) => req("POST", `/api/kb/${id}/feedback`, { helpful, comment }),
-
-    listCollections: () => req("GET", "/api/kb/collections"),
-    createCollection: (payload) => req("POST", "/api/kb/collections", payload),
-    listCollectionArticles: (cid) => req("GET", `/api/kb/collections/${cid}/articles`),
-    addCollectionArticle: (cid, payload) => req("POST", `/api/kb/collections/${cid}/articles`, payload),
-    removeCollectionArticle: (cid, aid) => req("DELETE", `/api/kb/collections/${cid}/articles/${aid}`),
-    listKbVersions: (aid) => req("GET", `/api/kb/${aid}/versions`),
-    listKbLinks: (aid) => req("GET", `/api/kb/${aid}/links`),
-    addKbLink: (aid, payload) => req("POST", `/api/kb/${aid}/links`, payload),
-    removeKbLink: (aid, targetId) => req("DELETE", `/api/kb/${aid}/links/${targetId}`),
-    draftKbFromTicket: (aid, payload) => req("POST", `/api/kb/${aid}/draft-from-ticket`, payload),
+    // Phase 2 — Knowledge Base (Obsidian-style vault)
+    // Folders
+    kbTree:        () => req("GET", "/api/kb/tree"),
+    createFolder:  (payload) => req("POST", "/api/kb/folders", payload),
+    updateFolder:  (id, payload) => req("PATCH", `/api/kb/folders/${id}`, payload),
+    deleteFolder:  (id) => req("DELETE", `/api/kb/folders/${id}`),
+    // Notes
+    listKbNotes:   (params = {}) => req("GET", "/api/kb/notes?" + new URLSearchParams(params).toString()),
+    createKbNote:  (payload) => req("POST", "/api/kb/notes", payload),
+    getKbNote:     (id) => req("GET", `/api/kb/notes/${id}`),
+    updateKbNote:  (id, payload) => req("PATCH", `/api/kb/notes/${id}`, payload),
+    deleteKbNote:  (id) => req("DELETE", `/api/kb/notes/${id}`),
+    publishKbNote: (id) => req("POST", `/api/kb/notes/${id}/publish`),
+    kbNoteFeedback: (id, helpful, comment) => req("POST", `/api/kb/notes/${id}/feedback`, { helpful, comment }),
+    kbNoteVersions: (id) => req("GET", `/api/kb/notes/${id}/versions`),
+    kbNoteVersionDiff: (id, vid) => req("GET", `/api/kb/notes/${id}/versions/${vid}/diff`),
+    // Graph / tags / analytics
+    kbGraph:   () => req("GET", "/api/kb/graph"),
+    kbLocalGraph: (id, hops) => req("GET", `/api/kb/graph/local/${id}` + (hops ? `?hops=${hops}` : "")),
+    kbTags:    () => req("GET", "/api/kb/tags"),
+    kbAnalytics: () => req("GET", "/api/kb/analytics"),
+    // Collections
+    listKbCollections:     () => req("GET", "/api/kb/collections"),
+    createKbCollection:    (payload) => req("POST", "/api/kb/collections", payload),
+    listKbCollectionNotes: (cid) => req("GET", `/api/kb/collections/${cid}/notes`),
+    addKbCollectionNote:   (cid, payload) => req("POST", `/api/kb/collections/${cid}/notes`, payload),
+    removeKbCollectionNote: (cid, nid) => req("DELETE", `/api/kb/collections/${cid}/notes/${nid}`),
 
     listIssueKnowledge: (iid) => req("GET", `/api/jira/issues/${iid}/knowledge`),
     linkIssueKnowledge: (iid, payload) => req("POST", `/api/jira/issues/${iid}/knowledge`, payload),

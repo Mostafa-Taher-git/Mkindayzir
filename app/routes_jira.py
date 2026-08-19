@@ -1701,7 +1701,7 @@ def promote_to_kb(iid):
     if not is_agent_or_manager(user):
         return jsonify(error="Forbidden"), 403
 
-    from .routes_kb import _draft_kb_body, _folder_for_category, _serialize as _serialize_note
+    from .routes_kb_vault import _draft_kb_body, _folder_for_category, _serialize as _serialize_note
     body, _ai_used = _draft_kb_body(user, t)
     now = db.now_iso()
     folder_id = _folder_for_category(t["category_id"])

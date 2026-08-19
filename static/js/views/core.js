@@ -755,7 +755,7 @@
   // Link-article picker used on the ticket detail page (staff only).
   async function kbLinkControl(t, alreadyLinked) {
     let notes = [];
-    try { notes = (await API.listKb()).notes || []; } catch (_) {}
+    try { notes = (await API.listKbNotes()).notes || []; } catch (_) {}
     const available = notes.filter((a) => !alreadyLinked.includes(a.id));
     const sel = el("select", { id: "kb-link-pick" },
       el("option", { value: "" }, "Choose an article…"),
@@ -844,7 +844,7 @@
       "btn danger sm"
     );
     if (!confirmed) return;
-    try { await API.deleteKb(id); toast("Deleted.", "info"); viewKbManage(); }
+    try { await API.deleteKbNote(id); toast("Deleted.", "info"); navigate("/kb/manage"); }
     catch (e) { toast(e.message, "error"); }
   }
 
@@ -1384,7 +1384,7 @@
   // Article-to-article link picker (staff only).
   async function kbArticleLinkControl(aid) {
     let notes = [];
-    try { notes = (await API.listKb()).notes || []; } catch (_) {}
+    try { notes = (await API.listKbNotes()).notes || []; } catch (_) {}
     const sel = el("select", { id: "kb-link-pick" },
       el("option", { value: "" }, "Choose an article…"),
       ...notes.filter((a) => a.id !== aid).map((a) => el("option", { value: a.id }, a.title)));
