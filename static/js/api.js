@@ -258,18 +258,26 @@ const API = (() => {
     // Model picker + usage
     aiModels: () => req("GET", "/api/ai/models"),
     aiUsage: () => req("GET", "/api/ai/usage"),
-    // Streaming chat. Returns the RAW fetch Response so the view can read the
-    // SSE stream with a reader. A non-200 response (503 no-key, 429 rate-limit)
-    // is delivered as a normal JSON body — the view checks response.status.
-    aiChatStream: async (convId, message) => {
+    // Streaming chat. Accepts a payload object: either { message } for a new
+    // turn or { resume: true } to continue after tool approvals. Returns the RAW
+    // fetch Response so the view can read the SSE stream with a reader. A non-200
+    // response (503 no-key, 429 rate-limit) is a normal JSON body — the view
+    // checks response.status.
+    aiChatStream: async (convId, payload) => {
       const token = await API.initCsrf();
       return fetch("/api/ai/chat/" + convId, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(payload || {}),
       });
     },
+    // Tool confirmation (Phase 4B). Record the user's decision for a
+    // tool_call message id; the view then resumes the stream.
+    aiToolConfirm: (msgId, decision) =>
+      req("POST", `/api/ai/tool-confirm/${msgId}`, { decision }),
+    // List available AI tools + their parameters (Phase 4B).
+    aiTools: () => req("GET", "/api/ai/tools"),
 
     // Admin
     adminTeams:    () => req("GET", "/api/admin/teams"),

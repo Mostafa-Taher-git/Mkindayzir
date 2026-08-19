@@ -150,7 +150,12 @@
   function handleEvent(ev, handlers) {
     if (!ev || !ev.type) return;
     if (ev.type === "chunk") { if (handlers.onChunk) handlers.onChunk(ev.text || ""); }
-    else if (ev.type === "done") { if (handlers.onDone) handlers.onDone(); }
+    else if (ev.type === "tool_call") { if (handlers.onToolCall) handlers.onToolCall(ev); }
+    else if (ev.type === "tool_result") { if (handlers.onToolResult) handlers.onToolResult(ev); }
+    else if (ev.type === "done") {
+      if (ev.awaiting_confirmation) { if (handlers.onAwaitingConfirmation) handlers.onAwaitingConfirmation(ev); }
+      else { if (handlers.onDone) handlers.onDone(ev); }
+    }
     else if (ev.type === "error") { if (handlers.onError) handlers.onError(ev.message || "AI error"); }
   }
 
@@ -230,6 +235,171 @@
       scrollDown();
     }
 
+    // ---- tool confirmation helpers (Phase 4B) ----
+    function statusLabel(status) {
+      switch (status) {
+        case "approved": return "✓ Approved";
+        case "rejected": return "✕ Rejected";
+        case "executed": return "✅ Executed";
+        case "pending":  return "⏳ Pending";
+        default:         return status || "⏳ Pending";
+      }
+    }
+
+    function toolArgsToJson(args) {
+      let val = args;
+      if (val && typeof val !== "object") val = { value: val };
+      try { return JSON.stringify(val == null ? {} : val, null, 2); }
+      catch (_) { return String(val == null ? "" : val); }
+    }
+
+    function buildToolCard(opts) {
+      opts = opts || {};
+      const card = el("div", {
+        class: "tool-card",
+        "data-msg-id": opts.msgId != null ? String(opts.msgId) : "",
+        "data-status": opts.status || "pending",
+      });
+      card.appendChild(el("div", { class: "tool-card__title" },
+        "🔧 AI wants to run: ", el("strong", {}, opts.name || "tool")));
+      card.appendChild(el("pre", { class: "tool-card__args" }, toolArgsToJson(opts.args)));
+      const actions = el("div", { class: "tool-card__actions" });
+      if (opts.interactive) {
+        actions.appendChild(el("button", { class: "btn primary sm",
+          onclick: () => confirmTool(opts.msgId, "approve", card) }, "Approve"));
+        actions.appendChild(el("button", { class: "btn ghost sm",
+          onclick: () => confirmTool(opts.msgId, "reject", card) }, "Reject"));
+      } else {
+        actions.appendChild(el("div", { class: "tool-card__status" }, statusLabel(opts.status)));
+      }
+      card.appendChild(actions);
+      return card;
+    }
+
+    function attachToolCard(ev) {
+      const card = buildToolCard({ name: ev.name, args: ev.args, msgId: ev.id, interactive: true, status: "pending" });
+      thread.appendChild(card);
+      scrollDown();
+      return card;
+    }
+
+    function attachToolResult(ev) {
+      thread.appendChild(el("div", { class: "tool-card__result-note" }, "✅ tool executed"));
+      scrollDown();
+    }
+
+    function showWaiting() {
+      if (thread.querySelector(".ai-tool-waiting")) return;
+      thread.appendChild(el("div", { class: "ai-tool-waiting" }, "⏳ Waiting for your approval…"));
+      scrollDown();
+    }
+
+    let resumeStarted = false;
+    async function confirmTool(id, decision, card) {
+      if (card.dataset.locked) return;
+      card.dataset.locked = "1";
+      card.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      const actions = card.querySelector(".tool-card__actions");
+      const statusEl = el("div", { class: "tool-card__status" }, decision === "approve" ? "Approving…" : "Rejecting…");
+      actions.appendChild(statusEl);
+      try {
+        await API.aiToolConfirm(id, decision);
+      } catch (err) {
+        toast(err.message || "Confirmation failed.", "error");
+        card.dataset.locked = "";
+        card.querySelectorAll("button").forEach((b) => (b.disabled = false));
+        statusEl.remove();
+        return;
+      }
+      statusEl.textContent = statusLabel(decision === "approve" ? "approved" : "rejected");
+      card.dataset.status = decision === "approve" ? "approved" : "rejected";
+      if (resumeStarted) return;
+      resumeStarted = true;
+      startResume();
+    }
+
+    async function startResume() {
+      if (busy) return;
+      const w = thread.querySelector(".ai-tool-waiting");
+      if (w) w.remove();
+      busy = true;
+      sendBtn.disabled = true;
+      await streamInto(convId, { resume: true });
+      busy = false;
+      sendBtn.disabled = false;
+      await reloadMessages(convId);
+      ta.focus();
+    }
+
+    async function streamInto(convId, payload) {
+      const { bubble, body } = addBubble("assistant");
+      let acc = "";
+      let awaiting = false;
+      try {
+        const res = await API.aiChatStream(convId, payload);
+        await readStream(res, {
+          onChunk: (t) => { acc += t; setBubbleMD(body, acc); scrollDown(); },
+          onToolCall: (ev) => attachToolCard(ev),
+          onToolResult: (ev) => attachToolResult(ev),
+          onAwaitingConfirmation: () => {
+            awaiting = true;
+            showWaiting();
+            if (!acc) body.innerHTML = '<span class="muted">Waiting for your approval…</span>';
+          },
+          onDone: () => {
+            if (!acc) body.innerHTML = '<span class="muted">(no response)</span>';
+            else setBubbleMD(body, acc);
+          },
+          onError: (msg) => { bubble.remove(); sysMsg(msg, true); },
+          onNonStream: (status, jsonBody) => {
+            bubble.remove();
+            const msg = (jsonBody && jsonBody.error) ||
+              (status === 429 ? "Rate limited. Please slow down and try again." : "AI service unavailable.");
+            sysMsg(msg, true);
+          },
+        });
+      } catch (err) {
+        bubble.remove();
+        sysMsg(err.message || "Network error talking to AI.", true);
+      }
+      return awaiting;
+    }
+
+    async function reloadMessages(id) {
+      const loadId = id != null ? id : convId;
+      convId = loadId;
+      let data;
+      thread.replaceChildren(el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…"));
+      try { data = await API.getAiMessages(loadId); }
+      catch (err) { thread.replaceChildren(el("div", { class: "empty" }, err.message)); return; }
+      const msgs = data.messages || [];
+      if (!msgs.length) { renderEmpty(); return; }
+      thread.replaceChildren();
+      msgs.forEach((m) => {
+        if (m.role === "user") { userBubble(m.content || ""); return; }
+        if (m.role === "tool_call") {
+          thread.appendChild(buildToolCard({
+            name: m.tool_name, args: m.tool_args, msgId: m.id,
+            interactive: false, status: m.tool_status || "approved",
+          }));
+          return;
+        }
+        if (m.role === "tool_result") {
+          let result = (m.content && (m.content.text || m.content)) || m.content || "";
+          if (typeof result !== "string") {
+            try { result = JSON.stringify(result, null, 2); } catch (_) { result = String(result); }
+          }
+          thread.appendChild(el("div", { class: "tool-card__result" },
+            el("div", { class: "tool-card__result-label" }, "✅ Tool result"),
+            el("pre", { class: "tool-card__args" }, result)));
+          return;
+        }
+        const { bubble, body } = addBubble("assistant");
+        setBubbleMD(body, m.content || "");
+      });
+      scrollDown();
+    }
+
     async function send() {
       const text = ta.value.trim();
       if (!text || busy) return;
@@ -248,37 +418,14 @@
       sendBtn.disabled = true;
       ta.value = "";
       userBubble(text);
+      resumeStarted = false;
 
-      const { bubble, body } = addBubble("assistant");
-      let acc = "";
-      let streamed = false;
-      try {
-        const res = await API.aiChatStream(convId, text);
-        await readStream(res, {
-          onChunk: (t) => { streamed = true; acc += t; setBubbleMD(body, acc); scrollDown(); },
-          onDone: () => {
-            if (!acc) body.innerHTML = '<span class="muted">(no response)</span>';
-            else setBubbleMD(body, acc);
-          },
-          onError: (msg) => { bubble.remove(); sysMsg(msg, true); },
-          onNonStream: (status, jsonBody) => {
-            bubble.remove();
-            const msg = (jsonBody && jsonBody.error) ||
-              (status === 429 ? "Rate limited. Please slow down and try again." : "AI service unavailable.");
-            sysMsg(msg, true);
-          },
-        });
-      } catch (err) {
-        bubble.remove();
-        sysMsg(err.message || "Network error talking to AI.", true);
-      }
-
+      const awaiting = await streamInto(convId, { message: text });
       busy = false;
       sendBtn.disabled = false;
-      if (streamed) {
-        if (opts.onMessageSent) opts.onMessageSent(convId);
-        if (header) loadUsage();
-      }
+      if (opts.onMessageSent) opts.onMessageSent(convId);
+      if (header) loadUsage();
+      if (!awaiting) await reloadMessages(convId);
       ta.focus();
     }
 
@@ -289,23 +436,7 @@
     return {
       getConvId: () => convId,
       setConvId: (id) => { convId = id; },
-      loadMessages: async (id) => {
-        convId = id;
-        let data;
-        thread.replaceChildren(el("div", { class: "empty" }, el("span", { class: "spinner" }), " Loading…"));
-        try { data = await API.getAiMessages(id); }
-        catch (err) { thread.replaceChildren(el("div", { class: "empty" }, err.message)); return; }
-        const msgs = data.messages || [];
-        if (!msgs.length) { renderEmpty(); return; }
-        thread.replaceChildren();
-        msgs.forEach((m) => {
-          if (m.role === "user") { userBubble(m.content || ""); return; }
-          const { bubble, body } = addBubble("assistant");
-          setBubbleMD(body, m.content || "");
-          if (m.tool_name) sysMsg("🔧 " + m.tool_name + (m.tool_status ? " · " + m.tool_status : ""));
-        });
-        scrollDown();
-      },
+      loadMessages: (id) => reloadMessages(id),
       focus: () => ta.focus(),
     };
   }

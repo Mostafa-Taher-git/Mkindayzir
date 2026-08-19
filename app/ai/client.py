@@ -151,6 +151,72 @@ def _ticket_block(ticket, comments=None):
     return "\n".join(lines)
 
 
+def chat_completion(model, messages, api_key=None, tools=None,
+                    temperature=0.3, max_tokens=600):
+    """Non-streaming chat completion that supports tool calls.
+
+    Builds the same request body as _complete() but WITHOUT `stream`, and WITH
+    `tools` (OpenAI function schema) + `"tool_choice": "auto"` when provided.
+
+    Returns a dict with the model's text content and any tool calls:
+      {"content": str|None,
+       "tool_calls": [{"id","name","arguments"}...],
+       "usage": {...}}
+    Fails closed: missing key / any error / timeout -> None (never raises).
+    """
+    key = api_key or os.environ.get("OPERADESK_OPENROUTER_KEY")
+    if not key:
+        return None
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    body = {
+        "model": model or MODEL,
+        "messages": full_messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = "auto"
+    req = urllib.request.Request(
+        OPENROUTER_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5000",
+            "X-Title": "OpsDesk",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        message = data["choices"][0]["message"]
+        raw_calls = message.get("tool_calls") or []
+        tool_calls = []
+        for tc in raw_calls:
+            fn = tc.get("function", {})
+            args = fn.get("arguments", {})
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args) if args else {}
+                except (ValueError, TypeError):
+                    args = {}
+            tool_calls.append({
+                "id": tc.get("id"),
+                "name": fn.get("name"),
+                "arguments": args,
+            })
+        return {
+            "content": message.get("content"),
+            "tool_calls": tool_calls,
+            "usage": data.get("usage") or {},
+        }
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError,
+            IndexError, ValueError, OSError, AttributeError, TypeError):
+        return None
+
+
 def chat(model, messages, api_key=None, temperature=0.3, max_tokens=400):
     """Generic chat helper: messages = [{"role": "user", "content": ...}].
 

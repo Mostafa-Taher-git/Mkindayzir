@@ -23,6 +23,7 @@ from .client import (
     suggest_priority,
     get_openrouter_models,
     stream_chat,
+    chat_completion,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "suggest_priority",
     "get_openrouter_models",
     "stream_chat",
+    "chat_completion",
 ]

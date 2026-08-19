@@ -221,6 +221,90 @@
   .ai-drawer { transform: translateX(0); }
 }
 
+/* ---------- tool confirmation cards (Phase 4B) ---------- */
+.tool-card {
+  align-self: stretch;
+  max-width: 95%;
+  border: 1px solid var(--outline-variant);
+  border-left: 3px solid var(--tertiary, var(--primary));
+  background: var(--surface-low);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.tool-card[data-status="approved"] { border-left-color: var(--success, var(--primary)); }
+.tool-card[data-status="rejected"] { border-left-color: var(--error); }
+.tool-card__title {
+  font-size: var(--fs-body);
+  color: var(--on-surface);
+}
+.tool-card__title strong { color: var(--primary); font-family: var(--font-mono); }
+.tool-card__args {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-code, 1.5);
+  color: var(--on-surface);
+  background: var(--surface-dim);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  white-space: pre;
+  word-break: break-word;
+}
+.tool-card__actions {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.tool-card__status {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+.tool-card[data-status="approved"] .tool-card__status { color: var(--success, var(--primary)); }
+.tool-card[data-status="rejected"] .tool-card__status { color: var(--on-error); }
+.tool-card__result-note {
+  align-self: flex-start;
+  font-size: var(--fs-sm);
+  color: var(--on-surface-variant);
+  background: var(--surface-low);
+  border: var(--border-card);
+  border-radius: var(--r-full);
+  padding: var(--sp-1) var(--sp-3);
+}
+.ai-tool-waiting {
+  align-self: center;
+  font-size: var(--fs-sm);
+  color: var(--on-surface-variant);
+  background: var(--surface-low);
+  border: var(--border-card);
+  border-radius: var(--r-full);
+  padding: var(--sp-1) var(--sp-3);
+}
+.tool-card__result {
+  align-self: stretch;
+  max-width: 95%;
+  border: 1px solid var(--outline-variant);
+  border-left: 3px solid var(--success, var(--primary));
+  background: var(--surface-low);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.tool-card__result-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--success, var(--primary));
+}
+
 /* ---------- responsive: stack on small screens ---------- */
 @media (max-width: 900px) {
   .ai-page .ai-layout { grid-template-columns: 1fr; height: auto; }
