@@ -44,6 +44,7 @@
   --on-tertiary:        #ffffff;
   --tertiary-container: #a33500;
   --on-tertiary-container:#ffc6b2;
+  --accent: var(--primary);
 
   /* ---- Semantic (status) colors ---- */
   --error:              #ba1a1a;
@@ -89,6 +90,7 @@
   --fs-body:    14px; --fw-body: 400; --lh-body: 20px;
   --fs-sm:      13px; --lh-sm: 18px;
   --fs-label:   12px; --fw-label: 600; --ls-label: 0.05em;
+  --fs-xs: 0.6875rem; --fs-md: 0.9375rem;
 
   /* ---- Spacing (4px baseline grid) ---- */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
@@ -109,6 +111,7 @@
   /* ---- Elevation (single soft ambient shadow) ---- */
   --shadow-ambient: 0 2px 4px rgba(9, 30, 66, 0.08);
   --border-card: 1px solid #dfe1e6;
+  --border: var(--border-card);
 
   /* ---- Layout ---- */
   --sidebar-w: 232px;
@@ -158,6 +161,7 @@
   --on-tertiary:        #2a0d00;
   --tertiary-container: #5a2410;
   --on-tertiary-container:#ffc6b2;
+  --accent: var(--primary);
 
   --error:              #ff8e8e;
   --on-error:           #2a0000;

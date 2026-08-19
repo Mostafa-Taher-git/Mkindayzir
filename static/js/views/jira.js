@@ -370,7 +370,7 @@
 
   /* ----------------------------- goals / OKRs ----------------------------- */
   const GOAL_STATUS_LABEL = { on_track: "On track", at_risk: "At risk", behind: "Behind", achieved: "Achieved" };
-  const GOAL_STATUS_COLOR = { on_track: "var(--ok)", at_risk: "var(--warn)", behind: "var(--danger)", achieved: "var(--primary)" };
+  const GOAL_STATUS_COLOR = { on_track: "var(--ok, #16a34a)", at_risk: "var(--warn, #f59e0b)", behind: "var(--danger, #dc2626)", achieved: "var(--primary, #2563eb)" };
 
   async function jiraGoals() {
     const main = el("div", {},
@@ -399,7 +399,7 @@
       el("span", { class: "spinner" }));
     const card = el("div", { class: "card goal-card" },
       el("div", { class: "row between" },
-        el("span", { class: "goal-status", style: "color:" + (GOAL_STATUS_COLOR[g.status] || "var(--text)") },
+        el("span", { class: "goal-status", style: "color:" + (GOAL_STATUS_COLOR[g.status] || "var(--text, var(--text-primary, #111827))") },
           GOAL_STATUS_LABEL[g.status] || g.status),
         el("span", { class: "muted small" }, g.quarter ? "Q " + g.quarter : "", g.quarter ? " · " : "", String(g.progress), "%")),
       el("h3", { class: "h3", style: "margin:6px 0 2px" }, esc(g.title)),

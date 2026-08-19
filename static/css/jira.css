@@ -51,7 +51,7 @@
   color: var(--on-surface);
   cursor: default;
 }
-.sprint-chip.active { background: var(--primary-container); color: #fff; }
+.sprint-chip.active { background: var(--primary-container); color: var(--surface, #fff); }
 .sprint-chip.closed { background: var(--surface-low); color: var(--muted); }
 .itype {
   display: inline-flex;
@@ -65,7 +65,7 @@
   color: var(--on-surface-variant);
 }
 .itype.epic { color: var(--primary); border-color: var(--primary); }
-.itype.story { color: #2e7d32; border-color: #2e7d32; }
+.itype.story { color: var(--success, #2e7d32); border-color: var(--success, #2e7d32); }
 .itype.bug { color: var(--error); border-color: var(--error); }
 
 .jira-card {
@@ -198,7 +198,7 @@
 }
 .progress-fill {
   height: 100%; border-radius: 999px;
-  background: var(--primary); transition: width 0.3s ease;
+  background: var(--primary); transition: transform 0.3s ease;
 }
 .goal-issues { border-top: 1px dashed var(--surface-low); margin-top: var(--sp-3); padding-top: var(--sp-3); }
 .goal-issue { padding: var(--sp-2) 0; border-bottom: 1px solid var(--surface-low); }
@@ -206,3 +206,4 @@
 /* ---------- custom fields on issue detail ---------- */
 .cf-row { padding: var(--sp-1) 0; gap: var(--sp-3); }
 .cf-row .muted { flex: 0 0 auto; }
+[data-theme="dark"] .sprint-chip.active { color: var(--on-primary); }

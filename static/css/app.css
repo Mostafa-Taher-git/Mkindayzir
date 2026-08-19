@@ -198,6 +198,11 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 .login-card .brand { justify-content: center; margin-bottom: var(--sp-6); font-size: 22px; }
 .hint { font-size: var(--fs-sm); color: var(--muted); margin-top: var(--sp-4); text-align:center; }
 
+/* ---------- Table utility ---------- */
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: var(--sp-2) var(--sp-3); text-align: left; border-bottom: 1px solid var(--border-card); }
+.table th { color: var(--text); font-weight: 600; }
+
 /* ---------- Utility ---------- */
 .row { display:flex; align-items:center; gap: var(--sp-3); }
 .row.wrap { flex-wrap: wrap; }
@@ -244,17 +249,17 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 }
 .notif.unread { background: var(--surface-lowest); border-left-color: var(--primary); }
 .notif-msg { font-size: var(--fs-sm); }
-.notif-meta { font-size: var(--fs-xs); }
+.notif-meta { font-size: 0.6875rem; }
 
 /* ---------- Knowledge Base (Phase 2) ---------- */
 .kb-list { display: flex; flex-direction: column; gap: var(--sp-3); }
 .kb-card { padding: var(--sp-4); }
-.kb-title { font-weight: 600; font-size: var(--fs-md); }
+.kb-title { font-weight: 600; font-size: 0.9375rem; }
 .pill.ok { background: var(--ok, #1a7f37); color: #fff; }
 .pill.warn { background: var(--warn, #b58105); color: #fff; }
 
 /* ---------- SLA badges (Phase 3) ---------- */
-.sla-badge { font-size: var(--fs-xs); font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.sla-badge { font-size: 0.6875rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .sla-badge.ok { background: rgba(26,127,55,.15); color: #1a7f37; }
 .sla-badge.atrisk { background: rgba(181,129,5,.18); color: #b58105; }
 .sla-badge.breached { background: rgba(197,38,38,.18); color: #c52626; }
@@ -266,7 +271,7 @@ table.tbl .ref { font-family: var(--font-mono); font-size: var(--fs-sm); color: 
 /* KB body preserves author formatting (Phase 2 fix) */
 .kb-body { white-space: pre-wrap; line-height: 1.55; }
 /* KB version-history rows */
-.version-item { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.version-item { border-bottom: 1px solid var(--border-card); padding: 8px 0; }
 /* KB cards are now real links */
 a.kb-card { display: block; text-decoration: none; color: inherit; }
 a.kb-card:hover { border-color: var(--accent); }
@@ -309,10 +314,10 @@ a.kb-card:hover { border-color: var(--accent); }
 /* ---------- Reports (Phase 4) ---------- */
 .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .report-card { text-align: center; padding: 16px; }
-.report-value { font-size: 28px; font-weight: 700; color: var(--accent); }
+.report-value { font-size: 28px; font-weight: 700; color: var(--text); }
 .report-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .trend { display: flex; flex-direction: column; gap: 4px; }
-.trend-row.chart-row { align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: 6px 0; }
+.trend-row.chart-row { align-items: center; gap: 8px; border-bottom: 1px solid var(--border-card); padding: 6px 0; }
 .trend .axis-label { width: 64px; text-align: right; padding-right: 8px; }
 .trend .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .trend .bar { height: 8px; border-radius: 4px; min-width: 2px; }

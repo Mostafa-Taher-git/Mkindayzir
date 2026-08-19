@@ -36,6 +36,8 @@
 
   let boardState = null; // cached board detail for the current board view
   let boardTab = "board"; // board | calendar | table
+  let selectedCardId = null; // last selected card on the board
+  let _boardMoveHandler = null;
 
   /* ----------------------------- helpers ----------------------------- */
   function labelColor(color) {
@@ -207,6 +209,7 @@
   }
 
   async function loadBoard(id, silent) {
+    if (_boardMoveHandler) { document.removeEventListener("keydown", _boardMoveHandler); _boardMoveHandler = null; }
     let data;
     try {
       data = await API.getBoard(id);
@@ -306,6 +309,24 @@
     } else if (boardTab === "table") {
       renderTableView(id, b, isWriter, data);
     }
+    document.addEventListener("keydown", _boardMoveHandler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "m" || e.key === "M")) {
+        e.preventDefault();
+        if (!selectedCardId || !boardState) return;
+        const lists = boardState.lists;
+        if (!lists.length) return;
+        const sel = el("select", { "aria-label": "Move to list" },
+          el("option", { value: "" }, "Move to list…"),
+          ...lists.map((l) => el("option", { value: l.id }, esc(l.title))));
+        const body = el("div", {}, el("label", { class: "field" }, el("span", { class: "label" }, "List"), sel));
+        openModal("Move card", body, async () => {
+          const targetList = sel.value;
+          if (!targetList) { toast("Pick a list.", "error"); return false; }
+          try { await doMove(selectedCardId, Number(targetList), null, null); return true; }
+          catch (err) { toast(err.message, "error"); return false; }
+        });
+      }
+    });
     return shell(boardEl);
   }
 
@@ -488,6 +509,7 @@
 
   /* --------------------------- card modal --------------------------- */
   function openCardModal(card) {
+    selectedCardId = card.id;
     const data = boardState;
     const b = data.board;
     const canEdit = data.members.some((m) => m.id === OD.h.currentUser().id &&

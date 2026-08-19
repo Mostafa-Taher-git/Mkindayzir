@@ -144,7 +144,7 @@
 .md blockquote {
   margin: var(--sp-2) 0;
   padding: var(--sp-2) var(--sp-3);
-  border-left: 3px solid var(--primary);
+  border-left: 2px solid var(--primary);
   color: var(--on-surface-variant);
   background: var(--surface-low);
   border-radius: 0 var(--r) var(--r) 0;

@@ -323,6 +323,9 @@
     const backdrop = el("div", { class: "drawer-backdrop", onclick: closeMobileDrawer });
     root.appendChild(backdrop);
     root.appendChild(drawer);
+    document.addEventListener("keydown", _drawerEscHandler = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); closeMobileDrawer(); }
+    });
   }
 
   function closeMobileDrawer() {
@@ -331,6 +334,7 @@
     const backdrop = root.querySelector(".drawer-backdrop");
     if (drawer) drawer.remove();
     if (backdrop) backdrop.remove();
+    if (_drawerEscHandler) { document.removeEventListener("keydown", _drawerEscHandler); _drawerEscHandler = null; }
   }
 
   function toggleTheme() {
@@ -345,6 +349,7 @@
 
   /* ----------------------------- modal ----------------------------- */
   let _modalKeyHandler = null;
+  let _drawerEscHandler = null;
   function openModal(title, body, onSave) {
     closeModal();
     const modal = el("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": title, tabindex: "-1" },

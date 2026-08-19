@@ -145,6 +145,16 @@
 
     setTimeout(() => input.focus(), 0);
     document.addEventListener("keydown", paletteKey);
+    document.addEventListener("keydown", _paletteFocusTrap = (e) => {
+      if (e.key === "Tab") {
+        const focusables = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
   }
   function paletteKey(e) {
     if (e.key === "Escape") { e.preventDefault(); closePalette(); }
@@ -156,6 +166,7 @@
   function closePalette() {
     if (!_palette) return;
     document.removeEventListener("keydown", paletteKey);
+    if (_paletteFocusTrap) { document.removeEventListener("keydown", _paletteFocusTrap); _paletteFocusTrap = null; }
     _palette.backdrop.remove();
     _palette = null;
   }
