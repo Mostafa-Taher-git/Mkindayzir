@@ -144,8 +144,8 @@ def list_entity_links():
         return jsonify(error="Invalid source_id"), 400
     rows = db.get_db().execute(
         "SELECT id, source_type, source_id, target_type, target_id, created_at "
-        "FROM entity_links WHERE source_type=? AND source_id=? ORDER BY id",
-        (st, si)).fetchall()
+        "FROM entity_links WHERE (source_type=? AND source_id=?) OR (target_type=? AND target_id=?) ORDER BY id",
+        (st, si, st, si)).fetchall()
     return jsonify(links=[dict(r) for r in rows])
 
 
