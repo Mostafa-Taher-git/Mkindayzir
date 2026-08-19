@@ -15,6 +15,9 @@ from .helpers import encrypt_secret, decrypt_secret
 
 settingsbp = Blueprint("settings", __name__)
 
+# Upper bound for the free-text OpenRouter model id we store and forward.
+MAX_AI_MODEL = 200
+
 
 @settingsbp.route("/api/settings/ai", methods=["GET"])
 @helpers.login_required
@@ -43,6 +46,8 @@ def save_ai_settings():
     data = request.get_json(silent=True) or {}
     raw_key = (data.get("api_key") or "").strip()
     model = (data.get("model") or "").strip()
+    if len(model) > MAX_AI_MODEL:
+        return jsonify(error=f"Model id must be {MAX_AI_MODEL} characters or fewer"), 400
 
     # Preserve existing key unless caller explicitly sends a new key or an
     # explicit empty string to clear it.

@@ -115,7 +115,13 @@ def create_issue(user, args):
     if not summary:
         raise ToolError("Missing required argument 'summary'", 400)
 
+    if len(summary) > config.MAX_SUBJECT:
+        raise ToolError(
+            f"Summary must be {config.MAX_SUBJECT} characters or fewer", 400)
     description = args.get("description") or ""
+    if len(description) > config.MAX_DESCRIPTION:
+        raise ToolError(
+            f"Description must be {config.MAX_DESCRIPTION} characters or fewer", 400)
     priority = (args.get("priority") or "normal").strip() or "normal"
     if priority not in config.PRIORITIES:
         priority = "normal"
@@ -162,13 +168,15 @@ def update_issue_status(user, args):
         raise ToolError(f"Issue {issue_key} not found", 404)
     issue = dict(row)
 
-    allowed = (
-        user["role"] in _AGENT_PLUS
-        or issue["requester_id"] == user["id"]
-        or issue["assignee_id"] == user["id"]
-    )
-    if not allowed:
+    # Parity with the REST endpoint (POST /api/jira/issues/<id>/status), which
+    # is agent/manager/admin only. Without this a requester could drive a status
+    # change through the AI tool that the HTTP API refuses with 403.
+    if user["role"] not in _AGENT_PLUS:
         raise ToolError("Not allowed to change this issue", 403)
+    if not _issue_visible_to(user, issue):
+        raise ToolError("Not allowed to change this issue", 403)
+    if status not in config.STATUSES:
+        raise ToolError(f"Unknown status '{status}'", 400)
 
     cur.execute(
         "UPDATE jira_issues SET status=?, updated_at=? WHERE id=?",

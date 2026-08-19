@@ -126,12 +126,14 @@ def test_legacy_tables_renamed_to_backup(legacy_app):
     conn = sqlite3.connect(path)
     tables = {r[0] for r in conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
-    assert "_backup_tickets" in tables
-    assert "_backup_kb_articles" in tables
-    assert "_backup_notifications" in tables
+    # Phase 7: _backup_* tables are dropped after a successful migration.
+    assert "_backup_tickets" not in tables
+    assert "_backup_kb_articles" not in tables
+    assert "_backup_notifications" not in tables
     assert "tickets" not in tables          # legacy names are gone
     assert "kb_articles" not in tables
     assert "jira_issues" in tables
+    assert "kb_notes" in tables             # new KB table present
     conn.close()
 
 

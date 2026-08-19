@@ -81,6 +81,7 @@ def login():
 
 
 @auth.route("/api/auth/logout", methods=["POST"])
+@helpers.csrf_protect
 def logout():
     session.clear()
     return jsonify(ok=True)

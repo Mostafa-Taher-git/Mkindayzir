@@ -763,17 +763,27 @@ def list_versions(nid):
 @kb_vault.route("/api/kb/<int:nid>/links", methods=["GET"])
 @helpers.login_required
 def list_links(nid):
-    a = db.get_db().execute("SELECT id FROM kb_notes WHERE id=?", (nid,)).fetchone()
+    a = db.get_db().execute(
+        "SELECT id, status FROM kb_notes WHERE id=?", (nid,)).fetchone()
     if not a:
         return jsonify(error="Not found"), 404
+    # RBAC: requesters only ever see published knowledge (same rule as
+    # get_note/list_versions). These rows are SELECT n.*, i.e. they carry the
+    # full note body, so an unfiltered join would leak draft content.
+    is_requester = request.current_user["role"] == config.ROLE_REQUESTER
+    if is_requester and a["status"] != "published":
+        return jsonify(error="Not found"), 404
+    pub_filter = " AND n.status='published'" if is_requester else ""
     outbound = db.get_db().execute(
         "SELECT n.*, l.created_at AS linked_at FROM kb_wikilinks l "
-        "JOIN kb_notes n ON n.id = l.target_note_id WHERE l.source_note_id=?",
+        "JOIN kb_notes n ON n.id = l.target_note_id WHERE l.source_note_id=?"
+        + pub_filter,
         (nid,),
     ).fetchall()
     inbound = db.get_db().execute(
         "SELECT n.*, l.created_at AS linked_at FROM kb_wikilinks l "
-        "JOIN kb_notes n ON n.id = l.source_note_id WHERE l.target_note_id=?",
+        "JOIN kb_notes n ON n.id = l.source_note_id WHERE l.target_note_id=?"
+        + pub_filter,
         (nid,),
     ).fetchall()
     return jsonify(outbound=[dict(r) for r in outbound], inbound=[dict(r) for r in inbound])
@@ -920,6 +930,7 @@ def patch_folder(fid):
 
 @kb_vault.route("/api/kb/folders/<int:fid>", methods=["DELETE"])
 @helpers.role_required(config.ROLE_ADMIN)
+@helpers.csrf_protect
 def delete_folder(fid):
     conn = db.get_db()
     f = conn.execute("SELECT * FROM kb_folders WHERE id=?", (fid,)).fetchone()

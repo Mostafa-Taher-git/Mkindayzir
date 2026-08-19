@@ -885,10 +885,10 @@ def _migrate_v2(db):
 
     Atomic: legacy tables are renamed to _backup_* and their rows copied into
     the new tables inside a SINGLE transaction — any failure rolls everything
-    back. Backups are kept (never dropped) until Phase 7 verification passes.
+    back. Once the copy succeeds, the _backup_* tables are DROPPED (Phase 7).
 
-    Idempotent: once _backup_tickets exists, the migration is considered done
-    and this is a no-op on every later startup.
+    Idempotent: once the legacy 'tickets' table is renamed away, the
+    migration is considered done and is a no-op on re-runs.
 
     The id mapping (ticket_id -> issue_id, article_id -> note_id) is built in
     Python from the real issue_key/title values because old ticket_refs are NOT
@@ -898,7 +898,11 @@ def _migrate_v2(db):
     """
     import json as _json
 
-    if _table_exists(db, "_backup_tickets") or not _table_exists(db, "tickets"):
+    # Idempotent: run the migration ONLY when a legacy 'tickets' table is
+    # still present (it is renamed away during a successful migration, so a
+    # later run sees no 'tickets' and skips cleanly). This no longer keys off
+    # the _backup_* tables, which are dropped at the end of a successful run.
+    if not _table_exists(db, "tickets"):
         return
     # A brand-new install also has legacy tables (created empty by
     # LEGACY_SCHEMA); there is nothing to migrate — keep the DB pristine.
@@ -1110,6 +1114,19 @@ def _migrate_v2(db):
     except Exception:
         db.rollback()
         raise
+    else:
+        # Phase 7: migration verified complete — drop the _backup_* tables.
+        # They are no longer needed for reversibility (all rows now live in
+        # the new schema). Done outside the copy transaction, with FK checks
+        # off, because some backups are still referenced by others' foreign
+        # keys and SQLite forbids PRAGMA foreign_keys changes mid-transaction.
+        db.execute("PRAGMA foreign_keys = OFF")
+        try:
+            for backup in RENAMES.values():
+                db.execute(f"DROP TABLE IF EXISTS {backup}")
+        finally:
+            db.execute("PRAGMA foreign_keys = ON")
+        db.commit()
 
 
 def _seed_workflow(db):
