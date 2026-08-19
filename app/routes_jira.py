@@ -219,6 +219,7 @@ def create_issue():
         return jsonify(error=f"Description must be {config.MAX_DESCRIPTION} characters or fewer"), 400
     if priority not in config.PRIORITIES:
         return jsonify(error="Invalid priority"), 400
+    cat = None
     if category_id is not None:
         cat = db.get_db().execute(
             "SELECT id, default_team_id, active FROM categories WHERE id=?", (category_id,)).fetchone()
@@ -232,11 +233,8 @@ def create_issue():
         effective_team = team_id
     else:
         effective_team = None
-    if not effective_team:
-        cat = db.get_db().execute(
-            "SELECT default_team_id FROM categories WHERE id=?", (category_id,)).fetchone()
-        if cat and cat["default_team_id"]:
-            effective_team = cat["default_team_id"]
+    if not effective_team and cat is not None:
+        effective_team = cat["default_team_id"]
     team_id = effective_team
 
     # Requester is whoever is logged in, UNLESS an agent/manager creates on
@@ -503,7 +501,7 @@ def change_status(iid):
         return jsonify(error="Forbidden"), 403
 
     data = request.get_json(silent=True) or {}
-    to = data.get("status")
+    to = data.get("to_status") or data.get("status")
     note = data.get("note") or data.get("blocked_reason") or ""
 
     allowed, reason_required = lifecycle.can_transition(

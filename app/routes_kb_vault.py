@@ -1015,7 +1015,7 @@ def create_note_v2():
         return jsonify(error="Only agents, managers and admins can author notes"), 403
     data = request.get_json(force=True, silent=True) or {}
     title = (data.get("title") or "").strip()
-    content = (data.get("content") or "").strip()
+    content = (data.get("content") or data.get("body") or "").strip()
     if not title or not content:
         return jsonify(error="Title and content are required"), 400
     if len(content) > config.MAX_KB_BODY:
@@ -1087,7 +1087,7 @@ def edit_note_v2(nid):
     data = request.get_json(force=True, silent=True) or {}
     title = (data.get("title") if data.get("title") is not None
              else a["title"]).strip()
-    content = data.get("content")
+    content = data.get("content") or data.get("body")
     if content is not None:
         content = content.strip()
     else:

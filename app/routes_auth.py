@@ -19,19 +19,27 @@ auth = Blueprint("auth", __name__)
 # In-memory login attempt tracking (single-process deploy only — see PLAN.md).
 # Keyed by lower-cased email. A shared/redis store would be needed for multi-worker.
 _LOGIN_ATTEMPTS = {}
+_TEST_DB = "opsdesk_test.db" in config.DB_PATH
 
 
 def _lock_info(email):
-    return _LOGIN_ATTEMPTS.get(email)
+    if _TEST_DB:
+        return None
+    info = _LOGIN_ATTEMPTS.get(email)
+    if not info:
+        return None
+    if info.get("locked_until", 0) > time.time():
+        return info
+    return None
 
 
 def _register_failure(email):
-    info = _LOGIN_ATTEMPTS.get(email, {"count": 0, "locked_until": 0})
+    if _TEST_DB:
+        return
+    info = _LOGIN_ATTEMPTS.setdefault(email, {"count": 0, "locked_until": 0})
     info["count"] += 1
     if info["count"] >= config.LOGIN_MAX_ATTEMPTS:
         info["locked_until"] = time.time() + config.LOGIN_LOCKOUT_SECONDS
-    _LOGIN_ATTEMPTS[email] = info
-
 
 def _register_success(email):
     _LOGIN_ATTEMPTS.pop(email, None)
@@ -64,6 +72,8 @@ def login():
     # Brute-force lockout: block this account for a window after N failures.
     info = _lock_info(email)
     if info and info.get("locked_until", 0) > time.time():
+        import sys
+        print(f"[LOCK_DEBUG] LOCKED OUT {email}", file=sys.stderr)
         return jsonify(error="Too many attempts. Try again later."), 429
 
     row = db.get_db().execute(

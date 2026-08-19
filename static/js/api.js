@@ -179,10 +179,13 @@ const API = (() => {
     // Notes
     listKbNotes:   (params = {}) => req("GET", "/api/kb/notes?" + new URLSearchParams(params).toString()),
     createKbNote:  (payload) => req("POST", "/api/kb/notes", payload),
+    createKb:      (payload) => req("POST", "/api/kb/notes", payload),
     getKbNote:     (id) => req("GET", `/api/kb/notes/${id}`),
     updateKbNote:  (id, payload) => req("PATCH", `/api/kb/notes/${id}`, payload),
+    updateKb:       (id, payload) => req("PATCH", `/api/kb/notes/${id}`, payload),
     deleteKbNote:  (id) => req("DELETE", `/api/kb/notes/${id}`),
     publishKbNote: (id) => req("POST", `/api/kb/notes/${id}/publish`),
+    publishKb:      (id) => req("POST", `/api/kb/notes/${id}/publish`),
     kbNoteFeedback: (id, helpful, comment) => req("POST", `/api/kb/notes/${id}/feedback`, { helpful, comment }),
     kbNoteVersions: (id) => req("GET", `/api/kb/notes/${id}/versions`),
     kbNoteVersionDiff: (id, vid) => req("GET", `/api/kb/notes/${id}/versions/${vid}/diff`),
