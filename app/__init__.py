@@ -24,6 +24,7 @@ from .routes_ai import aibp as ai_bp
 from .routes_ai_agent import ai_agent as ai_agent_bp
 from .routes_settings import settingsbp as settings_bp
 from .routes_trello import trello as trello_bp
+from .routes_help import help as help_bp
 
 
 def create_app():
@@ -64,6 +65,7 @@ def create_app():
     app.register_blueprint(ai_agent_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(trello_bp)
+    app.register_blueprint(help_bp)
 
     # ---- Serve the single-page frontend ----
     # The shell is just static markup, so it does NOT require login. Client-side

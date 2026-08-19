@@ -172,6 +172,8 @@
     "/trello/board": views.trelloBoard,
     // Phase 4A — AI Chat Core (views/ai.js loads before this file)
     "/ai": views.aiChat,
+    // Phase 5 - Help Center (views/help.js loads before this file)
+    "/help": views.helpCenter,
   };
 
   function navigate(hash) {
@@ -262,6 +264,8 @@
     // Phase 4A — AI Chat Core
     items.push(["", "AI Copilot", ""]);
     items.push(["/ai", "AI Copilot", "🤖"]);
+    // Phase 5 - Help Center
+    items.push(["/help", "Help Center", "❓"]);
     if (isAdmin()) items.push(["/admin", "Admin", "⚙️"]);
     items.push(["/settings", "Settings", "🔑"]);
     return items;
@@ -456,6 +460,12 @@
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
         if (OD.views.openAiDrawer) { e.preventDefault(); OD.views.openAiDrawer(); }
+      }
+      // Phase 5 - "?" opens the Help Center (ignore when typing in a field).
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const t = e.target;
+        const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+        if (!typing && OD.views.helpCenter) { e.preventDefault(); navigate("/help"); }
       }
     });
     API.me().then(({ user, ai_enabled }) => {

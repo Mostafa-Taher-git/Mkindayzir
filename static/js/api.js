@@ -290,5 +290,13 @@ const API = (() => {
     adminCreateUser: (u) => req("POST", "/api/admin/users", u),
     adminUpdateUser: (id, u) => req("PATCH", `/api/admin/users/${id}`, u),
     adminDeleteUser: (id) => req("DELETE", `/api/admin/users/${id}`),
+
+    // Phase 5 — Help Center
+    helpGuides:     () => req("GET", "/api/help/guides"),
+    helpGuide:      (tab) => req("GET", `/api/help/guides/${tab}`),
+    helpProgress:   () => req("GET", "/api/help/progress"),
+    recordMilestone: (key) => req("POST", "/api/help/progress", { milestone_key: key }),
+    helpShortcuts:  () => req("GET", "/api/help/shortcuts"),
+    helpTour:       (key) => req("GET", `/api/help/tours/${key}`),
   };
 })();

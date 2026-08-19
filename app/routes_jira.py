@@ -277,6 +277,11 @@ def create_issue():
         "UPDATE jira_projects SET next_seq=? WHERE id=?", (seq + 1, project_id))
     db.get_db().commit()
     iid = cur.lastrowid
+    try:
+        from .helpers import record_milestone
+        record_milestone(request.current_user["id"], "created_first_issue")
+    except Exception:
+        pass
     _log(iid, request.current_user["id"], "created", note=f"Issue {key} created")
     # Phase 3: attach the matching SLA policy (once) at creation time.
     sla.attach_sla(_fetch(iid))

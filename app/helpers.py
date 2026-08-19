@@ -192,6 +192,14 @@ def log_activity(entity_type, entity_id, actor_id, action, detail=None,
     db.get_db().commit()
 
 
+def record_milestone(user_id, key):
+    """Idempotently record an onboarding milestone for a user."""
+    db.get_db().execute(
+        "INSERT OR IGNORE INTO user_milestones (user_id, milestone_key, completed_at) VALUES (?,?,?)",
+        (user_id, key, db.now_iso()))
+    db.get_db().commit()
+
+
 def audit(user_id, action, entity_type=None, entity_id=None, details=None):
     """Record an administrative action in the audit log (Master Plan §4.1)."""
     db.get_db().execute(
