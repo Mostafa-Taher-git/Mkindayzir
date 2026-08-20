@@ -273,3 +273,81 @@ export type ProviderConfig = {
   apiKey: string;
   customBaseUrl?: string;
 };
+
+export interface DashboardSummary {
+  totalProjects: number;
+  openWorkItems: number;
+  assignedToMe: number;
+  overdueItems: number;
+}
+
+export interface WorkloadAssignee {
+  id: string;
+  displayName: string;
+  email: string;
+}
+
+export interface WorkloadItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  project: { key: string; name: string } | null;
+}
+
+export interface WorkloadGroup {
+  assignee: WorkloadAssignee;
+  items: WorkloadItem[];
+  count: number;
+}
+
+export interface VelocityIteration {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface VelocityGroup {
+  iteration: VelocityIteration;
+  totalPoints: number;
+  count: number;
+}
+
+export interface TrendDay {
+  date: string;
+  created: number;
+  resolved: number;
+}
+
+export type ReportType = "summary" | "workload" | "velocity" | "trends";
+
+export interface Guide {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  category: string;
+  order: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuidesResponse {
+  guides: Guide[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export type SearchResult = {
+  type: "work_item" | "vault_note" | "guide";
+  id: string;
+  title: string;
+  excerpt?: string;
+  score: number;
+};
