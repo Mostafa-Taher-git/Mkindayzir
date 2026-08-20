@@ -1,0 +1,726 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  displayName   String
+  avatar        String?
+  role          UserRole  @default(MEMBER)
+  status        UserStatus @default(ACTIVE)
+  timezone      String    @default("UTC")
+  preferences   Json      @default("{}")
+  aiApiKey      String?
+  aiProvider    String?
+  aiModel       String?
+  lastActiveAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  teamMemberships  TeamMember[]
+  assignedItems    WorkItem[]     @relation("assignee")
+  reportedItems    WorkItem[]     @relation("reporter")
+  createdProjects  Project[]
+  cards            CardMember[]
+  comments         Comment[]
+  activities       Activity[]
+  notifications    Notification[]
+  conversations    Conversation[]
+  sessions         Session[]
+  vaultNotes       VaultNote[]    @relation("author")
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  members  TeamMember[]
+  projects Project[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id     String   @id @default(cuid())
+  userId String
+  teamId String
+  role   TeamRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  leadId      String?
+  teamId      String?
+  settings    Json          @default("{}")
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  lead       User?       @relation(fields: [createdById], references: [id])
+  team       Team?       @relation(fields: [teamId], references: [id])
+  workItems  WorkItem[]
+  iterations Iteration[]
+  initiatives Initiative[]
+  workflows  Workflow[]
+  labels     Label[]
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+
+model WorkItem {
+  id           String         @id @default(cuid())
+  projectId    String
+  number       Int
+  type         WorkItemType
+  title        String
+  description  String?
+  status       String
+  priority     Priority       @default(MEDIUM)
+  assigneeId   String?
+  reporterId   String
+  initiativeId String?
+  iterationId  String?
+  parentId     String?
+  storyPoints  Int?
+  dueDate      DateTime?
+  resolvedAt   DateTime?
+  metadata     Json           @default("{}")
+  position     Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  project    Project     @relation(fields: [projectId], references: [id])
+  assignee   User?       @relation("assignee", fields: [assigneeId], references: [id])
+  reporter   User        @relation("reporter", fields: [reporterId], references: [id])
+  initiative Initiative? @relation(fields: [initiativeId], references: [id])
+  iteration  Iteration?  @relation(fields: [iterationId], references: [id])
+  parent     WorkItem?   @relation("subtasks", fields: [parentId], references: [id])
+  children   WorkItem[]  @relation("subtasks")
+  labels     WorkItemLabel[]
+  links      WorkItemLink[] @relation("source")
+  linkedBy   WorkItemLink[] @relation("target")
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@index([assigneeId])
+  @@index([iterationId])
+  @@map("work_items")
+}
+
+enum WorkItemType {
+  TASK
+  BUG
+  FEATURE
+  IMPROVEMENT
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model WorkItemLink {
+  id           String   @id @default(cuid())
+  sourceId     String
+  targetId     String
+  linkType     LinkType
+  createdAt    DateTime @default(now())
+
+  source WorkItem @relation("source", fields: [sourceId], references: [id], onDelete: Cascade)
+  target WorkItem @relation("target", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, linkType])
+  @@map("work_item_links")
+}
+
+enum LinkType {
+  BLOCKS
+  BLOCKED_BY
+  RELATES_TO
+  DUPLICATES
+  PARENT_OF
+  CHILD_OF
+}
+
+model Iteration {
+  id        String          @id @default(cuid())
+  projectId String
+  name      String
+  goal      String?
+  status    IterationStatus @default(PLANNING)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  project   Project    @relation(fields: [projectId], references: [id])
+  workItems WorkItem[]
+
+  @@map("iterations")
+}
+
+enum IterationStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Initiative {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  status      InitiativeStatus @default(OPEN)
+  progress    Float           @default(0)
+  startDate   DateTime?
+  targetDate  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project   Project    @relation(fields: [projectId], references: [id])
+  workItems WorkItem[]
+
+  @@map("initiatives")
+}
+
+enum InitiativeStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Workflow {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  statuses  Json
+  transitions Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("workflows")
+}
+
+model Label {
+  id        String @id @default(cuid())
+  projectId String
+  name      String
+  color     String
+  createdAt DateTime @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id])
+  workItems WorkItemLabel[]
+
+  @@unique([projectId, name])
+  @@map("labels")
+}
+
+model WorkItemLabel {
+  workItemId String
+  labelId    String
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  label    Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, labelId])
+  @@map("work_item_labels")
+}
+
+model Space {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  visibility  Visibility @default(PRIVATE)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  boards  Board[]
+  members SpaceMember[]
+
+  @@map("spaces")
+}
+
+enum Visibility {
+  PRIVATE
+  TEAM
+  PUBLIC
+}
+
+model SpaceMember {
+  id      String    @id @default(cuid())
+  spaceId String
+  userId  String
+  role    SpaceRole @default(MEMBER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId])
+  @@map("space_members")
+}
+
+enum SpaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  spaceId     String
+  name        String
+  description String?
+  background  String?
+  settings    Json     @default("{}")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  space   Space    @relation(fields: [spaceId], references: [id])
+  columns Column[]
+  boardLabels BoardLabel[]
+
+  @@map("boards")
+}
+
+model Column {
+  id       String @id @default(cuid())
+  boardId  String
+  name     String
+  position Int    @default(0)
+  limit    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@map("columns")
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  columnId    String
+  title       String
+  description String?
+  position    Int       @default(0)
+  dueDate     DateTime?
+  coverImage  String?
+  metadata    Json      @default("{}")
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  column     Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  members    CardMember[]
+  checklists Checklist[]
+  cardLabels CardLabel[]
+
+  @@index([columnId, position])
+  @@map("cards")
+}
+
+model CardMember {
+  cardId String
+  userId String
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@map("card_members")
+}
+
+model Checklist {
+  id       String @id @default(cuid())
+  cardId   String
+  name     String
+  position Int    @default(0)
+
+  card  Card            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String  @id @default(cuid())
+  checklistId String
+  title       String
+  isCompleted Boolean @default(false)
+  position    Int     @default(0)
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@map("checklist_items")
+}
+
+model BoardLabel {
+  id      String @id @default(cuid())
+  boardId String
+  name    String
+  color   String
+
+  board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards CardLabel[]
+
+  @@unique([boardId, name])
+  @@map("board_labels")
+}
+
+model CardLabel {
+  cardId  String
+  labelId String
+
+  card  Card       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label BoardLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@map("card_labels")
+}
+
+model VaultFolder {
+  id       String  @id @default(cuid())
+  parentId String?
+  name     String
+  path     String
+  position Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  parent   VaultFolder?  @relation("subfolders", fields: [parentId], references: [id])
+  children VaultFolder[] @relation("subfolders")
+  notes    VaultNote[]
+
+  @@unique([parentId, name])
+  @@map("vault_folders")
+}
+
+model VaultNote {
+  id        String     @id @default(cuid())
+  folderId  String?
+  title     String
+  slug      String     @unique
+  content   String
+  excerpt   String?
+  status    NoteStatus @default(DRAFT)
+  authorId  String
+  metadata  Json       @default("{}")
+  version   Int        @default(1)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+  publishedAt DateTime?
+
+  folder    VaultFolder? @relation(fields: [folderId], references: [id])
+  author    User         @relation("author", fields: [authorId], references: [id])
+  tags      NoteTag[]
+  outLinks  InternalLink[] @relation("source")
+  inLinks   InternalLink[] @relation("target")
+  versions  NoteVersion[]
+  feedback  NoteFeedback[]
+
+  @@index([folderId])
+  @@index([authorId])
+  @@map("vault_notes")
+}
+
+enum NoteStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model NoteVersion {
+  id       String   @id @default(cuid())
+  noteId   String
+  version  Int
+  title    String
+  content  String
+  editedBy String
+  createdAt DateTime @default(now())
+
+  note VaultNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, version])
+  @@map("note_versions")
+}
+
+model InternalLink {
+  id       String @id @default(cuid())
+  sourceId String
+  targetId String
+  context  String?
+
+  source VaultNote @relation("source", fields: [sourceId], references: [id], onDelete: Cascade)
+  target VaultNote @relation("target", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+  @@map("internal_links")
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  color String?
+
+  notes NoteTag[]
+
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+
+  note VaultNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
+
+model NoteFeedback {
+  id       String @id @default(cuid())
+  noteId   String
+  userId   String
+  helpful  Boolean
+  comment  String?
+  createdAt DateTime @default(now())
+
+  note VaultNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, userId])
+  @@map("note_feedback")
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  model     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  user     User      @relation(fields: [userId], references: [id])
+  messages Message[]
+
+  @@index([userId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  toolCalls      Json?
+  toolResults    Json?
+  model          String?
+  tokens         Int?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  authorId   String
+  content    String
+  parentId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  author   User      @relation(fields: [authorId], references: [id])
+  parent   Comment?  @relation("replies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("replies")
+
+  @@index([entityType, entityId])
+  @@map("comments")
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  storagePath String
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  userId     String
+  action     String
+  changes    Json?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("activities")
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  body       String?
+  entityType String?
+  entityId   String?
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Guide {
+  id          String      @id @default(cuid())
+  title       String
+  slug        String      @unique
+  content     String
+  category    String
+  order       Int         @default(0)
+  status      GuideStatus @default(PUBLISHED)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("guides")
+}
+
+enum GuideStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}

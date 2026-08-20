@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+.next
+out
+dist
+
+# Testing
+coverage
+playwright-report
+test-results
+
+# Environment
+.env.local
+.env*.local
+
+# Database
+prisma/migrations/*.sql
+!prisma/migrations/migration_lock.toml
+
+# Uploads
+data/uploads
+data/backups
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Misc
+*.pem
+*.key

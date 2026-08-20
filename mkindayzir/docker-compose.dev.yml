@@ -1,0 +1,45 @@
+services:
+  mkindayzir:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://mkindayzir:${POSTGRES_PASSWORD}@db:5432/mkindayzir
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://localhost:3000
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - NODE_ENV=development
+      - BASE_URL=http://localhost:3000
+      - PORT=3000
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - upload-data:/app/data/uploads
+      - backup-data:/app/data/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=mkindayzir
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=mkindayzir
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mkindayzir -d mkindayzir"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  upload-data:
+  backup-data:
+  db-data:

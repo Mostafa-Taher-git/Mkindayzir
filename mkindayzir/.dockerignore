@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env*
+data/
+prisma/migrations/
+tests/
+playwright-report/
+test-results/
