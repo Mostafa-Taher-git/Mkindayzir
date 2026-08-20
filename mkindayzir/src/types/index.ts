@@ -235,3 +235,41 @@ export type VaultNoteFilter = {
   page?: number;
   perPage?: number;
 };
+
+export type MessageRole = "USER" | "ASSISTANT" | "SYSTEM" | "TOOL";
+
+export type Conversation = {
+  id: string;
+  userId: string;
+  title: string | null;
+  model: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Message = {
+  id: string;
+  conversationId: string;
+  role: MessageRole;
+  content: string;
+  toolCalls?: Record<string, unknown>;
+  toolResults?: Record<string, unknown>;
+  model?: string | null;
+  tokens?: number | null;
+  createdAt: string;
+};
+
+export type ProviderType = "openrouter" | "openai" | "anthropic" | "custom";
+
+export type AITool = {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+};
+
+export type ProviderConfig = {
+  provider: ProviderType;
+  model: string;
+  apiKey: string;
+  customBaseUrl?: string;
+};
