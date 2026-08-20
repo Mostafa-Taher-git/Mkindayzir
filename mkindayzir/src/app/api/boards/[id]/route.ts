@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
-import { BoardLabelService } from "@/services/board-label.service";
+import { BoardService } from "@/services/board.service";
 
-const boardLabelService = new BoardLabelService();
+const boardService = new BoardService();
 
 const updateBodySchema = z.object({
   name: z.string().min(1).optional(),
-  color: z.string().min(1).optional(),
+  description: z.string().optional(),
+  background: z.string().optional(),
+  settings: z.record(z.string(), z.any()).optional(),
 });
 
 export async function GET(
@@ -21,11 +23,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const label = await boardLabelService.get(id, session.user);
-    return NextResponse.json({ label });
+    const board = await boardService.get(id, session.user);
+    return NextResponse.json({ board });
   } catch {
     return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Label not found" } },
+      { error: { code: "NOT_FOUND", message: "Board not found" } },
       { status: 404 }
     );
   }
@@ -45,14 +47,14 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const label = await boardLabelService.update(id, parsed, session.user);
-    return NextResponse.json({ label });
+    const board = await boardService.update(id, parsed, session.user);
+    return NextResponse.json({ board });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: error.message } }, { status: 400 });
     }
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to update label" } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to update board" } },
       { status: 500 }
     );
   }
@@ -69,11 +71,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await boardLabelService.delete(id, session.user);
+    await boardService.delete(id, session.user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to delete label" } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to delete board" } },
       { status: 500 }
     );
   }

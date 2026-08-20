@@ -8,6 +8,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   DASHBOARD: "/dashboard",
   PROJECTS: "/dashboard/projects",
+  SPACES: "/dashboard/spaces",
   BOARDS: "/dashboard/boards",
   VAULT: "/dashboard/vault",
   ASSISTANT: "/dashboard/assistant",
@@ -65,3 +66,41 @@ export const VISIBILITIES = [
   { value: "TEAM", label: "Team" },
   { value: "PUBLIC", label: "Public" },
 ] as const;
+
+export const SPACE_ROLES = [
+  { value: "OWNER", label: "Owner" },
+  { value: "ADMIN", label: "Admin" },
+  { value: "MEMBER", label: "Member" },
+  { value: "VIEWER", label: "Viewer" },
+] as const;
+
+export const BOARD_BACKGROUNDS = [
+  { value: "#ffffff", label: "White" },
+  { value: "#f3f4f6", label: "Light Gray" },
+  { value: "#1f2937", label: "Dark" },
+  { value: "#0ea5e9", label: "Sky Blue" },
+  { value: "#10b981", label: "Emerald" },
+  { value: "#f59e0b", label: "Amber" },
+  { value: "#ef4444", label: "Red" },
+  { value: "#8b5cf6", label: "Violet" },
+] as const;
+
+export const VIEW_MODES = [
+  { value: "kanban", label: "Kanban" },
+  { value: "table", label: "Table" },
+] as const;
+
+export const NOTE_STATUSES = [
+  { value: "DRAFT", label: "Draft" },
+  { value: "PUBLISHED", label: "Published" },
+  { value: "ARCHIVED", label: "Archived" },
+] as const;
+
+export const VAULT_ROUTES = {
+  HOME: "/dashboard/vault",
+  FOLDERS: "/dashboard/vault/folders",
+  NOTES: "/dashboard/vault/notes",
+  NEW_NOTE: "/dashboard/vault/notes/new",
+  GRAPH: "/dashboard/vault/graph",
+  TAGS: "/dashboard/vault/tags",
+} as const;

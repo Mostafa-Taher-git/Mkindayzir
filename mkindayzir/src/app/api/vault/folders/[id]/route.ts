@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { z } from "zod";
-import { BoardLabelService } from "@/services/board-label.service";
+import { VaultService } from "@/services/vault.service";
 
-const boardLabelService = new BoardLabelService();
+const vaultService = new VaultService();
 
 const updateBodySchema = z.object({
   name: z.string().min(1).optional(),
-  color: z.string().min(1).optional(),
+  parentId: z.string().optional(),
+  path: z.string().optional(),
 });
 
 export async function GET(
@@ -21,11 +23,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const label = await boardLabelService.get(id, session.user);
-    return NextResponse.json({ label });
+    const folder = await vaultService.getFolder(id, session.user);
+    return NextResponse.json({ folder });
   } catch {
     return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Label not found" } },
+      { error: { code: "NOT_FOUND", message: "Folder not found" } },
       { status: 404 }
     );
   }
@@ -37,22 +39,20 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authResult = await requirePermission("manage:vault");
+    if (authResult.error) return authResult.error;
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const label = await boardLabelService.update(id, parsed, session.user);
-    return NextResponse.json({ label });
+    const folder = await vaultService.updateFolder(id, parsed, authResult.session!.user);
+    return NextResponse.json({ folder });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: error.message } }, { status: 400 });
     }
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to update label" } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to update folder" } },
       { status: 500 }
     );
   }
@@ -64,16 +64,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authResult = await requirePermission("manage:vault");
+    if (authResult.error) return authResult.error;
 
-    await boardLabelService.delete(id, session.user);
+    await vaultService.deleteFolder(id, authResult.session!.user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to delete label" } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to delete folder" } },
       { status: 500 }
     );
   }
