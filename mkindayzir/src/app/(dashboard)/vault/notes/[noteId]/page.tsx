@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { VAULT_ROUTES } from "@/lib/constants";
+import { usePresence } from "@/hooks/use-presence";
+import { PresenceIndicator } from "@/components/shared/presence-indicator";
 import { VaultNote, NoteVersion } from "@/types";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteViewer } from "@/components/vault/note-viewer";
@@ -48,6 +50,12 @@ async function getFolders() {
   } catch {
     return [];
   }
+}
+
+function NotePresence({ noteId, currentUserId }: { noteId: string; currentUserId: string }) {
+  "use client";
+  const { presentUsers } = usePresence("vault_note", noteId);
+  return <PresenceIndicator users={presentUsers} currentUserId={currentUserId} />;
 }
 
 export default async function VaultNotePage({
@@ -137,6 +145,7 @@ export default async function VaultNotePage({
             )}
             <span className="text-muted-foreground">/</span>
             <span className="text-sm">{note.title || "Untitled"}</span>
+            {session && <NotePresence noteId={noteId} currentUserId={session.user.id} />}
           </div>
 
           <NoteViewer

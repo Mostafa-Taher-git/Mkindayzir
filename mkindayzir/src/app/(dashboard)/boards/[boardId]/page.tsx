@@ -60,6 +60,7 @@ export default async function BoardDetailPage({ params }: BoardDetailPageProps) 
       board={board}
       columns={columns}
       cards={cards}
+      currentUserId={session.user.id}
     />
   );
 }

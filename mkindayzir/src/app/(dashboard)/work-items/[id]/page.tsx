@@ -3,11 +3,14 @@
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { usePresence } from "@/hooks/use-presence";
+import { PresenceIndicator } from "@/components/shared/presence-indicator";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -147,6 +150,7 @@ function WorkItemDetailPage() {
               <span className="text-sm text-muted-foreground font-mono">
                 {item.project?.key || "PRJ"}-{item.number}
               </span>
+              <WorkItemPresence workItemId={id} />
               <Badge variant="secondary">{item.type}</Badge>
               <Badge variant="outline">{item.status}</Badge>
             </div>
@@ -320,6 +324,14 @@ function WorkItemDetailPage() {
       </div>
     </div>
   );
+}
+
+function WorkItemPresence({ workItemId }: { workItemId: string }) {
+  "use client";
+  const { data: session } = useSession();
+  const { presentUsers } = usePresence("work_item", workItemId);
+  if (!session?.user?.id) return null;
+  return <PresenceIndicator users={presentUsers} currentUserId={session.user.id} />;
 }
 
 export default WorkItemDetailPage;

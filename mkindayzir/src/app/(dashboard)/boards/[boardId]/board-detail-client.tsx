@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import {
   DndContext,
   DragEndEvent,
@@ -26,11 +27,14 @@ import { Board, BoardColumn, BoardCard, BoardLabel } from "@/types";
 import { ROUTES } from "@/lib/constants";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import Link from "next/link";
+import { usePresence } from "@/hooks/use-presence";
+import { PresenceIndicator } from "@/components/shared/presence-indicator";
 
 interface BoardDetailClientProps {
   board: Board;
   columns: BoardColumn[];
   cards: BoardCard[];
+  currentUserId: string;
 }
 
 type WorkItemLike = WorkItem & { id: string };
@@ -95,6 +99,15 @@ function mapCardToWorkItem(card: BoardCard, columnNameMap: Record<string, string
     iteration: undefined,
     labels: card.labels?.map((l) => ({ label: mapBoardLabelToWorkItemLabel(l.label!) })) ?? [],
   };
+}
+
+
+function BoardPresence({ boardId }: { boardId: string }) {
+  "use client";
+  const { data: session } = useSession();
+  const { presentUsers } = usePresence("board", boardId);
+  if (!session?.user?.id) return null;
+  return <PresenceIndicator users={presentUsers} currentUserId={session.user.id} />;
 }
 
 function BoardDetailClient({ board, columns: initialColumns, cards: initialCards }: BoardDetailClientProps) {
@@ -217,6 +230,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{board.name}</h1>
+            <BoardPresence boardId={board.id} />
           </div>
           {board.description && (
             <p className="text-muted-foreground mt-1">{board.description}</p>

@@ -1,3 +1,5 @@
+import { usePresence } from "@/hooks/use-presence";
+import { PresenceIndicator } from "@/components/shared/presence-indicator";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +27,12 @@ async function getProjectStats(projectId: string) {
   });
   if (!res.ok) return { total: 0, open: 0, closed: 0, backlog: 0 };
   return res.json();
+}
+
+function ProjectPresence({ projectId, currentUserId }: { projectId: string; currentUserId: string }) {
+  "use client";
+  const { presentUsers } = usePresence("project", projectId);
+  return <PresenceIndicator users={presentUsers} currentUserId={currentUserId} />;
 }
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
@@ -68,6 +76,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <Badge variant="secondary">{project.key}</Badge>
+            <ProjectPresence projectId={projectId} currentUserId={session.user.id} />
           </div>
           <p className="text-muted-foreground mt-1">
             {project.description || "No description"}
