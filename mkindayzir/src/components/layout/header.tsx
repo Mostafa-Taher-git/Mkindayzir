@@ -62,14 +62,21 @@ function Header({
   });
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4">
+    <header className="flex h-14 items-center justify-between border-b-2 border-outline bg-surface metallic-gradient px-4">
       <div className="flex items-center gap-4">
         {isMobile && (
           <Button variant="ghost" size="icon" onClick={onMenuClick}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h16" /><path d="M4 18h16" /><path d="M4 6h16" /></svg>
           </Button>
         )}
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <img
+            src="/MKINDAYZIR_logo.jpg"
+            alt="Mkindayzir"
+            className="h-8 w-auto object-contain"
+          />
+        </div>
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground font-mono uppercase tracking-wider">
           <a href={ROUTES.DASHBOARD} className="hover:text-foreground">
             Home
           </a>
@@ -106,27 +113,27 @@ function Header({
         <ConnectionStatus />
         <Button variant="ghost" size="icon" className="relative">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive border border-outline" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Button variant="ghost" className="relative h-8 w-8 border-2 border-outline">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={session?.user?.image ?? ""} alt={displayName} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent side="right" align="end" className="w-56 border-2 border-outline bg-surface">
+            <DropdownMenuLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator className="border-outline" />
             <DropdownMenuItem>
               <span>Profile</span>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="border-outline" />
             <DropdownMenuItem className="text-destructive" onSelect={handleLogout}>
               <span>Log out</span>
             </DropdownMenuItem>

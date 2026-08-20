@@ -28,3 +28,9 @@ export default NextAuth(authConfig).auth((req) => {
 
   return NextResponse.next();
 });
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|icons|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|json|css|js|map|woff2?|ttf)).*)",
+  ],
+};

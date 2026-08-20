@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Sora, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { Providers } from "@/components/shared/providers";
 import { OfflineBanner } from "@/components/shared/offline-banner";
@@ -12,14 +12,22 @@ export const metadata: Metadata = {
   description: "Self-hosted, local-first, offline-capable Work OS",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const hankenGrotesk = Hanken_Grotesk({
+  variable: "--font-hanken-grotesk",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export default function RootLayout({
@@ -30,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${sora.variable} ${hankenGrotesk.variable} ${jetBrainsMono.variable} antialiased`}
       >
         <SessionProvider>
           <Providers>{children}</Providers>

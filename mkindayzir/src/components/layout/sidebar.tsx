@@ -58,9 +58,15 @@ function Sidebar({
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4">
+      <div className="flex items-center justify-between p-4 border-b border-outline">
         {!collapsed && (
-          <span className="text-lg font-bold">Mkindayzir</span>
+          <div className="flex items-center gap-2">
+            <img
+              src="/MKINDAYZIR_logo.jpg"
+              alt="Mkindayzir"
+              className="h-8 w-auto object-contain"
+            />
+          </div>
         )}
         <Button
           variant="ghost"
@@ -83,10 +89,10 @@ function Sidebar({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors font-mono uppercase tracking-wider",
                 isActive
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  ? "border-l-primary bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-l-outline",
                 collapsed && "justify-center px-2"
               )}
             >
@@ -96,7 +102,7 @@ function Sidebar({
           );
         })}
       </nav>
-      <div className="border-t p-2">
+      <div className="border-t border-outline p-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -106,14 +112,14 @@ function Sidebar({
                 collapsed && "justify-center px-2"
               )}
             >
-              <Avatar className="h-8 w-8">
+              <Avatar className="h-8 w-8 border-2 border-outline">
                 <AvatarImage src={session?.user?.image ?? ""} alt={displayName} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               {!collapsed && (
                 <div className="flex flex-col items-start text-left">
                   <span className="text-sm font-medium">{displayName}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
                     {session?.user?.role ?? "MEMBER"}
                   </span>
                 </div>
@@ -123,16 +129,16 @@ function Sidebar({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent side="right" align="start" className="w-56 border-2 border-outline bg-surface">
+            <DropdownMenuLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator className="border-outline" />
             <DropdownMenuItem>
               <span>Profile</span>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="border-outline" />
             <DropdownMenuItem className="text-destructive" onSelect={handleLogout}>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
               <span>Log out</span>
@@ -154,7 +160,7 @@ function Sidebar({
         )}
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-background transition-transform duration-200",
+            "fixed inset-y-0 left-0 z-50 w-64 transform border-r-2 border-outline bg-surface transition-transform duration-200",
             open ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -167,7 +173,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-screen flex-col border-r bg-background transition-all duration-200",
+        "flex h-screen flex-col border-r-2 border-outline bg-surface transition-all duration-200",
         collapsed ? "w-16" : "w-64"
       )}
     >
