@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { IterationRepository } from "@/repositories/iteration.repository";
 

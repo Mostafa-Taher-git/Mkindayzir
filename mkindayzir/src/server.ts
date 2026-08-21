@@ -1,22 +1,28 @@
-import { createServer } from "http";
-import next from "next";
-import { socketServer } from "./lib/socket-server";
+// server.ts — Application entry point
+import { createServer } from 'http';
+import { parse } from 'url';
+import next from 'next';
+import { WebSocketServer } from 'ws';
+import { setupWebSocket } from './src/lib/websocket';
+import { getConfig } from './src/lib/config';
 
-const app = next({ dev: process.env.NODE_ENV !== "production" });
+const config = getConfig();
+const dev = process.env.NODE_ENV !== 'production';
+const app = next({ dev });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
-    if (typeof req.url === "string" && req.url.startsWith("/api/socket.io")) {
-      return;
-    }
-    handle(req, res);
+    handle(req, res, parse(req.url!, true));
   });
 
-  socketServer.initialize(server);
+  // Only enable WebSocket in Team/Enterprise mode
+  if (config.mode !== 'personal') {
+    const wss = new WebSocketServer({ server, path: '/ws' });
+    setupWebSocket(wss);
+  }
 
-  const port = parseInt(process.env.PORT || "3000", 10);
-  server.listen(port, () => {
-    console.log(`> Ready on http://localhost:${port}`);
+  server.listen(config.port, () => {
+    console.log(`Mkindayzir running at http://localhost:${config.port}`);
   });
 });

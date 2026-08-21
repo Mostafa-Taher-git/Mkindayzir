@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { GuideService } from "@/services/guide.service";
 
@@ -20,12 +20,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
-    const guide = await guideService.get(id, session.user);
+    const guide = await guideService.get(id, user);
     return NextResponse.json({ guide });
   } catch {
     return NextResponse.json(
@@ -41,15 +41,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const guide = await guideService.update(id, parsed, session.user);
+    const guide = await guideService.update(id, parsed, user);
     return NextResponse.json({ guide });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -68,12 +68,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
-    await guideService.delete(id, session.user);
+    await guideService.delete(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

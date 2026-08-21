@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { SpaceService } from "@/services/space.service";
 
@@ -17,12 +17,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const space = await spaceService.get(id, session.user);
+    const space = await spaceService.get(id, user);
     return NextResponse.json({ space });
   } catch {
     return NextResponse.json(
@@ -38,15 +38,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const space = await spaceService.update(id, parsed, session.user);
+    const space = await spaceService.update(id, parsed, user);
     return NextResponse.json({ space });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -65,12 +65,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await spaceService.delete(id, session.user);
+    await spaceService.delete(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

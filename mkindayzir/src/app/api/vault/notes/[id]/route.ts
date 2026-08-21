@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { VaultService } from "@/services/vault.service";
 
@@ -20,12 +20,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const note = await vaultService.getNote(id, session.user);
+    const note = await vaultService.getNote(id, user);
     return NextResponse.json({ note });
   } catch {
     return NextResponse.json(
@@ -41,15 +41,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const note = await vaultService.updateNote(id, parsed, session.user);
+    const note = await vaultService.updateNote(id, parsed, user);
     return NextResponse.json({ note });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -68,12 +68,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await vaultService.deleteNote(id, session.user);
+    await vaultService.deleteNote(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

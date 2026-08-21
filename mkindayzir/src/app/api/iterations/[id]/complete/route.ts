@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { IterationService } from "@/services/iteration.service";
 
 const iterationService = new IterationService();

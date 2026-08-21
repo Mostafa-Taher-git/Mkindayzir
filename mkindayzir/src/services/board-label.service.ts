@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { BoardLabelRepository } from "@/repositories/board-label.repository";
 import { BoardRepository } from "@/repositories/board.repository";

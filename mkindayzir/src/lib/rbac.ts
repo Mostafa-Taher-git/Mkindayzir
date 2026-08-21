@@ -1,6 +1,3 @@
-import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
-
 export const ROLES = {
   ADMIN: "ADMIN",
   MANAGER: "MANAGER",
@@ -65,26 +62,4 @@ const rolePermissions: Record<Role, Permission[]> = {
 
 export function hasPermission(role: Role, permission: Permission): boolean {
   return rolePermissions[role]?.includes(permission) ?? false;
-}
-
-export async function requirePermission(permission: Permission) {
-  const session = await auth();
-
-  if (!session?.user) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-      authorized: false,
-    };
-  }
-
-  const role = session.user.role as Role;
-
-  if (!hasPermission(role, permission)) {
-    return {
-      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
-      authorized: false,
-    };
-  }
-
-  return { error: null, session, authorized: true };
 }

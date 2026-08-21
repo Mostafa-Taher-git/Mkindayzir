@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { CardService } from "@/services/card.service";
 
@@ -16,15 +16,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = moveBodySchema.parse(body);
 
-    const card = await cardService.move(id, parsed.targetColumnId, parsed.position, session.user);
+    const card = await cardService.move(id, parsed.targetColumnId, parsed.position, user);
     return NextResponse.json({ card });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { getSessionUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac.server";
 import { z } from "zod";
 import { LabelService } from "@/services/label.service";
 
@@ -17,8 +17,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

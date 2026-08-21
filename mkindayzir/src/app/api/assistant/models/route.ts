@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { AIService, ProviderType } from "@/services/ai.service";
 
 const aiService = new AIService();
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const providerConfig = await aiService.getProviderConfig(session.user);
+    const providerConfig = await aiService.getProviderConfig(user);
     const provider = providerConfig.name as ProviderType;
     const models = await aiService.getAvailableModels(provider);
 

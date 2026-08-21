@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useSocket } from "@/hooks/use-socket";
-import { useSession } from "next-auth/react";
+import { useWebSocket } from "@/hooks/use-socket";
+import { useAuth } from "@/hooks/use-auth";
 
 function ConnectionStatusInner() {
-  const { data: session } = useSession();
-  const { status } = useSocket(session?.user?.id ?? null);
+  const { user } = useAuth();
+  const { status } = useWebSocket(user?.id ?? null);
 
   const colorClass =
     status === "connected"

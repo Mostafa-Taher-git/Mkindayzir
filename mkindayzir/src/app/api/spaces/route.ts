@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { SpaceService } from "@/services/space.service";
 
@@ -19,8 +19,8 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     Object.fromEntries(searchParams.entries());
     listQuerySchema.parse({});
 
-    const result = await spaceService.list(session.user);
+    const result = await spaceService.list(user);
     return NextResponse.json({ spaces: result });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -43,15 +43,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = createBodySchema.parse(body);
 
-    const space = await spaceService.create(parsed, session.user);
+    const space = await spaceService.create(parsed, user);
     return NextResponse.json({ space }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

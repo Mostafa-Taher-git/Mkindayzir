@@ -9,22 +9,22 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "metallic-gradient-primary text-on-primary border-2 border-mechanical-grey hover:brightness-110 active:translate-y-px active:border-mechanical-grey-light",
+        default: "bg-primary text-primary-foreground border-2 border-outline hover:brightness-110 active:translate-y-px",
         destructive:
-          "bg-destructive text-destructive-foreground border-2 border-mechanical-grey hover:brightness-110 active:translate-y-px",
+          "bg-destructive text-destructive-foreground border-2 border-outline hover:brightness-110 active:translate-y-px",
         outline:
           "border-2 border-outline bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground active:translate-y-px",
         secondary:
-          "bg-secondary text-on-secondary border-2 border-mechanical-grey hover:brightness-110 active:translate-y-px",
+          "bg-surface text-foreground border-2 border-outline hover:brightness-110 active:translate-y-px",
         ghost:
           "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3 chamfer-corners-sm",
-        sm: "h-8 gap-1.5 px-3 has-[>svg]:px-2.5 chamfer-corners-sm",
-        lg: "h-10 px-6 has-[>svg]:px-4 chamfer-corners",
-        icon: "size-9 chamfer-corners-sm",
+        default: "h-9 px-4 py-2 has-[>svg]:px-3 rounded-md",
+        sm: "h-8 gap-1.5 px-3 has-[>svg]:px-2.5 rounded-md",
+        lg: "h-10 px-6 has-[>svg]:px-4 rounded-lg",
+        icon: "size-9 rounded-md",
       },
     },
     defaultVariants: {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { SpaceService } from "@/services/space.service";
 
@@ -16,15 +16,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = addMemberBodySchema.parse(body);
 
-    const member = await spaceService.addMember(id, parsed.userId, parsed.role, session.user);
+    const member = await spaceService.addMember(id, parsed.userId, parsed.role, user);
     return NextResponse.json({ member }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

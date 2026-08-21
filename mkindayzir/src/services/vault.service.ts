@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { requirePermission, PERMISSIONS } from "@/lib/rbac";
+import { requirePermission, PERMISSIONS } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { VaultFolderRepository } from "@/repositories/vault-folder.repository";
 import { VaultNoteRepository } from "@/repositories/vault-note.repository";

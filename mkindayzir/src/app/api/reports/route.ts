@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ReportService } from "@/services/report.service";
 
@@ -12,8 +12,8 @@ const reportQuerySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
@@ -23,19 +23,19 @@ export async function GET(request: Request) {
 
     switch (parsed.type) {
       case "summary":
-        const summary = await reportService.getDashboardSummary(session.user.id, session.user);
+        const summary = await reportService.getDashboardSummary(user.id, user);
         return NextResponse.json({ data: summary });
 
       case "workload":
-        const workload = await reportService.getWorkloadReport(session.user);
+        const workload = await reportService.getWorkloadReport(user);
         return NextResponse.json({ data: workload });
 
       case "velocity":
-        const velocity = await reportService.getVelocityReport(session.user, parsed.projectId);
+        const velocity = await reportService.getVelocityReport(user, parsed.projectId);
         return NextResponse.json({ data: velocity });
 
       case "trends":
-        const trends = await reportService.getTrendReport(session.user);
+        const trends = await reportService.getTrendReport(user);
         return NextResponse.json({ data: trends });
 
       default:

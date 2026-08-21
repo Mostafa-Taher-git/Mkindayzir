@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { getSessionUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac.server";
 import { z } from "zod";
 import { ProjectService } from "@/services/project.service";
 import { ProjectStatus } from "@/types";
@@ -25,8 +25,8 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = listQuerySchema.parse(params);
 
-    const result = await projectService.list(parsed, session.user);
+    const result = await projectService.list(parsed, user);
     return NextResponse.json({
       projects: result.items,
       pagination: { page: result.page, limit: result.perPage, total: result.total, totalPages: Math.ceil(result.total / result.perPage) },

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { RegisterSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/crypto";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+
+const RegisterSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  displayName: z.string().min(1, "Display name is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const passwordHash = hashPassword(result.data.password);
+    const passwordHash = await hashPassword(result.data.password);
 
     const user = await prisma.user.create({
       data: {

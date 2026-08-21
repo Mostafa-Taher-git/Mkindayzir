@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { getSessionUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac.server";
 import { z } from "zod";
 import { VaultService } from "@/services/vault.service";
 
@@ -13,12 +13,12 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const tags = await vaultService.listTags(session.user);
+    const tags = await vaultService.listTags(user);
     return NextResponse.json({ tags });
   } catch {
     return NextResponse.json(

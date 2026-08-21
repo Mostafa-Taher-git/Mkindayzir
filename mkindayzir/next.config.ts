@@ -1,20 +1,19 @@
 import type { NextConfig } from "next";
+import withSerwist from "@serwist/next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["socket.io"],
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",
     },
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
+    remotePatterns: [],
+  },
+  webpack: (config) => {
+    config.externals = [...(config.externals || []), "bcrypt"];
+    return config;
   },
   async headers() {
     return [
@@ -33,10 +32,18 @@ const nextConfig: NextConfig = {
             key: "X-XSS-Protection",
             value: "1; mode=block",
           },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
         ],
       },
     ];
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig, {
+  swSrc: "sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+});

@@ -9,17 +9,17 @@ const badgeVariants = cva(
         default:
           "border-primary bg-primary/10 text-primary",
         secondary:
-          "border-mechanical-grey bg-surface-container text-mechanical-grey-light",
+          "border-outline bg-muted text-muted-foreground",
         destructive:
           "border-destructive bg-destructive/10 text-destructive",
         outline:
-          "border-outline text-on-surface",
+          "border-outline text-foreground",
         active:
           "border-primary bg-primary/20 text-primary",
         done:
-          "border-tertiary bg-tertiary/10 text-tertiary",
+          "border-outline bg-muted/50 text-muted-foreground",
         pending:
-          "border-secondary bg-secondary/10 text-secondary",
+          "border-outline bg-surface text-muted-foreground",
       },
     },
     defaultVariants: {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { CardService } from "@/services/card.service";
 
 const cardService = new CardService();
@@ -10,12 +10,12 @@ export async function DELETE(
 ) {
   try {
     const { id, labelId } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await cardService.removeLabel(id, labelId, session.user);
+    await cardService.removeLabel(id, labelId, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

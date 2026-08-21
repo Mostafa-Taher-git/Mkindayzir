@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { hasPermission, PERMISSIONS, ROLES } from "@/lib/rbac";
 import { Guide } from "@/types";
 
 function GuidesPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [search, setSearch] = React.useState("");
   const [selectedGuide, setSelectedGuide] = React.useState<Guide | null>(null);
 
@@ -27,7 +27,7 @@ function GuidesPage() {
     },
   });
 
-  const userRole = session?.user?.role as keyof typeof ROLES | undefined;
+  const userRole = user?.role as keyof typeof ROLES | undefined;
   const canCreateGuide = userRole ? hasPermission(ROLES[userRole], PERMISSIONS.MANAGE_SETTINGS) : false;
 
   return (

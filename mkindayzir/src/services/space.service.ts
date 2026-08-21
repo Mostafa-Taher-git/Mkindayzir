@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { SpaceRepository } from "@/repositories/space.repository";
 import { SpaceRole } from "@/types";

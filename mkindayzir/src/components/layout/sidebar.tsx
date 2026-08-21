@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +42,9 @@ function Sidebar({
 }) {
   const pathname = usePathname() || "";
   const isMobile = useMobile();
-  const { data: session } = useSession();
+  const { user } = useAuth();
 
-  const displayName = session?.user?.displayName ?? "User";
+  const displayName = user?.displayName ?? "User";
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
@@ -53,7 +53,8 @@ function Sidebar({
     .slice(0, 2);
 
   const handleLogout = async () => {
-    await signOut({ redirectTo: ROUTES.LOGIN });
+    await fetch('/api/auth/session', { method: 'DELETE' });
+    window.location.href = ROUTES.LOGIN;
   };
 
   const sidebarContent = (
@@ -113,14 +114,14 @@ function Sidebar({
               )}
             >
               <Avatar className="h-8 w-8 border-2 border-outline">
-                <AvatarImage src={session?.user?.image ?? ""} alt={displayName} />
+                <AvatarImage src={user?.avatar ?? ""} alt={displayName} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               {!collapsed && (
                 <div className="flex flex-col items-start text-left">
                   <span className="text-sm font-medium">{displayName}</span>
                   <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                    {session?.user?.role ?? "MEMBER"}
+                    {user?.role ?? "MEMBER"}
                   </span>
                 </div>
               )}
@@ -198,7 +199,7 @@ function FolderIcon({ className }: { className?: string }) {
 
 function KanbanIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 3H5a2 2 0 0 0-2 2v4" /><path d="M9 3h6a2 2 0 0 1 2 2v4" /><path d="M9 21h6a2 2 0 0 0 2-2v-4" /><path d="M9 21H5a2 2 0 0 1-2-2v-4" /><rect width="4" height="18" x="5" y="3" /><rect width="4" height="18" x="15" y="3" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 3H5a2 2 0 0 0-2 2v4" /><path d="M9 3h6a2 2 0 0 1 2 2v4" /><path d="M9 21h6a2 2 0 0 0 2-2v-4" /><path d="M9 21H5a2 2 0 0 1 2-2v-4" /><rect width="4" height="18" x="5" y="3" /><rect width="4" height="18" x="15" y="3" /></svg>
   );
 }
 
@@ -228,6 +229,6 @@ function ChartIcon({ className }: { className?: string }) {
 
 function SettingsIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0-.73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1 2 0l-.43.25a2 2 0 0 1 1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   DndContext,
   DragEndEvent,
@@ -104,10 +104,10 @@ function mapCardToWorkItem(card: BoardCard, columnNameMap: Record<string, string
 
 function BoardPresence({ boardId }: { boardId: string }) {
   "use client";
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const { presentUsers } = usePresence("board", boardId);
-  if (!session?.user?.id) return null;
-  return <PresenceIndicator users={presentUsers} currentUserId={session.user.id} />;
+  if (!user?.id) return null;
+  return <PresenceIndicator users={presentUsers} currentUserId={user.id} />;
 }
 
 function BoardDetailClient({ board, columns: initialColumns, cards: initialCards }: BoardDetailClientProps) {

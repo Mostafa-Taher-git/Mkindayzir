@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { requirePermission, PERMISSIONS } from "@/lib/rbac";
+import { requirePermission, PERMISSIONS } from "@/lib/rbac.server";
 
 function authError(result: { authorized: boolean; error?: any }) {
   if (!result.authorized && result.error) {

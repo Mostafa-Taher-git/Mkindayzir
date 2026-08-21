@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ColumnService } from "@/services/column.service";
 
@@ -16,12 +16,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const column = await columnService.get(id, session.user);
+    const column = await columnService.get(id, user);
     return NextResponse.json({ column });
   } catch {
     return NextResponse.json(
@@ -37,15 +37,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const column = await columnService.update(id, parsed, session.user);
+    const column = await columnService.update(id, parsed, user);
     return NextResponse.json({ column });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -64,12 +64,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await columnService.delete(id, session.user);
+    await columnService.delete(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

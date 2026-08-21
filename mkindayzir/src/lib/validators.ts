@@ -57,6 +57,13 @@ export const CreateInitiativeSchema = z.object({
   targetDate: z.string().optional().nullable(),
 });
 
+export const SetupSchema = z.object({
+  mode: z.enum(["personal", "team", "enterprise"]),
+  email: z.string().email("Invalid email address"),
+  displayName: z.string().min(1, "Display name is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
@@ -66,3 +73,4 @@ export type CreateWorkItemInput = z.infer<typeof CreateWorkItemSchema>;
 export type UpdateWorkItemInput = z.infer<typeof UpdateWorkItemSchema>;
 export type CreateIterationInput = z.infer<typeof CreateIterationSchema>;
 export type CreateInitiativeInput = z.infer<typeof CreateInitiativeSchema>;
+export type SetupInput = z.infer<typeof SetupSchema>;

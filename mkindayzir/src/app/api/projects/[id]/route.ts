@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { ROLES } from "@/lib/rbac";
 import { z } from "zod";
 import { ProjectService } from "@/services/project.service";
@@ -23,12 +23,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const project = await projectService.get(id, session.user);
+    const project = await projectService.get(id, user);
     const stats = await projectService.getStats(id);
 
     return NextResponse.json({ project, stats });
@@ -46,12 +46,12 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isAuthorized = isAdminOrManager(session.user.role);
+    const isAuthorized = isAdminOrManager(user.role);
     if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -59,7 +59,7 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const project = await projectService.update(id, parsed, session.user);
+    const project = await projectService.update(id, parsed, user);
     return NextResponse.json({ project });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -78,17 +78,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isAuthorized = session.user.role === ROLES.ADMIN;
+    const isAuthorized = user.role === ROLES.ADMIN;
     if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await projectService.archive(id, session.user);
+    await projectService.archive(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import { requirePermission, PERMISSIONS } from "@/lib/rbac";
+import { requirePermission, PERMISSIONS } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { GuideRepository } from "@/repositories/guide.repository";
 

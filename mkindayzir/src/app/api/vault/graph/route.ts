@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { VaultService } from "@/services/vault.service";
 
 const vaultService = new VaultService();
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { nodes, links } = await vaultService.getGraph(session.user);
+    const { nodes, links } = await vaultService.getGraph(user);
     return NextResponse.json({ nodes, links });
   } catch {
     return NextResponse.json(

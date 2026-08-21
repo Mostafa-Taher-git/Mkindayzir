@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Mkindayzir",
+    "tagline": "Your Operations, Your Server, Your Control."
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display Name",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "register": "Register",
+    "invalidCredentials": "Invalid email or password",
+    "sessionExpired": "Your session has expired"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "optional": "Optional"
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New Project",
+    "edit": "Edit Project",
+    "delete": "Delete Project",
+    "key": "Key",
+    "name": "Name",
+    "description": "Description",
+    "status": "Status",
+    "active": "Active",
+    "archived": "Archived",
+    "completed": "Completed"
+  },
+  "workItems": {
+    "title": "Work Items",
+    "new": "New Work Item",
+    "edit": "Edit Work Item",
+    "type": "Type",
+    "task": "Task",
+    "bug": "Bug",
+    "feature": "Feature",
+    "improvement": "Improvement",
+    "priority": "Priority",
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "status": "Status",
+    "assignee": "Assignee",
+    "reporter": "Reporter",
+    "dueDate": "Due Date",
+    "storyPoints": "Story Points"
+  },
+  "boards": {
+    "title": "Boards",
+    "new": "New Board",
+    "columns": "Columns",
+    "cards": "Cards",
+    "addColumn": "Add Column",
+    "addCard": "Add Card"
+  },
+  "vault": {
+    "title": "Knowledge Vault",
+    "newNote": "New Note",
+    "folders": "Folders",
+    "tags": "Tags",
+    "graph": "Graph",
+    "search": "Search vault"
+  },
+  "assistant": {
+    "title": "Mkindayzir Assistant",
+    "newConversation": "New Conversation",
+    "placeholder": "Ask Mkindayzir anything...",
+    "send": "Send",
+    "thinking": "Thinking..."
+  },
+  "setup": {
+    "title": "Welcome to Mkindayzir",
+    "subtitle": "Let's get you set up in 3 simple steps",
+    "modeQuestion": "How will you use Mkindayzir?",
+    "personal": "Personal",
+    "personalDesc": "Single user on a personal laptop. SQLite, no Docker, no team features.",
+    "team": "Team",
+    "teamDesc": "2-20 users on a local network. PostgreSQL, WebSocket, full auth.",
+    "enterprise": "Enterprise",
+    "enterpriseDesc": "20+ users on dedicated infrastructure. PostgreSQL, WebSocket, audit logging.",
+    "adminAccount": "Create your admin account",
+    "completeSetup": "Complete Setup",
+    "settingUp": "Setting up..."
+  }
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ChecklistService } from "@/services/checklist.service";
 
@@ -15,15 +15,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = createBodySchema.parse(body);
 
-    const checklist = await checklistService.create({ cardId: id, ...parsed }, session.user);
+    const checklist = await checklistService.create({ cardId: id, ...parsed }, user);
     return NextResponse.json({ checklist }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

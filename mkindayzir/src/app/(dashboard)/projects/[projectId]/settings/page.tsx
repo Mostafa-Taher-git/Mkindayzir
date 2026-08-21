@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
@@ -17,8 +17,8 @@ async function getProject(projectId: string) {
 }
 
 export default async function ProjectSettingsPage({ params }: ProjectSettingsPageProps) {
-  const session = await auth();
-  if (!session) {
+  const user = await getSessionUser();
+  if (!user) {
     redirect(ROUTES.LOGIN);
   }
 

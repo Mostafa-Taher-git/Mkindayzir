@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -6,7 +6,7 @@ import { ROUTES } from "@/lib/constants";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const session = await auth();
+  const user = await getSessionUser();
 
   const stats = [
     { title: "Projects", value: "12", description: "Active projects", critical: false },
@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-display uppercase tracking-wider">
-          Welcome back, {session?.user?.displayName?.split(" ")[0] ?? "User"}
+          Welcome back, {user?.displayName?.split(" ")[0] ?? "User"}
         </h1>
         <p className="text-muted-foreground mt-1 font-mono text-sm uppercase tracking-wider">
           Here&apos;s what&apos;s happening across your workspace today.

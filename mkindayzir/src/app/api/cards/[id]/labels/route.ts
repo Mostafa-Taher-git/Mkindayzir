@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { CardService } from "@/services/card.service";
 
@@ -15,15 +15,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = addLabelBodySchema.parse(body);
 
-    const label = await cardService.addLabel(id, parsed.labelId, session.user);
+    const label = await cardService.addLabel(id, parsed.labelId, user);
     return NextResponse.json({ label }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

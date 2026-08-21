@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 import { ProjectRepository } from "@/repositories/project.repository";
 import { ProjectFilter } from "@/repositories/project.repository";

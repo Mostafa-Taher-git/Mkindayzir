@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder } from "@/types";
@@ -24,7 +24,7 @@ async function getGraph() {
 }
 
 export default async function VaultGraphPage() {
-  const session = await auth();
+  const user = await getSessionUser();
   const [folders, graph] = await Promise.all([getFolders(), getGraph()]);
 
   const nodes = graph.nodes || [];

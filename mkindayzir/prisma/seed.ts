@@ -11,7 +11,7 @@ async function main() {
     update: {},
     create: {
       email: "admin@mkindayzir.local",
-      passwordHash: hashPassword("password"),
+      passwordHash: await hashPassword("password"),
       displayName: "Admin User",
       role: "ADMIN",
       status: "ACTIVE",
@@ -24,7 +24,7 @@ async function main() {
     update: {},
     create: {
       email: "manager@mkindayzir.local",
-      passwordHash: hashPassword("password"),
+      passwordHash: await hashPassword("password"),
       displayName: "Manager User",
       role: "MANAGER",
       status: "ACTIVE",
@@ -37,7 +37,7 @@ async function main() {
     update: {},
     create: {
       email: "member@mkindayzir.local",
-      passwordHash: hashPassword("password"),
+      passwordHash: await hashPassword("password"),
       displayName: "Member User",
       role: "MEMBER",
       status: "ACTIVE",
@@ -50,7 +50,7 @@ async function main() {
     update: {},
     create: {
       email: "viewer@mkindayzir.local",
-      passwordHash: hashPassword("password"),
+      passwordHash: await hashPassword("password"),
       displayName: "Viewer User",
       role: "VIEWER",
       status: "ACTIVE",
@@ -80,16 +80,16 @@ async function main() {
     workflow = await prisma.workflow.update({
       where: { id: existingWorkflow.id },
       data: {
-        statuses: [
+        statuses: JSON.stringify([
           { id: "todo", name: "To Do", category: "todo" },
           { id: "in_progress", name: "In Progress", category: "in_progress" },
           { id: "done", name: "Done", category: "done" },
-        ],
-        transitions: [
+        ]),
+        transitions: JSON.stringify([
           { from: "todo", to: "in_progress" },
           { from: "in_progress", to: "done" },
           { from: "done", to: "todo" },
-        ],
+        ]),
         isDefault: true,
       },
     });
@@ -99,16 +99,16 @@ async function main() {
       data: {
         projectId: project.id,
         name: "Default Workflow",
-        statuses: [
+        statuses: JSON.stringify([
           { id: "todo", name: "To Do", category: "todo" },
           { id: "in_progress", name: "In Progress", category: "in_progress" },
           { id: "done", name: "Done", category: "done" },
-        ],
-        transitions: [
+        ]),
+        transitions: JSON.stringify([
           { from: "todo", to: "in_progress" },
           { from: "in_progress", to: "done" },
           { from: "done", to: "todo" },
-        ],
+        ]),
         isDefault: true,
       },
     });
@@ -136,7 +136,7 @@ async function main() {
     update: {},
     create: {
       key: "setup_completed",
-      value: true,
+      value: JSON.stringify(true),
     },
   });
   console.log("Created system config: setup_completed");
@@ -146,7 +146,7 @@ async function main() {
     update: {},
     create: {
       key: "app_version",
-      value: "1.0.0",
+      value: JSON.stringify("1.0.0"),
     },
   });
   console.log("Created system config: app_version");

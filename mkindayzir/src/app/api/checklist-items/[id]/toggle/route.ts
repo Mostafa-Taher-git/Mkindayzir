@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { ChecklistItemService } from "@/services/checklist-item.service";
 
 const checklistItemService = new ChecklistItemService();
@@ -10,12 +10,12 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const item = await checklistItemService.toggle(id, session.user);
+    const item = await checklistItemService.toggle(id, user);
     return NextResponse.json({ item });
   } catch {
     return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { getSessionUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac.server";
 import { z } from "zod";
 import { WorkItemService } from "@/services/work-item.service";
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LoginSchema } from "@/lib/validators";
@@ -29,20 +28,21 @@ function LoginForm() {
     }
 
     try {
-      const res = await signIn("credentials", {
-        email: result.data.email,
-        password: result.data.password,
-        redirect: false,
-        callbackUrl,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: result.data.email, password: result.data.password }),
       });
 
-      if (res?.error) {
-        setError("Invalid email or password");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error?.message || "Invalid email or password");
         setLoading(false);
         return;
       }
 
-      router.push(res?.url || callbackUrl);
+      router.push(callbackUrl);
       router.refresh();
     } catch {
       setError("An unexpected error occurred");
@@ -51,8 +51,8 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background metallic-gradient p-4">
-      <div className="w-full max-w-md border-2 border-outline bg-surface-container inner-bevel p-8">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md border-2 border-outline bg-surface-container p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold font-display uppercase tracking-wider">Sign in to Mkindayzir</h1>
           <p className="text-muted-foreground mt-2 text-sm">Access your operations console</p>
@@ -92,7 +92,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 metallic-gradient-primary text-on-primary border-2 border-mechanical-grey hover:brightness-110 active:translate-y-px active:border-mechanical-grey-light chamfer-corners-sm disabled:opacity-50 disabled:cursor-not-allowed font-mono uppercase tracking-wider"
+            className="w-full py-2 px-4 bg-primary text-primary-foreground border-2 border-outline hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed font-mono uppercase tracking-wider"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>

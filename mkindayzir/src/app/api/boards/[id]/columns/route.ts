@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ColumnService } from "@/services/column.service";
 
@@ -16,15 +16,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = createBodySchema.parse(body);
 
-    const column = await columnService.create({ boardId: id, ...parsed }, session.user);
+    const column = await columnService.create({ boardId: id, ...parsed }, user);
     return NextResponse.json({ column }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { VaultService } from "@/services/vault.service";
 
@@ -24,8 +24,8 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = listQuerySchema.parse(params);
 
-    const result = await vaultService.listNotes(parsed, session.user);
+    const result = await vaultService.listNotes(parsed, user);
     return NextResponse.json({
       notes: result.items,
       pagination: { page: result.page, perPage: result.perPage, total: result.total, totalPages: Math.ceil(result.total / result.perPage) },
@@ -51,15 +51,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = createBodySchema.parse(body);
 
-    const note = await vaultService.createNote(parsed, session.user);
+    const note = await vaultService.createNote(parsed, user);
     return NextResponse.json({ note }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
 
 async function getInitialConversations() {
-  const session = await auth();
-  if (!session?.user) return [];
+  const user = await getSessionUser();
+  if (!user) return [];
 
   const res = await fetch("/api/assistant/conversations", {
     cache: "no-store",
@@ -15,8 +15,8 @@ async function getInitialConversations() {
 }
 
 async function getConversation(id: string) {
-  const session = await auth();
-  if (!session?.user) return null;
+  const user = await getSessionUser();
+  if (!user) return null;
 
   const res = await fetch(`/api/assistant/conversations/${id}`, {
     cache: "no-store",

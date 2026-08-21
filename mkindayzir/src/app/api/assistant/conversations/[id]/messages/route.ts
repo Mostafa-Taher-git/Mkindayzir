@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ConversationService } from "@/services/conversation.service";
 import { AIService } from "@/services/ai.service";
@@ -18,12 +18,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const conversation = await conversationService.getConversation(id, session.user);
+    const conversation = await conversationService.getConversation(id, user);
     const messages = (conversation as { messages?: unknown[] }).messages ?? [];
 
     return NextResponse.json({ messages });
@@ -41,21 +41,21 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = sendBodySchema.parse(body);
 
-    const conversation = await conversationService.getConversation(id, session.user);
+    const conversation = await conversationService.getConversation(id, user);
 
-    await conversationService.addMessage(id, parsed.content, "USER", session.user);
+    await conversationService.addMessage(id, parsed.content, "USER", user);
 
     let providerConfig;
     try {
-      providerConfig = await aiService.getProviderConfig(session.user);
+      providerConfig = await aiService.getProviderConfig(user);
     } catch {
       return NextResponse.json(
         { error: { code: "CONFIG_ERROR", message: "AI provider not configured" } },
@@ -102,7 +102,7 @@ export async function POST(
               send("tool_result", toolResult);
             },
             onDone: async (doneResult) => {
-              await conversationService.addMessage(id, doneResult.content, "ASSISTANT", session.user, {
+              await conversationService.addMessage(id, doneResult.content, "ASSISTANT", user, {
                 model: providerConfig.model,
                 tokens: doneResult.tokensUsed,
               });

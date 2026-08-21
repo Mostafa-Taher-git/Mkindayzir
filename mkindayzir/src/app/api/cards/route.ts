@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { CardService } from "@/services/card.service";
 
@@ -23,8 +23,8 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     if (parsed.boardId) {
       cards = await cardService.listByBoard(parsed.boardId);
     } else {
-      cards = await cardService.list(parsed.columnId!, session.user);
+      cards = await cardService.list(parsed.columnId!, user);
     }
     return NextResponse.json({ cards });
   } catch (error) {
@@ -52,8 +52,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         ...parsed,
         dueDate: parsed.dueDate ? new Date(parsed.dueDate) : undefined,
       },
-      session.user
+      user
     );
     return NextResponse.json({ card }, { status: 201 });
   } catch (error) {

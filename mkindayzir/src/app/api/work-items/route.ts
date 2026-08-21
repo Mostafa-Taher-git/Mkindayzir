@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { WorkItemService } from "@/services/work-item.service";
 
@@ -34,8 +34,8 @@ const createBodySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = listQuerySchema.parse(params);
 
-    const result = await workItemService.list(parsed, session.user);
+    const result = await workItemService.list(parsed, user);
     return NextResponse.json({
       workItems: result.items,
       pagination: { page: result.page, limit: result.perPage, total: result.total, totalPages: Math.ceil(result.total / result.perPage) },
@@ -61,8 +61,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         ...parsed,
         dueDate: parsed.dueDate ? new Date(parsed.dueDate) : undefined,
       },
-      session.user
+      user
     );
     return NextResponse.json({ workItem }, { status: 201 });
   } catch (error) {

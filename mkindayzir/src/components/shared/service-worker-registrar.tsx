@@ -1,27 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { Workbox } from "workbox-window";
+import { serwistWorker } from "@/sw";
 
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    if ("serviceWorker" in navigator) {
+      serwistWorker.register().catch((err) => {
+        console.error("Service worker registration failed:", err);
+      });
     }
-
-    const wb = new Workbox("/sw.js", { immediate: true });
-
-    wb.addEventListener("waiting", () => {
-      console.log("[SW] New version waiting to activate");
-    });
-
-    wb.addEventListener("activated", (event) => {
-      if (event.isUpdate) {
-        console.log("[SW] New version activated");
-      }
-    });
-
-    wb.register();
   }, []);
 
   return null;

@@ -1,6 +1,6 @@
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceIndicator } from "@/components/shared/presence-indicator";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,8 +36,8 @@ function ProjectPresence({ projectId, currentUserId }: { projectId: string; curr
 }
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
-  const session = await auth();
-  if (!session) {
+  const user = await getSessionUser();
+  if (!user) {
     redirect(ROUTES.LOGIN);
   }
 
@@ -76,7 +76,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <Badge variant="secondary">{project.key}</Badge>
-            <ProjectPresence projectId={projectId} currentUserId={session.user.id} />
+            <ProjectPresence projectId={projectId} currentUserId={user.id} />
           </div>
           <p className="text-muted-foreground mt-1">
             {project.description || "No description"}

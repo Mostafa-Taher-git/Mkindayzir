@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getEncryptionKey, encrypt } from "@/lib/encryption";
@@ -24,13 +24,13 @@ const patchBodySchema = z.object({
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const currentUser = await getSessionUser();
+    if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: currentUser.id },
       select: {
         aiProvider: true,
         aiModel: true,
@@ -57,8 +57,8 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const currentUser = await getSessionUser();
+    if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -81,7 +81,7 @@ export async function PATCH(request: Request) {
     }
 
     const user = await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: currentUser.id },
       data: updateData,
       select: {
         aiProvider: true,

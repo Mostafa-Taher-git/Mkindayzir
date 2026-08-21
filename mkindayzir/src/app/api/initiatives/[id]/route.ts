@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { getSessionUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac.server";
 import { z } from "zod";
 import { InitiativeService } from "@/services/initiative.service";
 
@@ -18,13 +18,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
-    const initiative = await initiativeService.get(id, session.user);
+    const initiative = await initiativeService.get(id, user);
     return NextResponse.json({ initiative, workItems: [] });
   } catch {
     return NextResponse.json(

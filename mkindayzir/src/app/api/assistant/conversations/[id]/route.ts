@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ConversationService } from "@/services/conversation.service";
 
@@ -16,12 +16,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const conversation = await conversationService.getConversation(id, session.user);
+    const conversation = await conversationService.getConversation(id, user);
     const messages = (conversation as { messages?: unknown[] }).messages ?? [];
 
     return NextResponse.json({ conversation, messages });
@@ -39,15 +39,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = updateBodySchema.parse(body);
 
-    const conversation = await conversationService.updateConversation(id, parsed, session.user);
+    const conversation = await conversationService.updateConversation(id, parsed, user);
     return NextResponse.json({ conversation });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -66,12 +66,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await conversationService.deleteConversation(id, session.user);
+    await conversationService.deleteConversation(id, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

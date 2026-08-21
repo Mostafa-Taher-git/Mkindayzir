@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ReportService } from "@/services/report.service";
 
@@ -12,8 +12,8 @@ const exportQuerySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = exportQuerySchema.parse(params);
 
-    const csv = await reportService.exportCSV(session.user, parsed);
+    const csv = await reportService.exportCSV(user, parsed);
 
     return new NextResponse(csv, {
       status: 200,

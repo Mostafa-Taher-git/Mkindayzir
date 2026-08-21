@@ -19,8 +19,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock next-auth
-vi.mock("next-auth", () => ({
-  getServerSession: vi.fn(),
-  SessionProvider: ({ children }: { children: React.ReactNode }) => children,
+// Mock custom auth module
+vi.mock("@/lib/auth", () => ({
+  getSession: vi.fn(),
+  getSessionUser: vi.fn(),
+  hashPassword: vi.fn(),
+  verifyPassword: vi.fn(),
+  createSession: vi.fn(),
+  deleteSession: vi.fn(),
+  getUserSessions: vi.fn(),
+  deleteUserSession: vi.fn(),
 }));

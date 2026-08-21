@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ async function getProjects() {
 }
 
 export default async function ProjectsPage() {
-  const session = await auth();
+  const user = await getSessionUser();
   const { projects } = await getProjects();
 
   return (

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,9 +40,9 @@ function Header({
 }) {
   const pathname = usePathname() || "";
   const isMobile = useMobile();
-  const { data: session } = useSession();
+  const { user } = useAuth();
 
-  const displayName = session?.user?.displayName ?? "User";
+  const displayName = user?.displayName ?? "User";
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
@@ -51,7 +51,8 @@ function Header({
     .slice(0, 2);
 
   const handleLogout = async () => {
-    await signOut({ redirectTo: ROUTES.LOGIN });
+    await fetch('/api/auth/session', { method: 'DELETE' });
+    window.location.href = ROUTES.LOGIN;
   };
 
   const segments = pathname.split("/").filter(Boolean);
@@ -62,7 +63,7 @@ function Header({
   });
 
   return (
-    <header className="flex h-14 items-center justify-between border-b-2 border-outline bg-surface metallic-gradient px-4">
+    <header className="flex h-14 items-center justify-between border-b-2 border-outline bg-surface px-4">
       <div className="flex items-center gap-4">
         {isMobile && (
           <Button variant="ghost" size="icon" onClick={onMenuClick}>
@@ -119,7 +120,7 @@ function Header({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 border-2 border-outline">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={session?.user?.image ?? ""} alt={displayName} />
+                <AvatarImage src={user?.avatar ?? ""} alt={displayName} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
             </Button>

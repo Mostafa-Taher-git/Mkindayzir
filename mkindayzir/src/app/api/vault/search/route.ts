@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { VaultService } from "@/services/vault.service";
 
@@ -11,8 +11,8 @@ const searchQuerySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = searchQuerySchema.parse(params);
 
-    const results = await vaultService.searchNotes(parsed.q, session.user);
+    const results = await vaultService.searchNotes(parsed.q, user);
     return NextResponse.json({ results });
   } catch (error) {
     if (error instanceof z.ZodError) {

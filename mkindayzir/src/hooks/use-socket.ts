@@ -1,5 +1,6 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
 
 type SocketEvent = {
   type: string;
@@ -8,76 +9,78 @@ type SocketEvent = {
 
 type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
 
-export function useSocket(sessionId: string | null) {
-  const socketRef = useRef<Socket | null>(null);
+export function useWebSocket(sessionToken: string | null) {
+  const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [events, setEvents] = useState<SocketEvent[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionToken) return;
 
-    const socket = io({
-      path: "/api/socket.io",
-      auth: { sessionId },
-    });
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${sessionToken}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
-    socket.on("connect", () => {
+    ws.onopen = () => {
       setConnected(true);
       setReconnecting(false);
       setStatus("connected");
-    });
+    };
 
-    socket.on("disconnect", () => {
-      setConnected(false);
-      setReconnecting(false);
-      setStatus("disconnected");
-    });
-
-    socket.on("connect_error", () => {
-      setReconnecting(true);
-      setStatus("reconnecting");
-    });
-
-    socket.on("reconnect_attempt", () => {
-      setReconnecting(true);
-      setStatus("reconnecting");
-    });
-
-    socket.onAny((event, data) => {
-      setEvents((prev) => [...prev, { type: event, data }]);
-    });
-
-    socketRef.current = socket;
-
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
+    ws.onclose = () => {
       setConnected(false);
       setReconnecting(false);
       setStatus("disconnected");
     };
-  }, [sessionId]);
 
-  const join = (entityType: string, entityId: string, userId: string) => {
-    socketRef.current?.emit("join", { entityType, entityId, userId });
-  };
+    ws.onerror = () => {
+      setReconnecting(true);
+      setStatus("reconnecting");
+    };
 
-  const leave = (entityType: string, entityId: string, userId: string) => {
-    socketRef.current?.emit("leave", { entityType, entityId, userId });
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        setEvents((prev) => [...prev, { type: message.type || message.event || "message", data: message }]);
+      } catch {
+        // ignore invalid messages
+      }
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+      setConnected(false);
+      setReconnecting(false);
+      setStatus("disconnected");
+    };
+  }, [sessionToken]);
+
+  const send = (data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    }
   };
 
   const clearEvents = () => setEvents([]);
 
   const onAny = (callback: (event: string, data: unknown) => void) => {
-    const socket = socketRef.current;
-    if (!socket) return () => {};
-    socket.onAny((event, data) => callback(event, data));
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        callback(message.type || message.event || "message", message);
+      } catch {
+        // ignore
+      }
+    };
+    wsRef.current?.addEventListener("message", handleMessage);
     return () => {
-      socket.offAny(callback as (...args: unknown[]) => void);
+      wsRef.current?.removeEventListener("message", handleMessage);
     };
   };
 
-  return { connected, reconnecting, status, events, join, leave, clearEvents, onAny, socket: socketRef.current };
+  return { connected, reconnecting, status, events, send, clearEvents, onAny, ws: wsRef.current };
 }

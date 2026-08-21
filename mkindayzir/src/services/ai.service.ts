@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getEncryptionKey, decrypt } from "@/lib/encryption";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 
 export type ProviderType = "openrouter" | "openai" | "anthropic" | "custom";

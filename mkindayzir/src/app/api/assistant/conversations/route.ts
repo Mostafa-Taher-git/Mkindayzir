@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { z } from "zod";
 import { ConversationService } from "@/services/conversation.service";
 
@@ -12,12 +12,12 @@ const createBodySchema = z.object({
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const conversations = await conversationService.listConversations(session.user);
+    const conversations = await conversationService.listConversations(user);
     return NextResponse.json({ conversations });
   } catch {
     return NextResponse.json(
@@ -29,15 +29,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const parsed = createBodySchema.parse(body);
 
-    const conversation = await conversationService.createConversation(parsed, session.user);
+    const conversation = await conversationService.createConversation(parsed, user);
     return NextResponse.json({ conversation }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

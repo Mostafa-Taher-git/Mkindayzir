@@ -3,9 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = env("DATABASE_PROVIDER") // "postgresql" or "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// ============================================================
+// AUTHENTICATION & USERS
+// ============================================================
 
 model User {
   id            String    @id @default(cuid())
@@ -13,44 +17,32 @@ model User {
   passwordHash  String
   displayName   String
   avatar        String?
-  role          UserRole  @default(MEMBER)
-  status        UserStatus @default(ACTIVE)
+  role          String    @default("MEMBER") // ADMIN, MANAGER, MEMBER, VIEWER
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE, LOCKED
   timezone      String    @default("UTC")
-  preferences   Json      @default("{}")
-  aiApiKey      String?
-  aiProvider    String?
-  aiModel       String?
+  locale        String    @default("en")
+  preferences   String    @default("{}") // JSON
+  aiApiKey      String?   // Encrypted at rest (AES-256-GCM)
+  aiProvider    String?   // openrouter, openai, anthropic, custom
+  aiModel       String?   // Model identifier
   lastActiveAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  teamMemberships  TeamMember[]
-  assignedItems    WorkItem[]     @relation("assignee")
-  reportedItems    WorkItem[]     @relation("reporter")
-  createdProjects  Project[]
-  cards            CardMember[]
-  comments         Comment[]
-  activities       Activity[]
-  notifications    Notification[]
-  conversations    Conversation[]
-  sessions         Session[]
-  vaultNotes       VaultNote[]    @relation("author")
+  teamMemberships TeamMember[]
+  assignedItems   WorkItem[]     @relation("assignee")
+  reportedItems   WorkItem[]     @relation("reporter")
+  createdProjects Project[]      @relation("creator")
+  cards           CardMember[]
+  comments        Comment[]
+  activities      Activity[]
+  notifications   Notification[]
+  conversations   Conversation[]
+  sessions        Session[]
+  vaultNotes      VaultNote[]    @relation("author")
 
   @@map("users")
-}
-
-enum UserRole {
-  ADMIN
-  MANAGER
-  MEMBER
-  VIEWER
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  LOCKED
 }
 
 model Session {
@@ -68,11 +60,11 @@ model Session {
 }
 
 model Team {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   members  TeamMember[]
@@ -82,10 +74,10 @@ model Team {
 }
 
 model TeamMember {
-  id     String   @id @default(cuid())
-  userId String
-  teamId String
-  role   TeamRole @default(MEMBER)
+  id       String   @id @default(cuid())
+  userId   String
+  teamId   String
+  role     String   @default("MEMBER") // LEAD, MEMBER
   joinedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -95,51 +87,44 @@ model TeamMember {
   @@map("team_members")
 }
 
-enum TeamRole {
-  LEAD
-  MEMBER
-}
+// ============================================================
+// PROJECT TRACKER
+// ============================================================
 
 model Project {
-  id          String        @id @default(cuid())
-  key         String        @unique
+  id          String    @id @default(cuid())
+  key         String    @unique
   name        String
   description String?
-  status      ProjectStatus @default(ACTIVE)
+  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED, COMPLETED
   leadId      String?
   teamId      String?
-  settings    Json          @default("{}")
+  settings    String    @default("{}") // JSON
   createdById String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  lead       User?       @relation(fields: [createdById], references: [id])
-  team       Team?       @relation(fields: [teamId], references: [id])
-  workItems  WorkItem[]
-  iterations Iteration[]
+  creator     User        @relation("creator", fields: [createdById], references: [id])
+  team        Team?       @relation(fields: [teamId], references: [id])
+  workItems   WorkItem[]
+  iterations  Iteration[]
   initiatives Initiative[]
-  workflows  Workflow[]
-  labels     Label[]
+  workflows   Workflow[]
+  labels      Label[]
 
   @@map("projects")
 }
 
-enum ProjectStatus {
-  ACTIVE
-  ARCHIVED
-  COMPLETED
-}
-
 model WorkItem {
-  id           String         @id @default(cuid())
+  id           String    @id @default(cuid())
   projectId    String
   number       Int
-  type         WorkItemType
+  type         String    // TASK, BUG, FEATURE, IMPROVEMENT
   title        String
   description  String?
   status       String
-  priority     Priority       @default(MEDIUM)
+  priority     String    @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
   assigneeId   String?
   reporterId   String
   initiativeId String?
@@ -148,10 +133,10 @@ model WorkItem {
   storyPoints  Int?
   dueDate      DateTime?
   resolvedAt   DateTime?
-  metadata     Json           @default("{}")
-  position     Int            @default(0)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  metadata     String    @default("{}")
+  position     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   project    Project     @relation(fields: [projectId], references: [id])
@@ -172,26 +157,12 @@ model WorkItem {
   @@map("work_items")
 }
 
-enum WorkItemType {
-  TASK
-  BUG
-  FEATURE
-  IMPROVEMENT
-}
-
-enum Priority {
-  CRITICAL
-  HIGH
-  MEDIUM
-  LOW
-}
-
 model WorkItemLink {
-  id           String   @id @default(cuid())
-  sourceId     String
-  targetId     String
-  linkType     LinkType
-  createdAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  sourceId  String
+  targetId  String
+  linkType  String   // BLOCKS, BLOCKED_BY, RELATES_TO, DUPLICATES
+  createdAt DateTime @default(now())
 
   source WorkItem @relation("source", fields: [sourceId], references: [id], onDelete: Cascade)
   target WorkItem @relation("target", fields: [targetId], references: [id], onDelete: Cascade)
@@ -200,25 +171,16 @@ model WorkItemLink {
   @@map("work_item_links")
 }
 
-enum LinkType {
-  BLOCKS
-  BLOCKED_BY
-  RELATES_TO
-  DUPLICATES
-  PARENT_OF
-  CHILD_OF
-}
-
 model Iteration {
-  id        String          @id @default(cuid())
+  id        String    @id @default(cuid())
   projectId String
   name      String
   goal      String?
-  status    IterationStatus @default(PLANNING)
+  status    String    @default("PLANNING") // PLANNING, ACTIVE, COMPLETED, CANCELLED
   startDate DateTime?
   endDate   DateTime?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   project   Project    @relation(fields: [projectId], references: [id])
   workItems WorkItem[]
@@ -226,24 +188,17 @@ model Iteration {
   @@map("iterations")
 }
 
-enum IterationStatus {
-  PLANNING
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
 model Initiative {
-  id          String          @id @default(cuid())
+  id          String    @id @default(cuid())
   projectId   String
   name        String
   description String?
-  status      InitiativeStatus @default(OPEN)
-  progress    Float           @default(0)
+  status      String    @default("OPEN") // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
+  progress    Float     @default(0)
   startDate   DateTime?
   targetDate  DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   project   Project    @relation(fields: [projectId], references: [id])
   workItems WorkItem[]
@@ -251,22 +206,15 @@ model Initiative {
   @@map("initiatives")
 }
 
-enum InitiativeStatus {
-  OPEN
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
 model Workflow {
-  id        String   @id @default(cuid())
+  id          String   @id @default(cuid())
   projectId String
   name      String
-  statuses  Json
-  transitions Json
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  statuses    String   // JSON: [{id, name, category: "todo"|"in_progress"|"done", color}]
+  transitions String   // JSON: [{from, to}]
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id])
 
@@ -274,13 +222,13 @@ model Workflow {
 }
 
 model Label {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   projectId String
   name      String
   color     String
   createdAt DateTime @default(now())
 
-  project   Project @relation(fields: [projectId], references: [id])
+  project   Project         @relation(fields: [projectId], references: [id])
   workItems WorkItemLabel[]
 
   @@unique([projectId, name])
@@ -298,14 +246,18 @@ model WorkItemLabel {
   @@map("work_item_labels")
 }
 
+// ============================================================
+// VISUAL TASK BOARDS
+// ============================================================
+
 model Space {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  visibility  Visibility @default(PRIVATE)
+  visibility  String    @default("PRIVATE") // PRIVATE, TEAM, PUBLIC
   createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   boards  Board[]
@@ -314,17 +266,11 @@ model Space {
   @@map("spaces")
 }
 
-enum Visibility {
-  PRIVATE
-  TEAM
-  PUBLIC
-}
-
 model SpaceMember {
-  id      String    @id @default(cuid())
+  id      String @id @default(cuid())
   spaceId String
   userId  String
-  role    SpaceRole @default(MEMBER)
+  role    String @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
 
   space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
@@ -332,40 +278,33 @@ model SpaceMember {
   @@map("space_members")
 }
 
-enum SpaceRole {
-  OWNER
-  ADMIN
-  MEMBER
-  VIEWER
-}
-
 model Board {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   spaceId     String
   name        String
   description String?
   background  String?
-  settings    Json     @default("{}")
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  settings    String    @default("{}")
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  space   Space    @relation(fields: [spaceId], references: [id])
-  columns Column[]
+  space       Space        @relation(fields: [spaceId], references: [id])
+  columns     Column[]
   boardLabels BoardLabel[]
 
   @@map("boards")
 }
 
 model Column {
-  id       String @id @default(cuid())
-  boardId  String
-  name     String
-  position Int    @default(0)
-  limit    Int?
+  id        String   @id @default(cuid())
+  boardId   String
+  name      String
+  position  Int      @default(0)
+  limit     Int?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime  @updatedAt
 
   board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards Card[]
@@ -380,8 +319,8 @@ model Card {
   description String?
   position    Int       @default(0)
   dueDate     DateTime?
-  coverImage  String?
-  metadata    Json      @default("{}")
+  coverColor  String?
+  metadata    String    @default("{}")
   createdById String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -434,7 +373,7 @@ model ChecklistItem {
 model BoardLabel {
   id      String @id @default(cuid())
   boardId String
-  name    String
+  name     String
   color   String
 
   board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -455,14 +394,18 @@ model CardLabel {
   @@map("card_labels")
 }
 
+// ============================================================
+// KNOWLEDGE VAULT
+// ============================================================
+
 model VaultFolder {
-  id       String  @id @default(cuid())
-  parentId String?
-  name     String
-  path     String
-  position Int     @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(cuid())
+  parentId  String?
+  name      String
+  path      String
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   parent   VaultFolder?  @relation("subfolders", fields: [parentId], references: [id])
@@ -474,47 +417,41 @@ model VaultFolder {
 }
 
 model VaultNote {
-  id        String     @id @default(cuid())
-  folderId  String?
-  title     String
-  slug      String     @unique
-  content   String
-  excerpt   String?
-  status    NoteStatus @default(DRAFT)
-  authorId  String
-  metadata  Json       @default("{}")
-  version   Int        @default(1)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  deletedAt DateTime?
+  id          String    @id @default(cuid())
+  folderId    String?
+  title       String
+  slug        String    @unique
+  content     String
+  excerpt     String?
+  status      String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  authorId    String
+  metadata    String    @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
   publishedAt DateTime?
 
-  folder    VaultFolder? @relation(fields: [folderId], references: [id])
-  author    User         @relation("author", fields: [authorId], references: [id])
-  tags      NoteTag[]
-  outLinks  InternalLink[] @relation("source")
-  inLinks   InternalLink[] @relation("target")
-  versions  NoteVersion[]
-  feedback  NoteFeedback[]
+  folder   VaultFolder?   @relation(fields: [folderId], references: [id])
+  author   User           @relation("author", fields: [authorId], references: [id])
+  tags     NoteTag[]
+  outLinks InternalLink[] @relation("source")
+  inLinks  InternalLink[] @relation("target")
+  versions NoteVersion[]
+  feedback NoteFeedback[]
 
   @@index([folderId])
   @@index([authorId])
   @@map("vault_notes")
 }
 
-enum NoteStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
 model NoteVersion {
-  id       String   @id @default(cuid())
-  noteId   String
-  version  Int
-  title    String
-  content  String
-  editedBy String
+  id        String   @id @default(cuid())
+  noteId    String
+  version   Int
+  title     String
+  content   String
+  editedBy  String
   createdAt DateTime @default(now())
 
   note VaultNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -524,7 +461,7 @@ model NoteVersion {
 }
 
 model InternalLink {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   sourceId String
   targetId String
   context  String?
@@ -537,8 +474,8 @@ model InternalLink {
 }
 
 model Tag {
-  id    String @id @default(cuid())
-  name  String @unique
+  id    String  @id @default(cuid())
+  name  String  @unique
   color String?
 
   notes NoteTag[]
@@ -558,11 +495,11 @@ model NoteTag {
 }
 
 model NoteFeedback {
-  id       String @id @default(cuid())
-  noteId   String
-  userId   String
-  helpful  Boolean
-  comment  String?
+  id        String   @id @default(cuid())
+  noteId    String
+  userId    String
+  helpful   Boolean
+  comment   String?
   createdAt DateTime @default(now())
 
   note VaultNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -571,13 +508,17 @@ model NoteFeedback {
   @@map("note_feedback")
 }
 
+// ============================================================
+// AI ASSISTANT
+// ============================================================
+
 model Conversation {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   title     String?
   model     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   user     User      @relation(fields: [userId], references: [id])
@@ -588,12 +529,12 @@ model Conversation {
 }
 
 model Message {
-  id             String      @id @default(cuid())
+  id             String   @id @default(cuid())
   conversationId String
-  role           MessageRole
+  role           String   // USER, ASSISTANT, SYSTEM, TOOL
   content        String
-  toolCalls      Json?
-  toolResults    Json?
+  toolCalls      String?  // JSON
+  toolResults    String?  // JSON
   model          String?
   tokens         Int?
   createdAt      DateTime @default(now())
@@ -604,12 +545,9 @@ model Message {
   @@map("messages")
 }
 
-enum MessageRole {
-  USER
-  ASSISTANT
-  SYSTEM
-  TOOL
-}
+// ============================================================
+// SHARED / CROSS-CUTTING
+// ============================================================
 
 model Comment {
   id         String   @id @default(cuid())
@@ -619,27 +557,27 @@ model Comment {
   content    String
   parentId   String?
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
-  author   User      @relation(fields: [authorId], references: [id])
-  parent   Comment?  @relation("replies", fields: [parentId], references: [id])
-  replies  Comment[] @relation("replies")
+  author  User      @relation(fields: [authorId], references: [id])
+  parent  Comment?  @relation("replies", fields: [parentId], references: [id])
+  replies Comment[] @relation("replies")
 
   @@index([entityType, entityId])
   @@map("comments")
 }
 
 model Attachment {
-  id         String   @id @default(cuid())
-  entityType String
-  entityId   String
-  fileName   String
-  fileSize   Int
-  mimeType   String
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  fileName    String
+  fileSize    Int
+  mimeType    String
   storagePath String
-  uploadedBy String
-  createdAt  DateTime @default(now())
+  uploadedBy  String
+  createdAt   DateTime @default(now())
 
   @@index([entityType, entityId])
   @@map("attachments")
@@ -651,7 +589,7 @@ model Activity {
   entityId   String
   userId     String
   action     String
-  changes    Json?
+  changes    String?  // JSON
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -680,15 +618,15 @@ model Notification {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  action    String
-  resource  String
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
   resourceId String?
-  details   Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  details    String?  // JSON
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@index([userId])
   @@index([resource, resourceId])
@@ -697,29 +635,23 @@ model AuditLog {
 }
 
 model Guide {
-  id          String      @id @default(cuid())
-  title       String
-  slug        String      @unique
-  content     String
-  category    String
-  order       Int         @default(0)
-  status      GuideStatus @default(PUBLISHED)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String
+  category  String
+  order     Int      @default(0)
+  status    String    @default("PUBLISHED") // DRAFT, PUBLISHED, ARCHIVED
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("guides")
 }
 
-enum GuideStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
 model SystemConfig {
-  id    String @id @default(cuid())
-  key   String @unique
-  value Json
+  id        String @id @default(cuid())
+  key       String @unique
+  value     String // JSON
   updatedAt DateTime @updatedAt
 
   @@map("system_config")

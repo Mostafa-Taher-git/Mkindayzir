@@ -1,4 +1,4 @@
-import { requirePermission, PERMISSIONS } from "@/lib/rbac";
+import { requirePermission, PERMISSIONS } from "@/lib/rbac.server";
 import { WorkItemService } from "./work-item.service";
 import { VaultService } from "./vault.service";
 import { IterationRepository } from "@/repositories/iteration.repository";

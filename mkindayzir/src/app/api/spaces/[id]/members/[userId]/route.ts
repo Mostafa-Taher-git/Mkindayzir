@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { SpaceService } from "@/services/space.service";
 
 const spaceService = new SpaceService();
@@ -10,12 +10,12 @@ export async function DELETE(
 ) {
   try {
     const { id, userId } = await params;
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await spaceService.removeMember(id, userId, session.user);
+    await spaceService.removeMember(id, userId, user);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +37,8 @@ async function getMembers(spaceId: string) {
 }
 
 export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) {
-  const session = await auth();
-  if (!session) {
+  const user = await getSessionUser();
+  if (!user) {
     redirect(ROUTES.LOGIN);
   }
 

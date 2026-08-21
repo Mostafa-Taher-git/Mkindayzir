@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
@@ -33,8 +33,8 @@ async function getCards(boardId: string) {
 }
 
 export default async function BoardDetailPage({ params }: BoardDetailPageProps) {
-  const session = await auth();
-  if (!session) {
+  const user = await getSessionUser();
+  if (!user) {
     redirect(ROUTES.LOGIN);
   }
 
@@ -60,7 +60,7 @@ export default async function BoardDetailPage({ params }: BoardDetailPageProps) 
       board={board}
       columns={columns}
       cards={cards}
-      currentUserId={session.user.id}
+      currentUserId={user.id}
     />
   );
 }

@@ -1,99 +1,101 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap');
+:root {
+  /* Colors - Light theme */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f1f3f5;
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #6c757d;
+  --color-text-muted: #adb5bd;
+  --color-border: #e9ecef;
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-light: #eef2ff;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 
-@theme {
-  --color-background: #001522;
-  --color-foreground: #c7e7ff;
-  --color-surface: #001522;
-  --color-surface-container: #002234;
-  --color-surface-container-high: #002d43;
-  --color-surface-container-highest: #003952;
-  --color-on-surface: #c7e7ff;
-  --color-primary: #ffb3b1;
-  --color-on-primary: #680011;
-  --color-primary-container: #ff535b;
-  --color-secondary: #b0c7f1;
-  --color-on-secondary: #183153;
-  --color-secondary-container: #334a6d;
-  --color-tertiary: #c0c9be;
-  --color-on-tertiary: #2a322b;
-  --color-tertiary-container: #8a9389;
-  --color-error: #ffb4ab;
-  --color-on-error: #690005;
-  --color-outline: #ab8987;
-  --color-mechanical-grey: #6b7280;
-  --color-mechanical-grey-light: #9ca3af;
-  --color-card: #002234;
-  --color-card-foreground: #c7e7ff;
-  --color-muted: #002d43;
-  --color-muted-foreground: #ab8987;
-  --color-accent: #002d43;
-  --color-accent-foreground: #c7e7ff;
-  --color-destructive: #ff535b;
-  --color-destructive-foreground: #680011;
-  --color-border: #ab8987;
-  --color-input: #002234;
-  --color-ring: #ffb3b1;
+  /* Spacing (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+
+  /* Radius */
   --radius-none: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --font-sans: "Hanken Grotesk", "Sora", sans-serif;
-  --font-display: "Sora", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+  /* Sidebar */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 64px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+[data-theme="dark"] {
+  --color-bg-primary: #1a1a2e;
+  --color-bg-secondary: #16213e;
+  --color-bg-tertiary: #0f3460;
+  --color-text-primary: #e9ecef;
+  --color-text-secondary: #adb5bd;
+  --color-text-muted: #6c757d;
+  --color-border: #2d3748;
+  --color-accent: #818cf8;
+  --color-accent-hover: #6366f1;
+  --color-accent-light: #1e1b4b;
 }
 
 @layer base {
   * {
-    @apply border-border;
-    border-radius: 0;
+    border-color: hsl(var(--color-border));
   }
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    background-color: hsl(var(--color-bg-primary));
+    color: hsl(var(--color-text-primary));
     font-family: var(--font-sans);
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-    text-transform: uppercase;
-    letter-spacing: -0.02em;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer utilities {
-  .metallic-gradient {
-    background: linear-gradient(180deg, #002d43 0%, #001522 50%, #002234 100%);
-  }
-  .metallic-gradient-primary {
-    background: linear-gradient(180deg, #ff535b 0%, #ffb3b1 50%, #ff535b 100%);
-  }
-  .metallic-gradient-surface {
-    background: linear-gradient(180deg, #003952 0%, #002d43 50%, #002234 100%);
-  }
-  .chamfer-corners {
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-  }
-  .chamfer-corners-sm {
-    clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-  }
-  .inner-bevel {
-    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.05), inset -1px -1px 0 rgba(0, 0, 0, 0.3);
-  }
-  .hard-border {
-    border: 1px solid #ab8987;
-  }
-  .hard-border-2 {
-    border: 2px solid #ab8987;
-  }
-  .hard-border-primary {
-    border: 2px solid #ffb3b1;
-  }
-  .font-display {
-    font-family: var(--font-display);
+  .font-sans {
+    font-family: var(--font-sans);
   }
   .font-mono {
     font-family: var(--font-mono);
+  }
+  .font-display {
+    font-family: var(--font-display);
   }
 }

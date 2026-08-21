@@ -1,9 +1,9 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
 
 async function getInitialConversations() {
-  const session = await auth();
-  if (!session?.user) return [];
+  const user = await getSessionUser();
+  if (!user) return [];
 
   const res = await fetch("/api/assistant/conversations", {
     cache: "no-store",

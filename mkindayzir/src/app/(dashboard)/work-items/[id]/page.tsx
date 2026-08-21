@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -328,10 +328,10 @@ function WorkItemDetailPage() {
 
 function WorkItemPresence({ workItemId }: { workItemId: string }) {
   "use client";
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const { presentUsers } = usePresence("work_item", workItemId);
-  if (!session?.user?.id) return null;
-  return <PresenceIndicator users={presentUsers} currentUserId={session.user.id} />;
+  if (!user?.id) return null;
+  return <PresenceIndicator users={presentUsers} currentUserId={user.id} />;
 }
 
 export default WorkItemDetailPage;

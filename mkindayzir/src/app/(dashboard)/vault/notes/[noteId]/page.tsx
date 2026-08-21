@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { usePresence } from "@/hooks/use-presence";
@@ -63,7 +63,7 @@ export default async function VaultNotePage({
 }: {
   params: Promise<{ noteId: string }>;
 }) {
-  const session = await auth();
+  const user = await getSessionUser();
   const resolvedParams = await params;
   const noteId = resolvedParams.noteId;
 
@@ -145,7 +145,7 @@ export default async function VaultNotePage({
             )}
             <span className="text-muted-foreground">/</span>
             <span className="text-sm">{note.title || "Untitled"}</span>
-            {session && <NotePresence noteId={noteId} currentUserId={session.user.id} />}
+            {user && <NotePresence noteId={noteId} currentUserId={user.id} />}
           </div>
 
           <NoteViewer
