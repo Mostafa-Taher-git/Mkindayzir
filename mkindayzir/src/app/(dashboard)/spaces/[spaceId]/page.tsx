@@ -101,7 +101,7 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {boards.map((board: Board) => (
-                    <Link key={board.id} href={`/dashboard/boards/${board.id}`}>
+                    <Link key={board.id} href={`/boards/${board.id}`}>
                       <div className="border-2 border-outline p-3 hover:border-primary transition-colors cursor-pointer">
                         <div
                           className="h-2 rounded-full mb-2"

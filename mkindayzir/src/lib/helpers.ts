@@ -24,7 +24,7 @@ export async function audit({
         action,
         resource,
         resourceId,
-        details: details as any,
+        details: details ? JSON.stringify(details) : null,
         ipAddress,
         userAgent,
       },

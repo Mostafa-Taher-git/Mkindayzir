@@ -1,29 +1,21 @@
 import { getSessionUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
 
-async function getInitialConversations() {
-  const user = await getSessionUser();
-  if (!user) return [];
-
-  const res = await fetch("/api/assistant/conversations", {
-    cache: "no-store",
+async function getInitialConversations(userId: string) {
+  return prisma.conversation.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    include: { messages: { take: 1, orderBy: { createdAt: "desc" } } },
   });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.conversations ?? [];
 }
 
-async function getConversation(id: string) {
-  const user = await getSessionUser();
-  if (!user) return null;
-
-  const res = await fetch(`/api/assistant/conversations/${id}`, {
-    cache: "no-store",
+async function getConversation(id: string, userId: string) {
+  return prisma.conversation.findFirst({
+    where: { id, userId },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
   });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.conversation ?? null;
 }
 
 export default async function ConversationPage({
@@ -32,18 +24,19 @@ export default async function ConversationPage({
   params: Promise<{ conversationId: string }>;
 }) {
   const { conversationId } = await params;
+  const user = await getSessionUser();
+  if (!user) notFound();
+
   const [conversation, conversations] = await Promise.all([
-    getConversation(conversationId),
-    getInitialConversations(),
+    getConversation(conversationId, user.id),
+    getInitialConversations(user.id),
   ]);
 
-  if (!conversation) {
-    notFound();
-  }
+  if (!conversation) notFound();
 
   return (
     <AssistantLayout
-      initialConversations={conversations}
+      initialConversations={conversations as any}
       conversationId={conversationId}
     />
   );

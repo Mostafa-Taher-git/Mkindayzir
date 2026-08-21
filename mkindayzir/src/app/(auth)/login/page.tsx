@@ -156,12 +156,18 @@ function LoginForm() {
               {loading ? "Authenticating..." : "Sign in"}
             </button>
           </form>
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-6 flex flex-col items-center gap-3">
             <Link
               href="/forgot-password"
               className="text-xs font-mono uppercase tracking-wider underline hover:text-foreground"
             >
               Forgot password?
+            </Link>
+            <Link
+              href="/setup"
+              className="w-full border-2 border-outline bg-surface px-4 py-2 text-center font-mono text-sm text-foreground uppercase tracking-wider hover:bg-surface-container-low chamfer"
+            >
+              Setup New Instance
             </Link>
           </div>
           {process.env.REGISTRATION_ENABLED === "true" && (

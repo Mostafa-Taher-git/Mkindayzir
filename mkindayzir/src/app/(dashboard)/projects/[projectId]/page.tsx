@@ -1,7 +1,6 @@
-import { usePresence } from "@/hooks/use-presence";
-import { PresenceIndicator } from "@/components/shared/presence-indicator";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import prisma from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,35 +13,33 @@ interface ProjectDetailPageProps {
 }
 
 async function getProject(projectId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/projects/${projectId}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    return await prisma.project.findUnique({ where: { id: projectId, deletedAt: null } });
+  } catch {
+    return null;
+  }
 }
 
 async function getProjectStats(projectId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/projects/${projectId}/stats`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return { total: 0, open: 0, closed: 0, backlog: 0 };
-  return res.json();
-}
-
-function ProjectPresence({ projectId, currentUserId }: { projectId: string; currentUserId: string }) {
-  "use client";
-  const { presentUsers } = usePresence("project", projectId);
-  return <PresenceIndicator users={presentUsers} currentUserId={currentUserId} />;
+  try {
+    const [total, open, closed, backlog] = await Promise.all([
+      prisma.workItem.count({ where: { projectId, deletedAt: null } }),
+      prisma.workItem.count({ where: { projectId, deletedAt: null, resolvedAt: null } }),
+      prisma.workItem.count({ where: { projectId, deletedAt: null, resolvedAt: { not: null } } }),
+      prisma.workItem.count({ where: { projectId, deletedAt: null, iterationId: null, resolvedAt: null } }),
+    ]);
+    return { total, open, closed, backlog };
+  } catch {
+    return { total: 0, open: 0, closed: 0, backlog: 0 };
+  }
 }
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const user = await getSessionUser();
-  if (!user) {
-    redirect(ROUTES.LOGIN);
-  }
+  if (!user) redirect(ROUTES.LOGIN);
 
   const { projectId } = await params;
-  const { project } = await getProject(projectId);
+  const project = await getProject(projectId);
   const stats = await getProjectStats(projectId);
 
   if (!project) {
@@ -76,15 +73,12 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <Badge variant="secondary">{project.key}</Badge>
-            <ProjectPresence projectId={projectId} currentUserId={user.id} />
           </div>
           <p className="text-muted-foreground mt-1">
             {project.description || "No description"}
           </p>
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-            <span className="capitalize">{project.status.toLowerCase()}</span>
-            <span>•</span>
-            <span className="capitalize">{project.visibility.toLowerCase()}</span>
+            <span className="capitalize">{project.status?.toLowerCase() ?? "active"}</span>
             <span>•</span>
             <span>{stats.total} items</span>
             <span>•</span>
@@ -112,73 +106,49 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </TabsList>
         <TabsContent value="work-items" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Work Items</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Work Items</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Navigate to the Work Items tab to view all items.
-              </p>
+              <p className="text-sm text-muted-foreground">Navigate to the Work Items tab to view all items.</p>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="board" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Board</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Board</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Navigate to the Board tab for the Kanban view.
-              </p>
+              <p className="text-sm text-muted-foreground">Navigate to the Board tab for the Kanban view.</p>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="backlog" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Backlog</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Backlog</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Navigate to the Backlog tab for unassigned items.
-              </p>
+              <p className="text-sm text-muted-foreground">Navigate to the Backlog tab for unassigned items.</p>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="iterations" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Iterations</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Iterations</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Navigate to the Iterations tab.
-              </p>
+              <p className="text-sm text-muted-foreground">Navigate to the Iterations tab.</p>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="initiatives" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Initiatives</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Initiatives</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Navigate to the Initiatives tab.
-              </p>
+              <p className="text-sm text-muted-foreground">Navigate to the Initiatives tab.</p>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Settings</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Project settings coming soon.
-              </p>
+              <p className="text-sm text-muted-foreground">Project settings coming soon.</p>
             </CardContent>
           </Card>
         </TabsContent>

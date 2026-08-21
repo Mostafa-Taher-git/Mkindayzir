@@ -7,15 +7,15 @@ export const ROUTES = {
   REGISTER: "/register",
   FORGOT_PASSWORD: "/forgot-password",
   DASHBOARD: "/dashboard",
-  PROJECTS: "/dashboard/projects",
-  SPACES: "/dashboard/spaces",
-  BOARDS: "/dashboard/boards",
-  VAULT: "/dashboard/vault",
-  ASSISTANT: "/dashboard/assistant",
-  GUIDES: "/dashboard/guides",
-  REPORTS: "/dashboard/reports",
-  ADMIN: "/dashboard/admin",
-  SETTINGS: "/dashboard/settings",
+  PROJECTS: "/projects",
+  SPACES: "/spaces",
+  BOARDS: "/boards",
+  VAULT: "/vault",
+  ASSISTANT: "/assistant",
+  GUIDES: "/guides",
+  REPORTS: "/reports",
+  ADMIN: "/admin",
+  SETTINGS: "/settings",
 } as const;
 
 export const PROJECT_STATUSES = [
@@ -97,10 +97,10 @@ export const NOTE_STATUSES = [
 ] as const;
 
 export const VAULT_ROUTES = {
-  HOME: "/dashboard/vault",
-  FOLDERS: "/dashboard/vault/folders",
-  NOTES: "/dashboard/vault/notes",
-  NEW_NOTE: "/dashboard/vault/notes/new",
-  GRAPH: "/dashboard/vault/graph",
-  TAGS: "/dashboard/vault/tags",
+  HOME: "/vault",
+  FOLDERS: "/vault/folders",
+  NOTES: "/vault/notes",
+  NEW_NOTE: "/vault/notes/new",
+  GRAPH: "/vault/graph",
+  TAGS: "/vault/tags",
 } as const;

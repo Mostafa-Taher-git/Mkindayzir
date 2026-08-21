@@ -18,7 +18,7 @@ function AssistantLayout({
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
-    router.push(`/dashboard/assistant/${id}`);
+    router.push(`/assistant/${id}`);
   };
 
   return (

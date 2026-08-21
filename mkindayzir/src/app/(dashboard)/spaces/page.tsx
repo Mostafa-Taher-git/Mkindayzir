@@ -1,16 +1,21 @@
+import prisma from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES, VISIBILITIES } from "@/lib/constants";
-import { Space } from "@/types";
 import Link from "next/link";
 
 async function getSpaces() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/spaces`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return { spaces: [] };
-  return res.json();
+  try {
+    const spaces = await prisma.space.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    return { spaces };
+  } catch {
+    return { spaces: [] };
+  }
 }
 
 export default async function SpacesPage() {
@@ -47,7 +52,7 @@ export default async function SpacesPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {spaces.map((space: Space) => (
+          {spaces.map((space: any) => (
             <Link key={space.id} href={`${ROUTES.SPACES}/${space.id}`}>
               <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
                 <CardHeader>

@@ -95,7 +95,7 @@ function WorkItemsPage({ params }: WorkItemsPageProps) {
   };
 
   const handleRowClick = (id: string) => {
-    router.push(`/dashboard/work-items/${id}`);
+    router.push(`/work-items/${id}`);
   };
 
   return (

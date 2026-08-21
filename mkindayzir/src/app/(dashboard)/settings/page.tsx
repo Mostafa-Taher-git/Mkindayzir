@@ -18,11 +18,12 @@ export default function SettingsPage() {
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
-        if (data.user) {
-          setUser(data.user);
-          setDisplayName(data.user.displayName || "");
-          setAiProvider(data.user.aiProvider || "openrouter");
-          setAiModel(data.user.aiModel || "");
+        const u = data.data || data.user;
+        if (u) {
+          setUser(u);
+          setDisplayName(u.displayName || "");
+          setAiProvider(u.aiProvider || "openrouter");
+          setAiModel(u.aiModel || "");
         }
       })
       .catch(() => {});

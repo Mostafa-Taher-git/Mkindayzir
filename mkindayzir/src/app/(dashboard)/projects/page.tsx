@@ -1,17 +1,22 @@
 import { getSessionUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
-import { PROJECT_STATUSES } from "@/lib/constants";
 import Link from "next/link";
 
 async function getProjects() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/projects`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return { projects: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
-  return res.json();
+  try {
+    const projects = await prisma.project.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    return { projects, pagination: { page: 1, limit: 20, total: projects.length, totalPages: 1 } };
+  } catch {
+    return { projects: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+  }
 }
 
 export default async function ProjectsPage() {
@@ -49,7 +54,7 @@ export default async function ProjectsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project: { id: string; key: string; name: string; description: string | null; status: string; visibility: string }) => (
+          {projects.map((project: any) => (
             <Link key={project.id} href={`${ROUTES.PROJECTS}/${project.id}`}>
               <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
                 <CardHeader>
@@ -64,10 +69,7 @@ export default async function ProjectsPage() {
                 <CardContent>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground capitalize">
-                      {project.status.toLowerCase()}
-                    </span>
-                    <span className="text-xs text-muted-foreground capitalize">
-                      {project.visibility.toLowerCase()}
+                      {project.status?.toLowerCase() ?? "active"}
                     </span>
                   </div>
                 </CardContent>

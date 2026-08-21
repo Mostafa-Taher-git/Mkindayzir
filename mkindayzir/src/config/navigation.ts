@@ -13,10 +13,10 @@ export const navigationItems = [
 ];
 
 export const adminNavigationItems = [
-  { title: "Users", href: "/dashboard/admin/users", icon: Users },
-  { title: "Teams", href: "/dashboard/admin/teams", icon: Users },
-  { title: "Settings", href: "/dashboard/admin/settings", icon: Settings },
-  { title: "Audit", href: "/dashboard/admin/audit", icon: BarChart3 },
+  { title: "Users", href: "/admin/users", icon: Users },
+  { title: "Teams", href: "/admin/teams", icon: Users },
+  { title: "Settings", href: "/admin/settings", icon: Settings },
+  { title: "Audit", href: "/admin/audit", icon: BarChart3 },
 ];
 
 export const bottomNavigationItems = [

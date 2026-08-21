@@ -25,7 +25,7 @@ function NewBoardPage({ params }: { params: Promise<{ spaceId: string }> }) {
       </div>
       <BoardForm
         spaceId={spaceId}
-        onSuccess={(board) => router.push(`/dashboard/boards/${board.id}`)}
+        onSuccess={(board) => router.push(`/boards/${board.id}`)}
       />
     </div>
   );

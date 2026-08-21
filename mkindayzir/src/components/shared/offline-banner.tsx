@@ -1,17 +1,39 @@
 "use client";
 
-import { useOnline } from "@/hooks/use-online";
+import { useEffect, useRef } from "react";
+import { useToast } from "@/components/ui/toast";
 
 export function OfflineBanner() {
-  const isOnline = useOnline();
+  const { toast } = useToast();
+  const wasOnline = useRef(typeof navigator !== "undefined" ? navigator.onLine : true);
 
-  if (isOnline) {
-    return null;
-  }
+  useEffect(() => {
+    const handleOnline = () => {
+      if (!wasOnline.current) {
+        toast({
+          title: "Back Online",
+          description: "Connection restored. Changes will sync.",
+        });
+      }
+      wasOnline.current = true;
+    };
 
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-center py-2 text-sm font-medium">
-      You&apos;re offline. Changes will sync when reconnected.
-    </div>
-  );
+    const handleOffline = () => {
+      wasOnline.current = false;
+      toast({
+          title: "You're Offline",
+          description: "Changes will sync when reconnected.",
+        });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [toast]);
+
+  return null;
 }

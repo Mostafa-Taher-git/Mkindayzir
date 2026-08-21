@@ -1,63 +1,88 @@
-
-import { api } from "@/lib/api";
+import { getSessionUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { VAULT_ROUTES } from "@/lib/constants";
-import { VaultFolder, VaultNote, NoteStatus } from "@/types";
 import { Button } from "@/components/ui/button";
-
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
 import Link from "next/link";
 
 async function getFolders() {
-  try {
-    return await api.get<{ folders: VaultFolder[] }>("/api/vault/folders");
-  } catch {
-    return { folders: [] };
-  }
+  const folders = await prisma.vaultFolder.findMany({
+    where: { deletedAt: null },
+    orderBy: { position: "asc" },
+  });
+  return folders.map((f) => ({
+    ...f,
+    createdAt: f.createdAt.toISOString(),
+    updatedAt: f.updatedAt.toISOString(),
+    deletedAt: f.deletedAt?.toISOString() ?? null,
+  }));
 }
 
-async function getNotes(folderId?: string, status?: NoteStatus, search?: string) {
-  try {
-    const params = new URLSearchParams();
-    if (folderId) params.set("folderId", folderId);
-    if (status) params.set("status", status);
-    if (search) params.set("search", search);
-    return await api.get<{ notes: VaultNote[]; pagination: any }>(
-      `/api/vault/notes?${params.toString()}`
-    );
-  } catch {
-    return { notes: [], pagination: { total: 0 } };
+async function getNotes(folderId?: string, status?: string, search?: string) {
+  const where: any = { deletedAt: null };
+  if (folderId) where.folderId = folderId;
+  if (status) where.status = status;
+  if (search) {
+    where.OR = [
+      { title: { contains: search } },
+      { content: { contains: search } },
+    ];
   }
-}
 
+  const [notes, total] = await Promise.all([
+    prisma.vaultNote.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      include: { folder: true, tags: { include: { tag: true } }, author: true },
+      take: 50,
+    }),
+    prisma.vaultNote.count({ where }),
+  ]);
+
+  const serialized = notes.map((n) => ({
+    ...n,
+    createdAt: n.createdAt.toISOString(),
+    updatedAt: n.updatedAt.toISOString(),
+    deletedAt: n.deletedAt?.toISOString() ?? null,
+    publishedAt: n.publishedAt?.toISOString() ?? null,
+    folder: n.folder ? {
+      ...n.folder,
+      createdAt: n.folder.createdAt.toISOString(),
+      updatedAt: n.folder.updatedAt.toISOString(),
+      deletedAt: n.folder.deletedAt?.toISOString() ?? null,
+    } : null,
+    author: n.author ? {
+      ...n.author,
+      createdAt: n.author.createdAt.toISOString(),
+      updatedAt: n.author.updatedAt.toISOString(),
+    } : null,
+  }));
+
+  return { notes: serialized, pagination: { total } };
+}
 
 export default async function VaultPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  
   const params = await searchParams;
   const folderId = params.folder as string | undefined;
   const statusParam = params.status as string | undefined;
   const search = params.search as string | undefined;
-  const status = statusParam ? (statusParam as NoteStatus) : undefined;
 
-  const [foldersData, notesData] = await Promise.all([
+  const [folders, notesData] = await Promise.all([
     getFolders(),
-    getNotes(folderId, status, search),
+    getNotes(folderId, statusParam, search),
   ]);
 
-  const folders = foldersData.folders || [];
   const notes = notesData.notes || [];
   const currentFolder = folderId ? folders.find((f) => f.id === folderId) : null;
 
   return (
     <div className="flex h-full">
-      <VaultSidebar
-        folders={folders}
-        currentFolderId={folderId}
-      />
+      <VaultSidebar folders={folders} currentFolderId={folderId} />
       <div className="flex-1 overflow-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -86,7 +111,7 @@ export default async function VaultPage({
           </div>
         )}
 
-        <NoteList notes={notes} />
+        <NoteList notes={notes as any} />
       </div>
     </div>
   );
