@@ -40,10 +40,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${sora.variable} ${hanken.variable} ${jetbrains.variable}`}
-      data-theme="dark"
+      className={`${sora.variable} ${hanken.variable} ${jetbrains.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("mkindayzir-theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");document.documentElement.className=document.documentElement.className.replace(/dark|light/g,"").trim()+" "+(t==="light"?"light":"dark")})()`,
+          }}
+        />
+      </head>
       <body className="antialiased font-sans">
         <Providers>{children}</Providers>
         <OfflineBanner />

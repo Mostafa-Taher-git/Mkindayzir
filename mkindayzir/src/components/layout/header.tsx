@@ -219,20 +219,27 @@ export { Header };
 
 function ThemeToggle() {
   const [theme, setTheme] = React.useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
     const stored = localStorage.getItem("mkindayzir-theme");
-    const initial = stored === "dark" ? "dark" : "dark";
+    const initial = stored === "light" ? "light" : "dark";
     setTheme(initial);
     document.documentElement.setAttribute("data-theme", initial);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(initial);
+    setMounted(true);
   }, []);
 
-  const toggle = () => {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("mkindayzir-theme", next);
-  };
+  React.useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(theme);
+    localStorage.setItem("mkindayzir-theme", theme);
+  }, [theme, mounted]);
+
+  const toggle = () => setTheme(theme === "light" ? "dark" : "light");
 
   return (
     <Button variant="ghost" size="icon" onClick={toggle} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>

@@ -75,6 +75,8 @@ export default function SettingsPage() {
     const current = document.documentElement.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(next);
     localStorage.setItem("mkindayzir-theme", next);
   };
 
