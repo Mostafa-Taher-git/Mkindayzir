@@ -24,8 +24,8 @@ export class ProjectRepository extends BaseRepository<any> {
       if (teamId) where.teamId = teamId;
       if (search) {
         where.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { key: { contains: search, mode: "insensitive" } },
+          { name: { contains: search } },
+          { key: { contains: search } },
         ];
       }
 
@@ -35,7 +35,7 @@ export class ProjectRepository extends BaseRepository<any> {
           where,
           skip,
           take: perPage,
-          include: { lead: true, team: true },
+          include: { team: true },
           orderBy: { createdAt: "desc" },
         }),
         prisma.project.count({ where }),
@@ -53,7 +53,6 @@ export class ProjectRepository extends BaseRepository<any> {
       return await prisma.project.findUnique({
         where: { id },
         include: {
-          lead: true,
           team: true,
           _count: { select: { workItems: true } },
         },
@@ -83,7 +82,7 @@ export class ProjectRepository extends BaseRepository<any> {
           key: key.toUpperCase(),
           createdById: data.createdById,
         },
-        include: { lead: true, team: true },
+        include: { team: true },
       });
     } catch (error) {
       console.error("Failed to create project:", error);
@@ -102,7 +101,7 @@ export class ProjectRepository extends BaseRepository<any> {
           ...data,
           updatedAt: new Date(),
         },
-        include: { lead: true, team: true },
+        include: { team: true },
       });
     } catch (error) {
       console.error("Failed to update project:", error);
@@ -118,7 +117,7 @@ export class ProjectRepository extends BaseRepository<any> {
           status: "ARCHIVED",
           deletedAt: new Date(),
         },
-        include: { lead: true, team: true },
+        include: { team: true },
       });
     } catch (error) {
       console.error("Failed to archive project:", error);
@@ -130,7 +129,7 @@ export class ProjectRepository extends BaseRepository<any> {
     try {
       return await prisma.project.findUnique({
         where: { key: key.toUpperCase() },
-        include: { lead: true, team: true },
+        include: { team: true },
       });
     } catch (error) {
       console.error("Failed to find project by key:", error);

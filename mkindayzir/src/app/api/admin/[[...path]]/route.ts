@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser, requirePermission } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { ROLES, PERMISSIONS } from "@/lib/rbac";
 
 export async function GET(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {

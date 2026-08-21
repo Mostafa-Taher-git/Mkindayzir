@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { BaseRepository } from "./base.repository";
-import type { VaultNoteFilter, NoteStatus } from "@/types";
+import type { VaultNoteFilter, NoteStatus, VaultNote } from "@/types";
 
 export class VaultNoteRepository extends BaseRepository<any> {
   constructor() {
@@ -29,8 +29,8 @@ export class VaultNoteRepository extends BaseRepository<any> {
       }
       if (search) {
         where.OR = [
-          { title: { contains: search, mode: "insensitive" } },
-          { content: { contains: search, mode: "insensitive" } },
+          { title: { contains: search } },
+          { content: { contains: search } },
         ];
       }
 
@@ -254,8 +254,8 @@ export class VaultNoteRepository extends BaseRepository<any> {
           deletedAt: null,
           status: "PUBLISHED",
           OR: [
-            { title: { contains: query, mode: "insensitive" } },
-            { content: { contains: query, mode: "insensitive" } },
+            { title: { contains: query } },
+            { content: { contains: query } },
           ],
         },
         include: {
@@ -304,7 +304,7 @@ export class VaultNoteRepository extends BaseRepository<any> {
         title: note.title,
         slug: note.slug,
         status: note.status,
-        links: note.outLinks.map((l) => l.targetId),
+        links: (note.outLinks ?? []).map((l) => l.targetId),
       }));
     } catch (error) {
       console.error("Failed to get graph:", error);

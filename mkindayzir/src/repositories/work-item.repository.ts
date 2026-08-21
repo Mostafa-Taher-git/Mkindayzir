@@ -30,8 +30,8 @@ export class WorkItemRepository extends BaseRepository<any> {
       if (type) where.type = type;
       if (search) {
         where.OR = [
-          { title: { contains: search, mode: "insensitive" } },
-          { description: { contains: search, mode: "insensitive" } },
+          { title: { contains: search } },
+          { description: { contains: search } },
         ];
       }
 
@@ -206,10 +206,10 @@ export class WorkItemRepository extends BaseRepository<any> {
           entityId: id,
           userId,
           action: "status_changed",
-          changes: {
+          changes: JSON.stringify({
             from: existing.status,
             to: newStatus,
-          },
+          }),
         },
       });
 

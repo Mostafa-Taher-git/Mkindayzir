@@ -89,7 +89,7 @@ export class CardRepository extends BaseRepository<any> {
           title: data.title,
           description: data.description,
           dueDate: data.dueDate,
-          coverImage: data.coverImage,
+          coverColor: data.coverImage,
           metadata: (data.metadata as any) || {},
           position: ((maxPosition._max.position as number) ?? -1) + 1,
           createdById: userId,

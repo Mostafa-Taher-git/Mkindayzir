@@ -7,11 +7,6 @@ type OptimisticMutationOptions<TVariables> = {
   onMutate?: (variables: TVariables) => unknown | Promise<unknown>;
   onError?: (error: Error, variables: TVariables, rollback: () => void) => void;
   onSettled?: () => void;
-  realtimeEvent?: {
-    event: string;
-    entityType: string;
-    entityId: string;
-  };
 };
 
 type UseOptimisticMutationReturn<TVariables> = {
@@ -25,7 +20,6 @@ export function useOptimisticMutation<TVariables>({
   onMutate,
   onError,
   onSettled,
-  realtimeEvent,
 }: OptimisticMutationOptions<TVariables>): UseOptimisticMutationReturn<TVariables> {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -46,14 +40,6 @@ export function useOptimisticMutation<TVariables>({
         }
 
         await mutationFn(variables);
-
-        if (realtimeEvent) {
-          const { broadcastAnyEvent } = await import("@/lib/realtime");
-          broadcastAnyEvent(realtimeEvent.event, {
-            entityType: realtimeEvent.entityType,
-            entityId: realtimeEvent.entityId,
-          });
-        }
       } catch (err) {
         const actualError = err instanceof Error ? err : new Error("Unknown error");
         setError(actualError);
@@ -65,7 +51,7 @@ export function useOptimisticMutation<TVariables>({
         onSettled?.();
       }
     },
-    [mutationFn, onMutate, onError, onSettled, realtimeEvent]
+    [mutationFn, onMutate, onError, onSettled]
   );
 
   return { mutate, isPending, error };

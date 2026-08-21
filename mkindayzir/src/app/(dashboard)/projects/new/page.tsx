@@ -80,7 +80,7 @@ function NewProjectPage() {
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             {mutation.isError && (
-              <div className="p-3 text-sm text-destructive-foreground bg-destructive/10 border border-destructive rounded-md">
+              <div className="border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground">
                 {mutation.error.message}
               </div>
             )}

@@ -15,7 +15,7 @@ interface NoteEditorProps {
   note?: VaultNote;
   folders: VaultFolder[];
   availableTags: Tag[];
-  onSave: (data: {
+  onSave?: (data: {
     title: string;
     content: string;
     folderId: string | null;
@@ -95,6 +95,7 @@ export function NoteEditor({
   };
 
   const handleSave = async (publish = false) => {
+    if (!onSave) return;
     await onSave({
       title,
       content,

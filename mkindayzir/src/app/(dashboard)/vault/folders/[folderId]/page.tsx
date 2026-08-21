@@ -64,7 +64,6 @@ export default async function VaultFolderPage({
       <VaultSidebar
         folders={allFolders}
         currentFolderId={folderId}
-        onCreateFolder={() => {}}
       />
       <div className="flex-1 overflow-auto p-6">
         <div className="flex items-center justify-between mb-6">

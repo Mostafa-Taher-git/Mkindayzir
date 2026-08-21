@@ -57,9 +57,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Setup failed";
     console.error("Setup error:", error);
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Setup failed" } },
+      { error: { code: "INTERNAL_ERROR", message } },
       { status: 500 }
     );
   }

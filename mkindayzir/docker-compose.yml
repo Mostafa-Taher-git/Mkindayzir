@@ -16,15 +16,35 @@ services:
       - BASE_URL=http://localhost:3000
       - PORT=3000
       - AUTO_LOGIN=false
+      - PYTHON_AI_URL=http://mkindayzir-ai:8000
     volumes:
       - upload-data:/app/data/uploads
       - backup-data:/app/data/backups
     depends_on:
       db:
         condition: service_healthy
+      mkindayzir-ai:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mkindayzir-ai:
+    build:
+      context: ./python-ai
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - NEXTJS_URL=http://mkindayzir:3000
+      - DEFAULT_AI_PROVIDER=openrouter
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

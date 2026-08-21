@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { BaseRepository } from "./base.repository";
-import type { VaultFolder } from "@/types";
 
 export class VaultFolderRepository extends BaseRepository<any> {
   constructor() {
@@ -29,55 +28,42 @@ export class VaultFolderRepository extends BaseRepository<any> {
 
   async findById(id: string) {
     try {
-      return await prisma.vaultFolder.findFirst({
-        where: { id, deletedAt: null },
+      return await prisma.vaultFolder.findUnique({
+        where: { id },
         include: {
           parent: true,
           children: {
             where: { deletedAt: null },
             orderBy: { position: "asc" },
           },
-          notes: {
-            where: { deletedAt: null },
-            orderBy: { updatedAt: "desc" },
-          },
+          _count: { select: { notes: true, children: true } },
         },
       });
     } catch (error) {
-      console.error("Failed to find vault folder by id:", error);
+      console.error("Failed to find vault folder by ID:", error);
       throw error;
     }
   }
 
-  async create(data: {
-    parentId?: string | null;
-    name: string;
-    position?: number;
-  }) {
+  async create(data: { name: string; parentId?: string | null; position?: number }) {
     try {
-      const parent = data.parentId
-        ? await prisma.vaultFolder.findUnique({ where: { id: data.parentId } })
-        : null;
-
-      const basePath = parent ? parent.path : "";
-      const path = basePath ? `${basePath}/${data.name}` : data.name;
-
-      const existing = await prisma.vaultFolder.findFirst({
-        where: { parentId: data.parentId ?? null, name: data.name, deletedAt: null },
-      });
-
-      if (existing) {
-        throw new Error("A folder with this name already exists at this level");
-      }
+      const parent = data.parentId ? await prisma.vaultFolder.findUnique({ where: { id: data.parentId } }) : null;
+      const path = parent ? `${parent.path}/${data.name}` : data.name;
 
       return await prisma.vaultFolder.create({
         data: {
-          parentId: data.parentId ?? null,
           name: data.name,
           path,
-          position: data.position ?? 0,
+          parentId: data.parentId || null,
+          position: data.position,
         },
-        include: { parent: true, children: true },
+        include: {
+          parent: true,
+          children: {
+            where: { deletedAt: null },
+            orderBy: { position: "asc" },
+          },
+        },
       });
     } catch (error) {
       console.error("Failed to create vault folder:", error);
@@ -88,27 +74,21 @@ export class VaultFolderRepository extends BaseRepository<any> {
   async update(id: string, data: { name?: string; parentId?: string | null; position?: number }) {
     try {
       const folder = await prisma.vaultFolder.findUnique({ where: { id } });
-      if (!folder) throw new Error("Folder not found");
+      if (!folder) throw new Error("VaultFolder not found");
 
-      let path = folder.path;
-      if (data.name || data.parentId !== undefined) {
-        const parentId = data.parentId ?? folder.parentId;
-        const parent = parentId
-          ? await prisma.vaultFolder.findUnique({ where: { id: parentId } })
-          : null;
-        const name = data.name ?? folder.name;
-        path = parent ? `${parent.path}/${name}` : name;
-      }
+      const parent = data.parentId ? await prisma.vaultFolder.findUnique({ where: { id: data.parentId } }) : null;
+      const path = parent ? `${parent.path}/${data.name || folder.name}` : (data.name || folder.name);
 
       return await prisma.vaultFolder.update({
         where: { id },
-        data: {
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.parentId !== undefined && { parentId: data.parentId }),
-          ...(data.position !== undefined && { position: data.position }),
-          path,
+        data: { ...data, path },
+        include: {
+          parent: true,
+          children: {
+            where: { deletedAt: null },
+            orderBy: { position: "asc" },
+          },
         },
-        include: { parent: true, children: true },
       });
     } catch (error) {
       console.error("Failed to update vault folder:", error);
@@ -124,18 +104,6 @@ export class VaultFolderRepository extends BaseRepository<any> {
       });
     } catch (error) {
       console.error("Failed to delete vault folder:", error);
-      throw error;
-    }
-  }
-
-  async findByPath(path: string) {
-    try {
-      return await prisma.vaultFolder.findFirst({
-        where: { path, deletedAt: null },
-        include: { parent: true, children: true },
-      });
-    } catch (error) {
-      console.error("Failed to find vault folder by path:", error);
       throw error;
     }
   }

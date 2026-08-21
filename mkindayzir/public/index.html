@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mkindayzir — Your Operations, Your Server, Your Control.</title>
+  <meta name="description" content="Mkindayzir is a self-hosted, local-first Work OS. Projects, boards, knowledge vault, and an AI assistant — all on your own machine." />
+  <link rel="icon" href="MKINDAYZIR_logo.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, [data-theme="dark"] {
+      --bg: #001522;
+      --bg-2: #002234;
+      --bg-3: #002d43;
+      --bg-low: #00101b;
+      --ink: #c7e7ff;
+      --ink-2: #a9c6e2;
+      --ink-mut: #6f8eac;
+      --steel: #4a6378;
+      --steel-2: #ab8987;
+      --red: #bb152c;
+      --red-h: #d61f33;
+      --red-br: #ff535b;
+      --red-lt: #ffb3b1;
+      --ok: #5fd6a0;
+      --warn: #ffce6b;
+      --sheen: linear-gradient(180deg, #003952 0%, #002234 55%, #001522 100%);
+      --red-sheen: linear-gradient(180deg, #ff535b 0%, #bb152c 100%);
+      --panel-line: rgba(199,231,255,0.06);
+      --font-display: "Sora", system-ui, sans-serif;
+      --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
+      color-scheme: dark;
+    }
+    [data-theme="light"] {
+      --bg: #e9eef3; --bg-2: #dce5ec; --bg-3: #cfdbe6; --bg-low: #f3f6f9;
+      --ink: #0c2233; --ink-2: #33526e; --ink-mut: #5f7a93;
+      --steel: #9fb2c4; --steel-2: #7d93a8;
+      --red: #bb152c; --red-h: #d61f33; --red-br: #ff535b; --red-lt: #8a0014;
+      --sheen: linear-gradient(180deg, #ffffff 0%, #dce5ec 60%, #cdd9e5 100%);
+      --panel-line: rgba(12,34,51,0.06);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; border-color: var(--steel); }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      background-image: var(--sheen);
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    h1,h2,h3 { font-family: var(--font-display); letter-spacing: -0.02em; font-weight: 800; }
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: var(--red); color: #fff; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--bg-low); }
+    ::-webkit-scrollbar-thumb { background: var(--steel); border: 2px solid var(--bg-low); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--red-br); }
+
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .mono { font-family: var(--font-mono); }
+    .label { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: var(--ink-mut); }
+    .nums { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* Nav */
+    header.nav {
+      position: sticky; top: 0; z-index: 50;
+      border-bottom: 2px solid var(--steel-2);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(8px);
+    }
+    .nav-in { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand img { height: 36px; width: 36px; object-fit: cover; border: 2px solid var(--steel-2); }
+    .brand b { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; font-size: 16px; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; color: var(--ink-2); }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 13px; font-weight: 500;
+      padding: 11px 20px; border: 2px solid var(--steel-2); cursor: pointer; transition: all .16s cubic-bezier(.16,1,.3,1);
+    }
+    .btn-primary { background: var(--red-sheen); color: #fff; border-color: var(--steel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.4); }
+    .btn-primary:hover { background: var(--red-h); box-shadow: 0 0 0 1px var(--red), 0 0 14px -2px var(--red-br); }
+    .btn-ghost { background: transparent; color: var(--ink); }
+    .btn-ghost:hover { border-color: var(--red); color: var(--red-lt); }
+    .chamfer { clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 9px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px), 0 9px); }
+    .chamfer-lg { clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px); }
+
+    /* Hero */
+    .hero { padding: 96px 0 72px; position: relative; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+    .status-dot { display: inline-flex; align-items: center; gap: 8px; }
+    .dot { width: 8px; height: 8px; background: var(--red-br); box-shadow: 0 0 10px var(--red-br); animation: pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .hero h1 { font-size: clamp(2.4rem, 5vw, 4rem); line-height: 1.04; text-transform: uppercase; }
+    .hero h1 .accent { color: var(--red-lt); }
+    .hero p.lead { margin-top: 22px; font-size: 18px; color: var(--ink-2); max-width: 520px; }
+    .hero-actions { margin-top: 32px; display: flex; gap: 14px; flex-wrap: wrap; }
+    .hero-stats { margin-top: 44px; display: grid; grid-template-columns: repeat(3, auto); gap: 36px; }
+    .stat .n { font-family: var(--font-mono); font-size: 30px; font-weight: 700; color: var(--ink); }
+    .stat .l { margin-top: 4px; }
+
+    .console {
+      border: 2px solid var(--steel-2);
+      background: var(--bg-2);
+      background-image: var(--sheen);
+      box-shadow: 0 0 0 2px var(--steel), 0 24px 60px -30px rgba(0,0,0,.8);
+    }
+    .console-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 2px solid var(--steel-2); background: var(--bg-3); }
+    .console-bar .t { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-mut); margin-left: 6px; }
+    .console-body { padding: 20px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .tile { border: 2px solid var(--steel); background: var(--bg-low); padding: 16px; }
+    .tile .k { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-mut); }
+    .tile .v { font-family: var(--font-mono); font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .tile.red { border-color: var(--red); box-shadow: inset 0 0 14px -6px var(--red-br); }
+    .tile.red .v { color: var(--red-lt); }
+    .bar { height: 8px; background: var(--bg-low); border: 1px solid var(--steel); margin-top: 10px; position: relative; }
+    .bar > i { position: absolute; inset: 0 70% 0 0; background: var(--red-sheen); }
+
+    /* Sections */
+    section { padding: 72px 0; }
+    .sec-head { max-width: 640px; margin-bottom: 40px; }
+    .sec-head h2 { font-size: clamp(1.8rem, 3vw, 2.5rem); text-transform: uppercase; }
+    .sec-head p { margin-top: 14px; color: var(--ink-2); }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card {
+      border: 2px solid var(--steel);
+      background: var(--bg-2);
+      background-image: var(--sheen);
+      padding: 24px;
+      box-shadow: inset 0 1px 0 rgba(199,231,255,.12);
+    }
+    .card .ico { width: 42px; height: 42px; border: 2px solid var(--steel-2); display: grid; place-items: center; color: var(--red-lt); margin-bottom: 16px; }
+    .card h3 { font-size: 18px; text-transform: uppercase; letter-spacing: .01em; }
+    .card p { margin-top: 10px; color: var(--ink-2); font-size: 15px; }
+
+    .modes { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+    .mode { border: 2px solid var(--steel); background: var(--bg-2); padding: 26px; position: relative; }
+    .mode.featured { border-color: var(--red); box-shadow: 0 0 0 1px var(--red), 0 0 22px -8px var(--red-br); }
+    .mode .tag { position: absolute; top: -1px; right: -1px; background: var(--red-sheen); color:#fff; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; padding: 4px 10px; }
+    .mode h3 { font-size: 20px; text-transform: uppercase; }
+    .mode ul { margin-top: 16px; list-style: none; display: grid; gap: 10px; }
+    .mode li { font-size: 14px; color: var(--ink-2); display: flex; gap: 10px; }
+    .mode li::before { content: "▸"; color: var(--red-br); }
+
+    .cta-band {
+      border: 2px solid var(--steel-2);
+      background: var(--bg-2); background-image: var(--sheen);
+      padding: 48px; text-align: center; position: relative; overflow: hidden;
+    }
+    .cta-band h2 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); text-transform: uppercase; }
+    .cta-band p { margin: 14px auto 0; color: var(--ink-2); max-width: 540px; }
+    .cta-band .hero-actions { justify-content: center; }
+
+    footer { border-top: 2px solid var(--steel-2); background: var(--bg-low); padding: 44px 0; margin-top: 40px; }
+    .foot-in { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .foot-links { display: flex; gap: 24px; flex-wrap: wrap; }
+    .foot-links a { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; color: var(--ink-mut); }
+    .foot-links a:hover { color: var(--ink); }
+    .copy { font-family: var(--font-mono); font-size: 11px; color: var(--ink-mut); }
+
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .grid-3, .modes { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="/index.html">
+        <img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" />
+        <b>Mkindayzir</b>
+      </a>
+      <nav class="nav-links">
+        <a href="/features.html">Features</a>
+        <a href="/about.html">About</a>
+        <a href="/login">Console</a>
+      </nav>
+      <div class="nav-cta">
+        <button class="btn btn-ghost chamfer" id="themeBtn" title="Toggle theme">◐</button>
+        <a class="btn btn-primary chamfer" href="/login">Enter Console</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="status-dot label"><span class="dot"></span> System Online · Local-first</div>
+        <h1 style="margin-top:18px">Your Operations.<br>Your Server.<br><span class="accent">Your Control.</span></h1>
+        <p class="lead">A self-hosted Work OS that runs entirely on your own machine. Projects, boards, a knowledge vault, and an AI assistant — no cloud, no leakage, no monthly bill.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary chamfer-lg" href="/login">Enter Console →</a>
+          <a class="btn btn-ghost chamfer" href="/features.html">View Features</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><div class="n nums">100%</div><div class="l label">On your hardware</div></div>
+          <div class="stat"><div class="n nums">0</div><div class="l label">Cloud dependencies</div></div>
+          <div class="stat"><div class="n nums">3</div><div class="l label">Deployment modes</div></div>
+        </div>
+      </div>
+      <div class="console chamfer-lg">
+        <div class="console-bar">
+          <span class="dot"></span>
+          <span class="t">mkindayzir · ops-console</span>
+        </div>
+        <div class="console-body">
+          <div class="tile"><div class="k">Projects</div><div class="v nums">12</div><div class="bar"><i></i></div></div>
+          <div class="tile red"><div class="k">Open Items</div><div class="v nums">47</div><div class="bar"><i style="inset:0 40% 0 0"></i></div></div>
+          <div class="tile"><div class="k">Vault Notes</div><div class="v nums">208</div><div class="bar"><i style="inset:0 25% 0 0"></i></div></div>
+          <div class="tile"><div class="k">Uptime</div><div class="v nums">99.9%</div><div class="bar"><i style="inset:0 12% 0 0"></i></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">Core Capabilities</div>
+        <h2>Built like a cockpit.</h2>
+        <p>Every surface is engineered for focus — structural panels, monospaced telemetry, and a clear chain of command from task to resolution.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="ico">▦</div>
+          <h3>Projects &amp; Boards</h3>
+          <p>Plan in hierarchies, execute on Kanban boards, and track work items with statuses, priorities, and assignments.</p>
+        </div>
+        <div class="card">
+          <div class="ico">❖</div>
+          <h3>Knowledge Vault</h3>
+          <p>A markdown-powered wiki with folders, tags, backlinks, and a graph view — your team's institutional memory.</p>
+        </div>
+        <div class="card">
+          <div class="ico">✦</div>
+          <h3>AI Assistant</h3>
+          <p>A local-first AI that searches your items and vault, creates work, and answers from your own data — your keys, your call.</p>
+        </div>
+        <div class="card">
+          <div class="ico">⛨</div>
+          <h3>Encrypted &amp; Local</h3>
+          <p>Data stays on disk. API keys are encrypted at rest with AES-256-GCM. Nothing leaves your network unless you choose.</p>
+        </div>
+        <div class="card">
+          <div class="ico">⟳</div>
+          <h3>Offline-Capable</h3>
+          <p>A service worker keeps the console usable without a connection. Changes sync when you reconnect.</p>
+        </div>
+        <div class="card">
+          <div class="ico">⚙</div>
+          <h3>Self-Hosted</h3>
+          <p>One binary or one Docker Compose file. Personal mode runs on SQLite with zero external services.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">Deployment</div>
+        <h2>One product, three scales.</h2>
+        <p>Start alone, grow to a team, expand to the enterprise — same interface, same data model.</p>
+      </div>
+      <div class="modes">
+        <div class="mode">
+          <h3>Personal</h3>
+          <ul>
+            <li>SQLite, single user</li>
+            <li>No Docker required</li>
+            <li>Runs on an old laptop</li>
+            <li>Auto-login option</li>
+          </ul>
+        </div>
+        <div class="mode featured">
+          <span class="tag">Popular</span>
+          <h3>Team</h3>
+          <ul>
+            <li>PostgreSQL + Docker</li>
+            <li>2–20 users, roles</li>
+            <li>Real-time sync</li>
+            <li>Shared vault &amp; boards</li>
+          </ul>
+        </div>
+        <div class="mode">
+          <h3>Enterprise</h3>
+          <ul>
+            <li>20+ users, SSO-ready</li>
+            <li>nginx reverse proxy</li>
+            <li>Backups &amp; audit</li>
+            <li>Priority support</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="cta-band chamfer-lg">
+        <div class="label" style="justify-content:center; display:flex">Get Started</div>
+        <h2 style="margin-top:10px">Take back your operations.</h2>
+        <p>Deploy in minutes. Your data never leaves the building.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary chamfer-lg" href="/login">Enter Console →</a>
+          <a class="btn btn-ghost chamfer" href="/features.html">All Features</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot-in">
+      <a class="brand" href="/index.html">
+        <img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" />
+        <b>Mkindayzir</b>
+      </a>
+      <nav class="foot-links">
+        <a href="/index.html">Home</a>
+        <a href="/features.html">Features</a>
+        <a href="/about.html">About</a>
+        <a href="/login">Console</a>
+      </nav>
+      <div class="copy">© <span id="yr"></span> Mkindayzir · Local-first Work OS</div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+    var btn = document.getElementById('themeBtn');
+    var saved = localStorage.getItem('mkindayzir-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    btn.addEventListener('click', function () {
+      var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      var next = cur === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('mkindayzir-theme', next);
+    });
+  </script>
+</body>
+</html>

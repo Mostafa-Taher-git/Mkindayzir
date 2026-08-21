@@ -53,27 +53,11 @@ export default async function EditNotePage({
 
   const note = noteData.note;
 
-  const handleSave = async (data: {
-    title: string;
-    content: string;
-    folderId: string | null;
-    tagIds: string[];
-    status: string;
-  }) => {
-    try {
-      await api.patch(`/api/vault/notes/${noteId}`, data);
-      window.location.href = `${VAULT_ROUTES.NOTES}/${noteId}`;
-    } catch (e) {
-      console.error("Failed to update note", e);
-    }
-  };
-
   return (
     <div className="flex h-full">
       <VaultSidebar
         folders={folders}
         currentFolderId={note.folderId}
-        onCreateFolder={() => {}}
       />
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
@@ -91,7 +75,6 @@ export default async function EditNotePage({
             note={note}
             folders={folders}
             availableTags={tags}
-            onSave={handleSave}
           />
         </div>
       </div>

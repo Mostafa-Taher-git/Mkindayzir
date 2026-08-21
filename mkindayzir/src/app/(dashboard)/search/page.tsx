@@ -69,7 +69,7 @@ function SearchPage() {
               <button
                 key={type}
                 onClick={() => toggleType(type)}
-                className={`inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                className={`inline-flex items-center border border-outline px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   types.includes(type)
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-accent"

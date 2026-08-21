@@ -159,7 +159,7 @@ function WorkItemDetailPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="text-2xl font-bold mt-1 w-full border rounded px-2 py-1"
+                className="text-2xl font-bold mt-1 w-full border-2 border-outline bg-surface px-2 py-1 font-mono text-foreground focus:border-primary focus:outline-none"
               />
             ) : (
               <h1 className="text-2xl font-bold">{item.title}</h1>

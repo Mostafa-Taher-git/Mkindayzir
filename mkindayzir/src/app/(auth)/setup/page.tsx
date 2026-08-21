@@ -7,21 +7,24 @@ import { SetupSchema } from "@/lib/validators";
 
 type Mode = "personal" | "team" | "enterprise";
 
-const MODES: { value: Mode; label: string; description: string }[] = [
+const MODES: { value: Mode; label: string; spec: string; description: string }[] = [
   {
     value: "personal",
     label: "Personal",
-    description: "Single user on a personal laptop. SQLite, no Docker, no team features.",
+    spec: "1 USER · SQLITE",
+    description: "Single user on a personal laptop. No Docker, no network, no team features.",
   },
   {
     value: "team",
     label: "Team",
-    description: "2-20 users on a local network. PostgreSQL, WebSocket, full auth.",
+    spec: "2–20 USERS · POSTGRES",
+    description: "Local-network team. PostgreSQL, WebSocket sync, full role-based auth.",
   },
   {
     value: "enterprise",
     label: "Enterprise",
-    description: "20+ users on dedicated infrastructure. PostgreSQL, WebSocket, audit logging.",
+    spec: "20+ USERS · POSTGRES",
+    description: "Dedicated infrastructure. PostgreSQL, audit logging, reverse proxy.",
   },
 ];
 
@@ -41,7 +44,7 @@ export default function SetupPage() {
     setLoading(true);
 
     if (!mode) {
-      setError("Please select a usage mode");
+      setError("Select a usage mode to continue");
       setLoading(false);
       return;
     }
@@ -87,102 +90,88 @@ export default function SetupPage() {
     }
   };
 
+  const fieldClass =
+    "w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-2xl border-2 border-outline bg-surface-container p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-display uppercase tracking-wider">Welcome to Mkindayzir</h1>
-          <p className="text-muted-foreground mt-2">Let's get you set up in 3 simple steps</p>
+      <div className="panel w-full max-w-2xl p-8 shadow-panel">
+        <div className="mb-8 flex items-center gap-3 border-b-2 border-outline-strong pb-6">
+          <img src="/MKINDAYZIR_logo.jpg" alt="Mkindayzir" className="h-11 w-11 object-cover border-2 border-outline-strong" />
+          <div>
+            <div className="font-display text-xl font-extrabold uppercase tracking-tight">System Setup</div>
+            <div className="uppercase-label text-muted-foreground mt-1">Initialize your operations console</div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {error && (
-            <div className="p-3 text-sm text-destructive-foreground bg-destructive/10 border-2 border-destructive">
+            <div className="border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground">
               {error}
             </div>
           )}
 
           {/* Step 1: Mode Selection */}
           <div>
-            <h2 className="text-lg font-semibold mb-4 font-mono uppercase tracking-wider">
-              1. How will you use Mkindayzir?
+            <h2 className="mb-4 font-mono text-sm font-semibold uppercase tracking-wider">
+              01 · How will you use Mkindayzir?
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {MODES.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMode(m.value)}
-                  className={`p-4 border-2 text-left transition-colors ${
-                    mode === m.value
-                      ? "border-primary bg-accent"
-                      : "border-outline hover:border-primary"
-                  }`}
-                >
-                  <h3 className="font-semibold">{m.label}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
-                </button>
-              ))}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {MODES.map((m) => {
+                const active = mode === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMode(m.value)}
+                    className={`border-2 p-4 text-left transition-all ${
+                      active
+                        ? "border-primary bg-primary/10 shadow-[inset_0_0_14px_-4px_var(--color-accent-bright)]"
+                        : "border-outline hover:border-primary"
+                    }`}
+                  >
+                    <div className={`font-display text-base font-bold uppercase ${active ? "text-primary-light" : "text-foreground"}`}>
+                      {m.label}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {m.spec}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">{m.description}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Step 2: Admin Account */}
           <div>
-            <h2 className="text-lg font-semibold mb-4 font-mono uppercase tracking-wider">
-              2. Create your admin account
+            <h2 className="mb-4 font-mono text-sm font-semibold uppercase tracking-wider">
+              02 · Create your admin account
             </h2>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium mb-2 font-mono uppercase tracking-wider">
+                <label htmlFor="email" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Email
                 </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-outline bg-surface text-foreground font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-                  required
-                />
+                <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={fieldClass} required />
               </div>
               <div>
-                <label htmlFor="displayName" className="block text-sm font-medium mb-2 font-mono uppercase tracking-wider">
+                <label htmlFor="displayName" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Display Name
                 </label>
-                <input
-                  id="displayName"
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-outline bg-surface text-foreground font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-                  required
-                />
+                <input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={fieldClass} required />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium mb-2 font-mono uppercase tracking-wider">
+                <label htmlFor="password" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-outline bg-surface text-foreground font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-                  required
-                />
+                <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={fieldClass} required />
               </div>
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2 font-mono uppercase tracking-wider">
+                <label htmlFor="confirmPassword" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Confirm Password
                 </label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-outline bg-surface text-foreground font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-                  required
-                />
+                <input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={fieldClass} required />
               </div>
             </div>
           </div>
@@ -190,9 +179,9 @@ export default function SetupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-primary text-primary-foreground border-2 border-outline hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed font-mono uppercase tracking-wider"
+            className="w-full border-2 border-outline-strong bg-primary px-4 py-3 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Setting up..." : "Complete Setup"}
+            {loading ? "Initializing system..." : "Complete Setup →"}
           </button>
         </form>
       </div>

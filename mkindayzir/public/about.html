@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — Mkindayzir</title>
+  <meta name="description" content="Why Mkindayzir exists: a self-hosted, local-first Work OS that puts you back in control of your operations data." />
+  <link rel="icon" href="MKINDAYZIR_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, [data-theme="dark"] {
+      --bg:#001522; --bg-2:#002234; --bg-3:#002d43; --bg-low:#00101b;
+      --ink:#c7e7ff; --ink-2:#a9c6e2; --ink-mut:#6f8eac;
+      --steel:#4a6378; --steel-2:#ab8987;
+      --red:#bb152c; --red-h:#d61f33; --red-br:#ff535b; --red-lt:#ffb3b1;
+      --sheen:linear-gradient(180deg,#003952 0%,#002234 55%,#001522 100%);
+      --red-sheen:linear-gradient(180deg,#ff535b 0%,#bb152c 100%);
+      --font-display:"Sora",system-ui,sans-serif; --font-sans:"Hanken Grotesk",system-ui,sans-serif; --font-mono:"JetBrains Mono",ui-monospace,monospace;
+      color-scheme: dark;
+    }
+    [data-theme="light"] {
+      --bg:#e9eef3; --bg-2:#dce5ec; --bg-3:#cfdbe6; --bg-low:#f3f6f9;
+      --ink:#0c2233; --ink-2:#33526e; --ink-mut:#5f7a93;
+      --steel:#9fb2c4; --steel-2:#7d93a8; --red:#bb152c; --red-h:#d61f33; --red-br:#ff535b; --red-lt:#8a0014;
+      --sheen:linear-gradient(180deg,#ffffff 0%,#dce5ec 60%,#cdd9e5 100%); color-scheme: light;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; border-color:var(--steel); }
+    body { background:var(--bg); background-image:var(--sheen); background-attachment:fixed; color:var(--ink); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; line-height:1.6; }
+    h1,h2,h3 { font-family:var(--font-display); letter-spacing:-0.02em; font-weight:800; }
+    a { color:inherit; text-decoration:none; }
+    ::selection { background:var(--red); color:#fff; }
+    .wrap { max-width:880px; margin:0 auto; padding:0 24px; }
+    .label { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.08em; font-size:11px; color:var(--ink-mut); }
+    header.nav { position:sticky; top:0; z-index:50; border-bottom:2px solid var(--steel-2); background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(8px); }
+    .nav-in { display:flex; align-items:center; justify-content:space-between; height:64px; max-width:1200px; margin:0 auto; padding:0 24px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand img { height:36px; width:36px; object-fit:cover; border:2px solid var(--steel-2); }
+    .brand b { font-family:var(--font-display); font-weight:800; text-transform:uppercase; font-size:16px; }
+    .nav-links { display:flex; gap:28px; }
+    .nav-links a { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:12px; color:var(--ink-2); }
+    .nav-links a:hover, .nav-links a.active { color:var(--ink); }
+    .btn { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:13px; font-weight:500; padding:11px 20px; border:2px solid var(--steel-2); cursor:pointer; transition:all .16s; }
+    .btn-primary { background:var(--red-sheen); color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.4); }
+    .btn-primary:hover { background:var(--red-h); }
+    .chamfer { clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% calc(100% - 9px),calc(100% - 9px) 100%,9px 100%,0 calc(100% - 9px),0 9px); }
+    section { padding:64px 0; }
+    .hero h1 { font-size:clamp(2.2rem,5vw,3.4rem); text-transform:uppercase; margin-top:12px; line-height:1.05; }
+    .hero h1 .accent { color:var(--red-lt); }
+    .hero p { margin-top:20px; font-size:18px; color:var(--ink-2); }
+    .prose p { color:var(--ink-2); margin-top:16px; font-size:16px; }
+    .prose h2 { font-size:1.5rem; text-transform:uppercase; margin-top:40px; }
+    .prose ul { margin-top:16px; list-style:none; display:grid; gap:10px; }
+    .prose li { display:flex; gap:10px; color:var(--ink-2); }
+    .prose li::before { content:"▸"; color:var(--red-br); }
+    .pull { border-left:4px solid var(--red); background:var(--bg-2); padding:20px 24px; margin-top:32px; font-family:var(--font-display); font-weight:700; font-size:20px; text-transform:uppercase; }
+    .principles { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:24px; }
+    .pcard { border:2px solid var(--steel); background:var(--bg-2); background-image:var(--sheen); padding:22px; }
+    .pcard .n { font-family:var(--font-mono); color:var(--red-lt); font-size:12px; letter-spacing:0.1em; }
+    .pcard h3 { font-size:17px; text-transform:uppercase; margin-top:6px; }
+    .pcard p { color:var(--ink-2); font-size:14px; margin-top:8px; }
+    footer { border-top:2px solid var(--steel-2); background:var(--bg-low); padding:44px 0; margin-top:40px; }
+    .foot-in { display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; max-width:1200px; margin:0 auto; padding:0 24px; }
+    .foot-links { display:flex; gap:24px; flex-wrap:wrap; }
+    .foot-links a { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:11px; color:var(--ink-mut); }
+    .foot-links a:hover { color:var(--ink); }
+    .copy { font-family:var(--font-mono); font-size:11px; color:var(--ink-mut); }
+    @media (max-width:800px){ .principles{grid-template-columns:1fr;} .nav-links{display:none;} }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-in">
+      <a class="brand" href="/index.html"><img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" /><b>Mkindayzir</b></a>
+      <nav class="nav-links">
+        <a href="/index.html">Home</a>
+        <a href="/features.html">Features</a>
+        <a href="/about.html" class="active">About</a>
+        <a href="/login">Console</a>
+      </nav>
+      <a class="btn btn-primary chamfer" href="/login">Enter Console</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <div class="label">About</div>
+      <h1>Your operations,<br><span class="accent">your server.</span></h1>
+      <p>Mkindayzir is a self-hosted, local-first Work OS built for people who refuse to rent their own data back from someone else's cloud.</p>
+      <div class="pull">"If it leaves your network, it's no longer yours."</div>
+    </div>
+  </section>
+
+  <section class="prose">
+    <div class="wrap">
+      <h2>Why we built it</h2>
+      <p>Most "work" software is a beautiful cage: smooth interfaces, helpful automations, and a bill that grows with your team. The cost isn't only money — it's custody. Your projects, your knowledge, your decisions, and your customers' data all live on someone else's hardware, behind someone else's terms.</p>
+      <p>Mkindayzir flips the model. It runs on a machine you control — a laptop, a NAS, a spare server. The interface is the same, but the data never leaves the building unless you explicitly send it.</p>
+
+      <h2>What we believe</h2>
+      <div class="principles">
+        <div class="pcard"><div class="n">01</div><h3>Local-first</h3><p>Your data is stored on your disk. The app works without the internet.</p></div>
+        <div class="pcard"><div class="n">02</div><h3>Yours to leave</h3><p>No lock-in. Export everything. Move hosts. Shut it down. It's your machine.</p></div>
+        <div class="pcard"><div class="n">03</div><h3>Quiet by default</h3><p>No dark patterns, no upsells inside the product. Just the tool.</p></div>
+      </div>
+
+      <h2>How it's made</h2>
+      <p>Mkindayzir is a TypeScript/Next.js application with a Prisma data layer that targets both SQLite (Personal mode) and PostgreSQL (Team/Enterprise). The AI layer is a small Python service that proxies your provider of choice — your API key is encrypted at rest and never logged.</p>
+      <ul>
+        <li>Next.js app + custom Node server</li>
+        <li>Prisma: SQLite &amp; PostgreSQL from one schema</li>
+        <li>Python FastAPI service for AI streaming &amp; tools</li>
+        <li>One Docker Compose file for team deployments</li>
+      </ul>
+
+      <h2>Who it's for</h2>
+      <p>Individuals who want a calm, private workspace. Teams who need shared boards and a vault without surrendering data. Companies with compliance needs who must keep operations on-premises. If you value control over convenience, Mkindayzir is built for you.</p>
+
+      <div class="pull" style="margin-top:36px">Start alone. Grow to a team. Expand to the enterprise. Same interface, same data model.</div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-in">
+      <a class="brand" href="/index.html"><img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" /><b>Mkindayzir</b></a>
+      <nav class="foot-links">
+        <a href="/index.html">Home</a><a href="/features.html">Features</a><a href="/about.html">About</a><a href="/login">Console</a>
+      </nav>
+      <div class="copy">© <span id="yr"></span> Mkindayzir · Local-first Work OS</div>
+    </div>
+  </footer>
+  <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>

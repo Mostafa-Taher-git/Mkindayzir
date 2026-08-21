@@ -328,7 +328,7 @@ export class VaultService {
 
     try {
       const links = await noteRepo.getBacklinks(noteId);
-      return links.map((link) => ({
+      return links.map((link: { source: { id: string; title: string }; context: string | null }) => ({
         id: link.source.id,
         title: link.source.title,
         context: link.context,
@@ -345,8 +345,8 @@ export class VaultService {
 
     try {
       const notes = await noteRepo.getGraph();
-      const nodes = notes.map((n) => ({ id: n.id, title: n.title, slug: n.slug }));
-      const links = notes.flatMap((n) => n.links.map((targetId) => ({ source: n.id, target: targetId })));
+      const nodes = notes.map((n: { id: string; title: string; slug: string; links: string[] }) => ({ id: n.id, title: n.title, slug: n.slug }));
+      const links = notes.flatMap((n: { id: string; title: string; slug: string; links: string[] }) => n.links.map((targetId: string) => ({ source: n.id, target: targetId })));
       return { nodes, links };
     } catch (error) {
       console.error("VaultService.getGraph error:", error);

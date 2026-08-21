@@ -210,7 +210,7 @@ export class WorkItemService {
         return [];
       }
 
-      const transitions = defaultWorkflow.transitions as Record<string, string[]>;
+      const transitions = JSON.parse(defaultWorkflow.transitions) as Record<string, string[]>;
       return transitions[workItem.status] || [];
     } catch (error) {
       console.error("WorkItemService.getAllowedTransitions error:", error);

@@ -44,54 +44,54 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const fieldClass =
+    "w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background";
+
   if (success) {
     return (
-      <div className="w-full max-w-md text-center">
-        <h1 className="text-2xl font-bold mb-4">Check your email</h1>
-        <p className="text-muted-foreground mb-4">
-          If an account exists with that email, we&apos;ve sent password reset instructions.
-        </p>
-        <Link href="/login" className="hover:text-foreground underline">
-          Back to login
-        </Link>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="panel w-full max-w-md p-8 text-center shadow-panel">
+          <img src="/MKINDAYZIR_logo.jpg" alt="Mkindayzir" className="mx-auto h-12 w-12 object-cover border-2 border-outline-strong" />
+          <h1 className="mt-4 font-display text-2xl font-extrabold uppercase">Check Your Inbox</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            If an account exists with that email, we&apos;ve sent password reset instructions.
+          </p>
+          <Link href="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary px-5 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red">
+            Back to login
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md">
-      <h1 className="text-2xl font-bold text-center mb-6">Forgot password</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="p-3 text-sm text-destructive-foreground bg-destructive/10 border border-destructive rounded-md">
-            {error}
-          </div>
-        )}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            required
-          />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="panel w-full max-w-md p-8 shadow-panel">
+        <div className="mb-6 flex items-center gap-3 border-b-2 border-outline-strong pb-5">
+          <img src="/MKINDAYZIR_logo.jpg" alt="Mkindayzir" className="h-10 w-10 object-cover border-2 border-outline-strong" />
+          <div className="font-display text-lg font-extrabold uppercase tracking-tight">Reset Password</div>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Sending..." : "Send reset link"}
-        </button>
-      </form>
-      <div className="mt-4 text-center text-sm text-muted-foreground">
-        <Link href="/login" className="hover:text-foreground underline">
-          Back to login
-        </Link>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground">
+              {error}
+            </div>
+          )}
+          <div>
+            <label htmlFor="email" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">Email</label>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={fieldClass} required />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full border-2 border-outline-strong bg-primary px-4 py-3 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Sending..." : "Send Reset Link →"}
+          </button>
+        </form>
+        <div className="mt-5 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          <Link href="/login" className="text-primary-light hover:text-foreground underline">Back to login</Link>
+        </div>
       </div>
     </div>
   );

@@ -103,7 +103,7 @@ export class WorkflowRepository extends BaseRepository<any> {
 
       if (!workflow) return false;
 
-      const transitions = workflow.transitions as Record<string, string[]>;
+      const transitions = JSON.parse(workflow.transitions) as Record<string, string[]>;
       const allowed = transitions[fromStatus] || [];
       return allowed.includes(toStatus);
     } catch (error) {

@@ -7,13 +7,14 @@ export default async function proxy(request: Request) {
   const publicPaths = [
     '/',
     '/login',
+    '/setup',
     '/register',
     '/forgot-password',
   ];
 
   const isPublic =
     publicPaths.some(
-      (path) => pathname === path || pathname.startsWith('/api/auth') || pathname === '/api/health'
+      (path) => pathname === path || pathname.startsWith('/api/auth') || pathname.startsWith('/api/setup') || pathname === '/api/health'
     );
 
   if (isPublic) {

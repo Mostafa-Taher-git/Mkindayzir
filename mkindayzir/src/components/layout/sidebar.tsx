@@ -59,14 +59,22 @@ function Sidebar({
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 border-b border-outline">
+      <div className="flex items-center justify-between p-4 border-b-2 border-outline-strong bg-surface-container-low">
         {!collapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <img
               src="/MKINDAYZIR_logo.jpg"
               alt="Mkindayzir"
-              className="h-8 w-auto object-contain"
+              className="h-9 w-9 rounded-none object-cover border-2 border-outline-strong"
             />
+            <div className="leading-none">
+              <div className="font-display font-extrabold uppercase tracking-tight text-sm text-foreground">
+                Mkindayzir
+              </div>
+              <div className="uppercase-label text-muted-foreground mt-1">
+                Ops Control
+              </div>
+            </div>
           </div>
         )}
         <Button
@@ -92,7 +100,7 @@ function Sidebar({
               className={cn(
                 "flex items-center gap-3 border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors font-mono uppercase tracking-wider",
                 isActive
-                  ? "border-l-primary bg-primary/10 text-primary"
+                  ? "border-l-primary bg-primary/10 text-primary-light shadow-[inset_0_0_12px_-4px_var(--color-accent-bright)]"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-l-outline",
                 collapsed && "justify-center px-2"
               )}
@@ -174,7 +182,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-screen flex-col border-r-2 border-outline bg-surface transition-all duration-200",
+        "flex h-screen flex-col border-r-2 border-outline-strong bg-surface-container-low transition-all duration-200",
         collapsed ? "w-16" : "w-64"
       )}
     >

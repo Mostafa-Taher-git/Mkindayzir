@@ -36,7 +36,6 @@ export default async function VaultTagsPage() {
       <VaultSidebar
         folders={folders}
         currentFolderId={null}
-        onCreateFolder={() => {}}
       />
       <div className="flex-1 overflow-auto p-6">
         <div className="flex items-center justify-between mb-6">
@@ -74,7 +73,7 @@ export default async function VaultTagsPage() {
                   <Link
                     key={tag.id}
                     href={`${VAULT_ROUTES.HOME}?tag=${tag.id}`}
-                    className="flex items-center justify-between rounded-md border p-3 hover:bg-accent transition-colors no-underline"
+                    className="flex items-center justify-between border-2 border-outline p-3 hover:border-primary transition-colors no-underline"
                   >
                     <div className="flex items-center gap-2">
                       <span

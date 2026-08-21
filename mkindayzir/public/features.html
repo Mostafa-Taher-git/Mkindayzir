@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features — Mkindayzir</title>
+  <meta name="description" content="Projects, boards, vault, AI assistant, encryption and offline sync in Mkindayzir." />
+  <link rel="icon" href="MKINDAYZIR_logo.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, [data-theme="dark"] {
+      --bg:#001522; --bg-2:#002234; --bg-3:#002d43; --bg-low:#00101b;
+      --ink:#c7e7ff; --ink-2:#a9c6e2; --ink-mut:#6f8eac;
+      --steel:#4a6378; --steel-2:#ab8987;
+      --red:#bb152c; --red-h:#d61f33; --red-br:#ff535b; --red-lt:#ffb3b1;
+      --sheen:linear-gradient(180deg,#003952 0%,#002234 55%,#001522 100%);
+      --red-sheen:linear-gradient(180deg,#ff535b 0%,#bb152c 100%);
+      --font-display:"Sora",system-ui,sans-serif; --font-sans:"Hanken Grotesk",system-ui,sans-serif; --font-mono:"JetBrains Mono",ui-monospace,monospace;
+      color-scheme: dark;
+    }
+    [data-theme="light"] {
+      --bg:#e9eef3; --bg-2:#dce5ec; --bg-3:#cfdbe6; --bg-low:#f3f6f9;
+      --ink:#0c2233; --ink-2:#33526e; --ink-mut:#5f7a93;
+      --steel:#9fb2c4; --steel-2:#7d93a8; --red:#bb152c; --red-h:#d61f33; --red-br:#ff535b; --red-lt:#8a0014;
+      --sheen:linear-gradient(180deg,#ffffff 0%,#dce5ec 60%,#cdd9e5 100%); color-scheme: light;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; border-color:var(--steel); }
+    body { background:var(--bg); background-image:var(--sheen); background-attachment:fixed; color:var(--ink); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; line-height:1.6; }
+    h1,h2,h3 { font-family:var(--font-display); letter-spacing:-0.02em; font-weight:800; }
+    a { color:inherit; text-decoration:none; }
+    ::selection { background:var(--red); color:#fff; }
+    .wrap { max-width:1200px; margin:0 auto; padding:0 24px; }
+    .mono { font-family:var(--font-mono); }
+    .label { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.08em; font-size:11px; color:var(--ink-mut); }
+    header.nav { position:sticky; top:0; z-index:50; border-bottom:2px solid var(--steel-2); background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(8px); }
+    .nav-in { display:flex; align-items:center; justify-content:space-between; height:64px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand img { height:36px; width:36px; object-fit:cover; border:2px solid var(--steel-2); }
+    .brand b { font-family:var(--font-display); font-weight:800; text-transform:uppercase; font-size:16px; }
+    .nav-links { display:flex; gap:28px; }
+    .nav-links a { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:12px; color:var(--ink-2); }
+    .nav-links a:hover, .nav-links a.active { color:var(--ink); }
+    .btn { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:13px; font-weight:500; padding:11px 20px; border:2px solid var(--steel-2); cursor:pointer; transition:all .16s; }
+    .btn-primary { background:var(--red-sheen); color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.4); }
+    .btn-primary:hover { background:var(--red-h); box-shadow:0 0 0 1px var(--red),0 0 14px -2px var(--red-br); }
+    .btn-ghost { background:transparent; color:var(--ink); }
+    .btn-ghost:hover { border-color:var(--red); color:var(--red-lt); }
+    .chamfer { clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% calc(100% - 9px),calc(100% - 9px) 100%,9px 100%,0 calc(100% - 9px),0 9px); }
+    section { padding:72px 0; }
+    .sec-head { max-width:680px; margin-bottom:40px; }
+    .sec-head h1 { font-size:clamp(2rem,4vw,3rem); text-transform:uppercase; margin-top:10px; }
+    .sec-head p { margin-top:14px; color:var(--ink-2); }
+    .grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:18px; }
+    .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+    .card { border:2px solid var(--steel); background:var(--bg-2); background-image:var(--sheen); padding:26px; box-shadow:inset 0 1px 0 rgba(199,231,255,.12); }
+    .card .num { font-family:var(--font-mono); font-size:11px; color:var(--red-lt); letter-spacing:0.1em; }
+    .card h3 { font-size:19px; text-transform:uppercase; margin-top:6px; }
+    .card p { margin-top:10px; color:var(--ink-2); font-size:15px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; margin-bottom:48px; }
+    .row.rev > div:first-child { order:2; }
+    .row h2 { font-size:clamp(1.6rem,3vw,2.2rem); text-transform:uppercase; }
+    .row p { margin-top:14px; color:var(--ink-2); }
+    .row ul { margin-top:16px; list-style:none; display:grid; gap:10px; }
+    .row li { font-size:15px; color:var(--ink-2); display:flex; gap:10px; }
+    .row li::before { content:"▸"; color:var(--red-br); }
+    .visual { border:2px solid var(--steel-2); background:var(--bg-2); background-image:var(--sheen); padding:20px; min-height:220px; box-shadow:inset 0 1px 0 rgba(199,231,255,.12); }
+    .visual .k { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-mut); }
+    .visual .v { font-family:var(--font-mono); font-size:22px; font-weight:700; margin-top:6px; }
+    .visual .bar { height:8px; background:var(--bg-low); border:1px solid var(--steel); margin-top:10px; position:relative; }
+    .visual .bar > i { position:absolute; inset:0 65% 0 0; background:var(--red-sheen); }
+    .visual .bar.b2 > i { inset:0 30% 0 0; }
+    .visual .bar.b3 > i { inset:0 15% 0 0; }
+    footer { border-top:2px solid var(--steel-2); background:var(--bg-low); padding:44px 0; margin-top:40px; }
+    .foot-in { display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+    .foot-links { display:flex; gap:24px; flex-wrap:wrap; }
+    .foot-links a { font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; font-size:11px; color:var(--ink-mut); }
+    .foot-links a:hover { color:var(--ink); }
+    .copy { font-family:var(--font-mono); font-size:11px; color:var(--ink-mut); }
+    @media (max-width:900px){ .grid-2,.grid-3,.row { grid-template-columns:1fr; } .row.rev>div:first-child{order:0;} .nav-links{display:none;} }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="/index.html"><img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" /><b>Mkindayzir</b></a>
+      <nav class="nav-links">
+        <a href="/features.html" class="active">Features</a>
+        <a href="/about.html">About</a>
+        <a href="/login">Console</a>
+      </nav>
+      <a class="btn btn-primary chamfer" href="/login">Enter Console</a>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">Capabilities</div>
+        <h1>Everything, under your roof.</h1>
+        <p>A complete operations stack — planning, knowledge, automation, and AI — with no external dependencies.</p>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="label">01 · Plan</div>
+          <h2>Projects &amp; Work Items</h2>
+          <p>Organize work into projects and hierarchical work items. Track status, priority, assignee, due dates, and labels. Filter, search, and report across everything.</p>
+          <ul><li>Projects → work items → subtasks</li><li>Status &amp; priority workflows</li><li>Assignees, due dates, labels</li></ul>
+        </div>
+        <div class="visual">
+          <div class="k">Project · MKZ</div><div class="v">12 items</div><div class="bar"></div>
+          <div class="k" style="margin-top:16px">Open</div><div class="v">47</div><div class="bar b2"></div>
+          <div class="k" style="margin-top:16px">Overdue</div><div class="v">3</div><div class="bar b3"></div>
+        </div>
+      </div>
+
+      <div class="row rev">
+        <div>
+          <div class="label">02 · Execute</div>
+          <h2>Kanban Boards</h2>
+          <p>Visualize flow on drag-and-drop boards. Create multiple boards per project, customize columns, and watch work move from backlog to done.</p>
+          <ul><li>Multiple boards per project</li><li>Configurable columns &amp; WIP</li><li>Drag-and-drop with dnd-kit</li></ul>
+        </div>
+        <div class="visual">
+          <div class="k">Board · Sprint 14</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mut)">
+            <div>Backlog</div><div>Active</div><div>Done</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+            <div style="border:2px solid var(--steel);padding:8px;font-family:var(--font-mono);font-size:11px">5</div>
+            <div style="border:2px solid var(--red);padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--red-lt)">8</div>
+            <div style="border:2px solid var(--steel);padding:8px;font-family:var(--font-mono);font-size:11px">34</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="label">03 · Remember</div>
+          <h2>Knowledge Vault</h2>
+          <p>A markdown wiki with folders, tags, backlinks, and a graph view. Capture decisions, runbooks, and docs where the work actually happens.</p>
+          <ul><li>Markdown editor with preview</li><li>Folders, tags, backlinks</li><li>Interactive graph view</li></ul>
+        </div>
+        <div class="visual">
+          <div class="k">Vault</div><div class="v">208 notes</div><div class="bar b2"></div>
+          <div class="k" style="margin-top:16px">Tags</div><div class="v">42</div><div class="bar b3"></div>
+          <div class="k" style="margin-top:16px">Links</div><div class="v">611</div><div class="bar"></div>
+        </div>
+      </div>
+
+      <div class="row rev">
+        <div>
+          <div class="label">04 · Automate</div>
+          <h2>AI Assistant</h2>
+          <p>A local-first AI that reads your items and vault, creates work, and answers from your own context. Your API key, encrypted, never shared.</p>
+          <ul><li>Search &amp; create work items</li><li>Query the knowledge vault</li><li>Your key, your provider</li></ul>
+        </div>
+        <div class="visual">
+          <div class="k">Assistant</div>
+          <div style="font-family:var(--font-mono);font-size:12px;margin-top:10px;color:var(--ink-2);line-height:1.5">› Show my overdue items<br>› Summarize the Q3 runbook<br>› Create a task for the deploy</div>
+          <div class="bar" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <div class="sec-head" style="margin-top:24px">
+        <div class="label">Foundations</div>
+        <h2>Engineered for control.</h2>
+      </div>
+      <div class="grid-3">
+        <div class="card"><div class="num">SEC</div><h3>Encryption</h3><p>API keys encrypted at rest with AES-256-GCM. Sessions signed and short-lived.</p></div>
+        <div class="card"><div class="num">NET</div><h3>Offline Sync</h3><p>Service worker keeps the console usable offline; edits reconcile on reconnect.</p></div>
+        <div class="card"><div class="num">OPS</div><h3>Backups</h3><p>Scheduled SQLite/Postgres backups to your own storage. Restore in one command.</p></div>
+        <div class="card"><div class="num">ROLE</div><h3>Access Control</h3><p>ADMIN, MANAGER, MEMBER, VIEWER roles with scoped permissions.</p></div>
+        <div class="card"><div class="num">API</div><h3>REST + Realtime</h3><p>76+ API routes and WebSocket sync for team deployments.</p></div>
+        <div class="card"><div class="num">HOST</div><h3>Portable</h3><p>Runs on a laptop, a NAS, or a server. One Compose file to deploy.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot-in">
+      <a class="brand" href="/index.html"><img src="MKINDAYZIR_logo.jpg" alt="Mkindayzir" /><b>Mkindayzir</b></a>
+      <nav class="foot-links">
+        <a href="/index.html">Home</a><a href="/features.html">Features</a><a href="/about.html">About</a><a href="/login">Console</a>
+      </nav>
+      <div class="copy">© <span id="yr"></span> Mkindayzir · Local-first Work OS</div>
+    </div>
+  </footer>
+  <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>

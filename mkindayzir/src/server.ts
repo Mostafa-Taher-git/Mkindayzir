@@ -1,10 +1,13 @@
 // server.ts — Application entry point
+import { config as loadEnv } from 'dotenv';
+import path from 'path';
+loadEnv({ path: path.resolve(process.cwd(), '.env') });
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer } from 'ws';
-import { setupWebSocket } from './src/lib/websocket';
-import { getConfig } from './src/lib/config';
+import { setupWebSocket } from './lib/websocket';
+import { getConfig } from './lib/config';
 
 const config = getConfig();
 const dev = process.env.NODE_ENV !== 'production';

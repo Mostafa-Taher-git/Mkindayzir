@@ -46,7 +46,7 @@ export class ReportService {
         },
       });
 
-      const grouped = workItems.reduce<Record<string, { assignee: { id: string; displayName: string; email: string }; items: typeof workItems }>>((acc, item) => {
+      const grouped: Record<string, { assignee: { id: string; displayName: string; email: string }; items: any[] }> = workItems.reduce((acc: Record<string, { assignee: { id: string; displayName: string; email: string }; items: any[] }>, item) => {
         const assigneeId = item.assigneeId!;
         if (!acc[assigneeId]) {
           acc[assigneeId] = {
@@ -60,7 +60,7 @@ export class ReportService {
         }
         acc[assigneeId].items.push(item);
         return acc;
-      }, {});
+      }, {} as Record<string, { assignee: { id: string; displayName: string; email: string }; items: typeof workItems }>);
 
       return Object.values(grouped).map((group) => ({
         ...group,
@@ -94,7 +94,7 @@ export class ReportService {
         },
       });
 
-      const grouped = workItems.reduce<Record<string, { iteration: { id: string; name: string; startDate: string; endDate: string }; totalPoints: number; count: number }>>((acc, item) => {
+      const grouped: Record<string, { iteration: { id: string; name: string; startDate: string; endDate: string }; totalPoints: number; count: number }> = workItems.reduce((acc: Record<string, { iteration: { id: string; name: string; startDate: string; endDate: string }; totalPoints: number; count: number }>, item) => {
         if (!item.iterationId) return acc;
         if (!acc[item.iterationId]) {
           acc[item.iterationId] = {
@@ -111,7 +111,7 @@ export class ReportService {
         acc[item.iterationId].totalPoints += item.storyPoints ?? 0;
         acc[item.iterationId].count += 1;
         return acc;
-      }, {});
+      }, {} as Record<string, { iteration: { id: string; name: string; startDate: string; endDate: string }; totalPoints: number; count: number }>);
 
       return Object.values(grouped);
     } catch (error) {
@@ -157,14 +157,14 @@ export class ReportService {
         daily[key] = { date: key, created: 0, resolved: 0 };
       }
 
-      createdItems.forEach((item) => {
+      createdItems.forEach((item: { createdAt: Date }) => {
         const key = item.createdAt.toISOString().split("T")[0];
         if (daily[key]) {
           daily[key].created += 1;
         }
       });
 
-      resolvedItems.forEach((item) => {
+      resolvedItems.forEach((item: { resolvedAt: Date | null }) => {
         if (item.resolvedAt) {
           const key = item.resolvedAt.toISOString().split("T")[0];
           if (daily[key]) {
@@ -199,7 +199,7 @@ export class ReportService {
       });
 
       const headers = ["ID", "Title", "Type", "Status", "Priority", "Assignee", "Project", "Created At"];
-      const rows = workItems.map((item) => [
+      const rows = workItems.map((item: { id: string; title: string; type: string; status: string; priority: string; assignee: { displayName: string } | null; project: { key: string; name: string }; createdAt: Date }) => [
         item.id,
         `"${item.title.replace(/"/g, '""')}"`,
         item.type,
@@ -210,7 +210,7 @@ export class ReportService {
         item.createdAt.toISOString(),
       ]);
 
-      const csv = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      const csv = "FEFF" + [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join("\n");
       return csv;
     } catch (error) {
       console.error("ReportService.exportCSV error:", error);

@@ -1,101 +1,252 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  /* Colors - Light theme */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f8f9fa;
-  --color-bg-tertiary: #f1f3f5;
-  --color-text-primary: #1a1a2e;
-  --color-text-secondary: #6c757d;
-  --color-text-muted: #adb5bd;
-  --color-border: #e9ecef;
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
-  --color-accent-light: #eef2ff;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
+/* ============================================================
+   GRENDIZER HEROIC INDUSTRIAL — design system
+   Deep space-blue structure, Grendizer Red power accents,
+   sharp geometry, hard bevels, brushed-metal sheen.
+   ============================================================ */
 
-  /* Spacing (4px grid) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
+:root,
+[data-theme="dark"] {
+  /* Structure — deep space & mechanical blue */
+  --color-bg-primary: #001522;      /* background / surface */
+  --color-bg-secondary: #002234;     /* surface-container */
+  --color-bg-tertiary: #002d43;      /* surface-container-high */
+  --color-bg-highest: #003952;       /* surface-container-highest */
+  --color-bg-lowest: #00101b;        /* surface-container-lowest */
 
-  /* Typography */
-  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-display: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 1.875rem;
+  /* Ink — titanium white / glowing blue */
+  --color-text-primary: #c7e7ff;     /* on-surface */
+  --color-text-secondary: #a9c6e2;   /* secondary text */
+  --color-text-muted: #6f8eac;       /* dimmed / metadata */
 
-  /* Radius */
-  --radius-none: 0px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-full: 9999px;
+  /* Borders — brushed steel & alloy */
+  --color-border: #4a6378;           /* mechanical grey (steel) */
+  --color-border-strong: #ab8987;    /* alloy outline (warm) */
+  --color-border-subtle: #1c3247;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  /* Power Red — Grendizer */
+  --color-accent: #bb152c;           /* deep grendizer red (action fill) */
+  --color-accent-hover: #d61f33;
+  --color-accent-bright: #ff535b;    /* bright red (hover glow) */
+  --color-accent-light: #ffb3b1;     /* light red (active text / accents) */
+  --color-accent-strong: #5b000e;    /* on red */
 
-  /* Sidebar */
-  --sidebar-width: 260px;
-  --sidebar-collapsed-width: 64px;
+  /* Status */
+  --color-success: #5fd6a0;
+  --color-warning: #ffce6b;
+  --color-error: #ff8a82;
+  --color-info: #b0c7f1;
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  /* Sheen — painted metal armor */
+  --metal-sheen: linear-gradient(180deg, #003952 0%, #002234 55%, #001522 100%);
+  --metal-sheen-raised: linear-gradient(180deg, #00406a 0%, #002a40 100%);
+  --red-sheen: linear-gradient(180deg, #ff535b 0%, #bb152c 100%);
+  --panel-line: rgba(199, 231, 255, 0.06);
+
+  /* Typography (assigned by next/font in layout) */
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Radius — sharp industrial silhouette */
+  --radius: 0px;
+
+  /* Motion */
+  --transition: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  color-scheme: dark;
 }
 
-[data-theme="dark"] {
-  --color-bg-primary: #1a1a2e;
-  --color-bg-secondary: #16213e;
-  --color-bg-tertiary: #0f3460;
-  --color-text-primary: #e9ecef;
-  --color-text-secondary: #adb5bd;
-  --color-text-muted: #6c757d;
-  --color-border: #2d3748;
-  --color-accent: #818cf8;
-  --color-accent-hover: #6366f1;
-  --color-accent-light: #1e1b4b;
+[data-theme="light"] {
+  --color-bg-primary: #e9eef3;
+  --color-bg-secondary: #dce5ec;
+  --color-bg-tertiary: #cfdbe6;
+  --color-bg-highest: #c2d2e0;
+  --color-bg-lowest: #f3f6f9;
+
+  --color-text-primary: #0c2233;
+  --color-text-secondary: #33526e;
+  --color-text-muted: #5f7a93;
+
+  --color-border: #9fb2c4;
+  --color-border-strong: #7d93a8;
+  --color-border-subtle: #c2cedb;
+
+  --color-accent: #bb152c;
+  --color-accent-hover: #d61f33;
+  --color-accent-bright: #ff535b;
+  --color-accent-light: #8a0014;
+  --color-accent-strong: #ffffff;
+
+  --color-success: #1f8f63;
+  --color-warning: #9a6b00;
+  --color-error: #c0392b;
+  --color-info: #2c4a78;
+
+  --metal-sheen: linear-gradient(180deg, #ffffff 0%, #dce5ec 60%, #cdd9e5 100%);
+  --metal-sheen-raised: linear-gradient(180deg, #ffffff 0%, #d4dfe9 100%);
+  --red-sheen: linear-gradient(180deg, #d61f33 0%, #bb152c 100%);
+  --panel-line: rgba(12, 34, 51, 0.06);
+
+  color-scheme: light;
 }
 
 @layer base {
   * {
-    border-color: hsl(var(--color-border));
+    border-color: var(--color-border);
   }
+
+  html {
+    background-color: var(--color-bg-primary);
+  }
+
   body {
-    background-color: hsl(var(--color-bg-primary));
-    color: hsl(var(--color-text-primary));
+    background-color: var(--color-bg-primary);
+    background-image: var(--metal-sheen);
+    background-attachment: fixed;
+    color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-text-primary);
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+
+  /* Heroic page titles — primary section headers are ALL CAPS per the brief */
+  main h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    font-size: 1.875rem;
+    line-height: 1.1;
+  }
+  main h1 + p {
+    margin-top: 6px;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+  }
+  main h2 {
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  /* Caret & selection belong to the design system */
+  ::selection {
+    background-color: var(--color-accent);
+    color: #ffffff;
+  }
+  ::-moz-selection {
+    background-color: var(--color-accent);
+    color: #ffffff;
+  }
+  input,
+  textarea {
+    caret-color: var(--color-accent-bright);
+  }
+}
+
+@layer components {
+  /* Hard bevel — raised tactile edge on controls */
+  .bevel {
+    box-shadow:
+      inset 0 1px 0 rgba(199, 231, 255, 0.18),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  /* Chamfered corners — 45° armor-plate cut */
+  .chamfer {
+    clip-path: polygon(
+      9px 0,
+      calc(100% - 9px) 0,
+      100% 9px,
+      100% calc(100% - 9px),
+      calc(100% - 9px) 100%,
+      9px 100%,
+      0 calc(100% - 9px),
+      0 9px
+    );
+  }
+
+  /* Panel — structural console surface with hairline top edge */
+  .panel {
+    background-color: var(--color-bg-secondary);
+    background-image: var(--metal-sheen);
+    border: 2px solid var(--color-border);
+  }
+
+  /* Powered-on glow for active red elements */
+  .glow-red {
+    box-shadow: 0 0 0 1px var(--color-accent), 0 0 14px -2px var(--color-accent-bright);
   }
 }
 
 @layer utilities {
-  .font-sans {
-    font-family: var(--font-sans);
-  }
-  .font-mono {
+  .font-sans { font-family: var(--font-sans); }
+  .font-mono { font-family: var(--font-mono); }
+  .font-display { font-family: var(--font-display); }
+
+  .text-balance { text-wrap: balance; }
+
+  /* Tabular numerals for status panels / data */
+  .nums {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
   }
-  .font-display {
-    font-family: var(--font-display);
+
+  .uppercase-label {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
   }
 }
+
+/* Browser surfaces — themed scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track {
+  background: var(--color-bg-lowest);
+  border-left: 1px solid var(--color-border-subtle);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 2px solid var(--color-bg-lowest);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent-bright); }
+
+/* Focus ring — high-vis red, never default */
+:focus-visible {
+  outline: 2px solid var(--color-accent-bright);
+  outline-offset: 2px;
+}
+
+/* Animations — one authored entrance, exponential ease-out */
+@keyframes powerOn {
+  from { opacity: 0; transform: translateY(6px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-power-on { animation: powerOn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 0.9s linear infinite; }
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 83, 91, 0.0); }
+  50% { box-shadow: 0 0 12px 0 rgba(255, 83, 91, 0.45); }
+}
+.animate-pulse-glow { animation: pulseGlow 2.4s ease-in-out infinite; }

@@ -12,7 +12,7 @@ export type SearchResult = {
   type: "work_item" | "vault_note" | "guide";
   id: string;
   title: string;
-  excerpt?: string;
+  excerpt: string | null;
   score: number;
 };
 
@@ -40,8 +40,8 @@ export class SearchService {
         const workItems = await prisma.workItem.findMany({
           where: {
             OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { description: { contains: q, mode: "insensitive" } },
+              { title: { contains: q } },
+              { description: { contains: q } },
             ],
           },
           take: 10,
@@ -52,13 +52,13 @@ export class SearchService {
           },
         });
 
-        workItems.forEach((item) => {
+        workItems.forEach((item: { id: string; title: string; description: string | null }) => {
           const titleMatch = item.title.toLowerCase().includes(q.toLowerCase());
           results.push({
             type: "work_item",
             id: item.id,
             title: item.title,
-            excerpt: item.description || undefined,
+            excerpt: item.description || null,
             score: titleMatch ? 1 : 0.5,
           });
         });
@@ -68,8 +68,8 @@ export class SearchService {
         const notes = await prisma.vaultNote.findMany({
           where: {
             OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { content: { contains: q, mode: "insensitive" } },
+              { title: { contains: q } },
+              { content: { contains: q } },
             ],
           },
           take: 10,
@@ -80,13 +80,13 @@ export class SearchService {
           },
         });
 
-        notes.forEach((note) => {
+        notes.forEach((note: { id: string; title: string }) => {
           const titleMatch = note.title.toLowerCase().includes(q.toLowerCase());
           results.push({
             type: "vault_note",
             id: note.id,
             title: note.title,
-            excerpt: note.excerpt || undefined,
+            excerpt: null,
             score: titleMatch ? 1 : 0.5,
           });
         });
@@ -96,8 +96,8 @@ export class SearchService {
         const guides = await prisma.guide.findMany({
           where: {
             OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { content: { contains: q, mode: "insensitive" } },
+              { title: { contains: q } },
+              { content: { contains: q } },
             ],
           },
           take: 10,
@@ -108,13 +108,13 @@ export class SearchService {
           },
         });
 
-        guides.forEach((guide) => {
+        guides.forEach((guide: { id: string; title: string }) => {
           const titleMatch = guide.title.toLowerCase().includes(q.toLowerCase());
           results.push({
             type: "guide",
             id: guide.id,
             title: guide.title,
-            excerpt: guide.content.substring(0, 200) || undefined,
+            excerpt: null,
             score: titleMatch ? 1 : 0.5,
           });
         });
@@ -141,31 +141,31 @@ export class SearchService {
 
       const [workItems, notes, guides] = await Promise.all([
         prisma.workItem.findMany({
-          where: { title: { contains: q, mode: "insensitive" } },
+          where: { title: { contains: q } },
           take: limit,
           select: { id: true, title: true },
         }),
         prisma.vaultNote.findMany({
-          where: { title: { contains: q, mode: "insensitive" } },
+          where: { title: { contains: q } },
           take: limit,
           select: { id: true, title: true },
         }),
         prisma.guide.findMany({
-          where: { title: { contains: q, mode: "insensitive" } },
+          where: { title: { contains: q } },
           take: limit,
           select: { id: true, title: true },
         }),
       ]);
 
-      workItems.forEach((item) => {
+      workItems.forEach((item: { id: string; title: string }) => {
         suggestions.push({ id: item.id, title: item.title, type: "work_item" });
       });
 
-      notes.forEach((note) => {
+      notes.forEach((note: { id: string; title: string }) => {
         suggestions.push({ id: note.id, title: note.title, type: "vault_note" });
       });
 
-      guides.forEach((guide) => {
+      guides.forEach((guide: { id: string; title: string }) => {
         suggestions.push({ id: guide.id, title: guide.title, type: "guide" });
       });
 

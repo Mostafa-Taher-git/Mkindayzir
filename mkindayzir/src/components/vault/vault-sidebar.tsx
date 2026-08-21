@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 interface VaultSidebarProps {
   folders: VaultFolder[];
   currentFolderId?: string | null;
-  onCreateFolder: (parentId: string | null) => void;
+  onCreateFolder?: (parentId: string | null) => void;
 }
 
 function FolderTreeItem({
@@ -23,7 +23,7 @@ function FolderTreeItem({
   folder: VaultFolder;
   level?: number;
   currentFolderId?: string | null;
-  onCreateFolder: (parentId: string | null) => void;
+  onCreateFolder?: (parentId: string | null) => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const pathname = usePathname();
@@ -80,7 +80,7 @@ function FolderTreeItem({
           variant="ghost"
           size="icon"
           className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
-          onClick={() => onCreateFolder(folder.id)}
+          onClick={() => onCreateFolder?.(folder.id)}
           title="Create subfolder"
         >
           <svg
@@ -130,7 +130,7 @@ export function VaultSidebar({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => onCreateFolder(null)}
+            onClick={() => onCreateFolder?.(null)}
             title="Create root folder"
           >
             <svg

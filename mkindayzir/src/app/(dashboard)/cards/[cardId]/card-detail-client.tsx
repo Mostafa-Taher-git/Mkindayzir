@@ -150,7 +150,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="border-input data-[state=open]:border-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  className="border-2 border-outline flex h-9 w-full bg-surface px-3 py-1 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
@@ -159,7 +159,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  className="border-input data-[state=open]:border-ring flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  className="border-2 border-outline flex w-full bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div className="flex justify-end">
