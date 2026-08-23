@@ -93,7 +93,8 @@ mkindayzir/
 │   │   ├── features/             # Reports, guides, search
 │   │   ├── spaces/               # Space management
 │   │   ├── work-items/           # Work item table, form, filters
-│   │   └── assistant/            # AI assistant chat UI
+│   │   ├── assistant/            # AI assistant chat UI
+│   │   ├── tickets/              # Ticket management UI
 │   ├── config/                   # App configuration
 │   │   ├── navigation.ts
 │   │   ├── permissions.ts
@@ -305,6 +306,7 @@ All routes are implemented as FastAPI routers under `backend/app/routers/`.
 | **Uploads** | `/api/uploads` | File upload/download |
 | **Admin** | `/api/admin` | Admin operations |
 | **System** | `/api/system` | System operations |
+| **Tickets** | `/api/tickets` | Ticket CRUD, replies, stats, SLA tracking |
 | **Dashboard** | `/api/dashboard` | Dashboard data |
 
 > In development, `/api/*` requests are proxied from Vite to `http://localhost:8000`. In production, FastAPI serves both `/api/*` and the static SPA on the same port.
@@ -335,6 +337,7 @@ All files under `backend/app/services/`. Each service encapsulates business logi
 | `backend/app/services/checklist.py` | Checklist CRUD. |
 | `backend/app/services/iteration.py` | Iteration lifecycle. |
 | `backend/app/services/initiative.py` | Initiative CRUD. |
+| `backend/app/services/ticket_service.py` | Ticket CRUD, replies, stats, SLA tracking, customer management. |
 | `backend/app/services/migration_service.py` | SQLite -> PostgreSQL live migration with SSE progress. |
 
 ---
@@ -360,6 +363,7 @@ The repository pattern is simplified into service methods with direct SQLAlchemy
 | `src/components/work-items/` | Work item table, form, filters |
 | `src/components/assistant/` | AI assistant chat (layout, interface, input, message bubble, conversation list, settings, model selector) |
 | `src/components/settings/` | Migration wizard for SQLite -> PostgreSQL upgrade |
+| `src/components/tickets/` | Ticket list, form, sidebar, reply form, status badges |
 
 ---
 
@@ -492,6 +496,7 @@ Frontend: Vitest + Playwright. Backend: pytest in `backend/pyproject.toml` optio
 15. **SSE Streaming**: FastAPI handles AI assistant streaming via `text/event-stream`.
 16. **WebSocket Deferred**: Real-time features deferred to future FastAPI implementation.
 17. **Prisma Reference Only**: `prisma/` folder exists at root with schema, migrations, and seed script, but is NOT actively used by the backend. SQLAlchemy models replace it. Some legacy scripts still reference Prisma CLI commands.
+18. **Ticketing System**: Internal support/ticketing module with SLA tracking, customer linking, and internal/external replies. Routes: `/api/tickets/*` and `/tickets/*`.
 
 ---
 

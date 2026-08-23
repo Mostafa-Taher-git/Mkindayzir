@@ -53,6 +53,7 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 
 - All REST endpoints are mounted under `/api/*` (e.g. `/api/health`, `/api/auth/login`, `/api/projects`).
 - `GET /api/config` exposes public runtime config (mode, registration flag).
+- `/api/tickets` — Ticket CRUD, replies, stats, SLA tracking.
 - The SPA is served from `/` and all non-`/api` client routes fall through to `index.html` (SPA catch-all).
 
 ## Services layer

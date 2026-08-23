@@ -43,6 +43,8 @@ The app is then available on **http://localhost:3000** (put it behind your rever
 - **Team collaboration**: multi-user Team mode with PostgreSQL and role-based access.
 - **Local-first & self-hosted**: runs on your own hardware; SQLite by default, upgrade to PostgreSQL in-place.
 - **Migration wizard**: Settings -> System -> "Upgrade to Team Mode" migrates SQLite -> PostgreSQL live, with SSE progress and rollback — no terminal needed.
+- **Ticketing**: support ticket management with statuses, priorities, categories, SLA tracking, internal notes, and customer replies.
+- **Roadmap**: product roadmap view showing planned features and release stages.
 
 ## Documentation
 
