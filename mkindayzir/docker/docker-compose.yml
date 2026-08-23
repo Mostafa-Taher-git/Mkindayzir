@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+      - mkindayzir_data:/app/data
+    environment:
+      - MKINDAYZIR_MODE=personal
+      - DATABASE_PROVIDER=sqlite
+      - DATABASE_URL=sqlite+aiosqlite:///data/mkindayzir.db
+    env_file:
+      - ../.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../src:/app/src
+      - ../public:/app/public
+    environment:
+      - API_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: pnpm dev
+
+  # Only for Team/Enterprise mode:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: mkindayzir
+      POSTGRES_USER: mkindayzir
+      POSTGRES_PASSWORD: mkindayzir
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    profiles:
+      - team
+
+volumes:
+  mkindayzir_data:
+  pgdata:

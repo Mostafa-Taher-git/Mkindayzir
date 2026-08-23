@@ -16,6 +16,7 @@ export const ROUTES = {
   REPORTS: "/reports",
   ADMIN: "/admin",
   SETTINGS: "/settings",
+  SETTINGS_SYSTEM: "/settings/system",
 } as const;
 
 export const PROJECT_STATUSES = [

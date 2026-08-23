@@ -1,0 +1,1 @@
+"""Mkindayzir CLI commands."""

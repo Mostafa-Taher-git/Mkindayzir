@@ -1,55 +1,55 @@
+import click
 import asyncio
-import sys
-import secrets
-import string
 from app.config import settings
-from app.database import engine, Base, DATABASE_URL
+from app.database import engine, Base
 from app.models import User, Team, SystemConfig
-from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+@click.group()
+def setup_cli():
+    """Setup and initialization commands."""
+    pass
 
-async def run_setup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+@setup_cli.command()
+@click.option("--email", prompt="Admin email", help="Admin user email")
+@click.option("--password", prompt="Admin password", hide_input=True, confirmation_prompt=True, help="Admin password")
+@click.option("--name", default="Admin", help="Admin display name")
+def admin(email, password, name):
+    """Create the admin user."""
+    async def _create():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+        async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with async_session() as session:
-        admin = User(
-            id="admin-001",
-            email="admin@mkindayzir.local",
-            passwordHash=pwd_context.hash("admin123"),
-            displayName="Admin",
-            role="ADMIN",
-            status="ACTIVE",
-        )
-        session.add(admin)
+        async with async_session() as session:
+            admin = User(
+                id="admin-001",
+                email=email,
+                passwordHash=pwd_context.hash(password),
+                displayName=name,
+                role="ADMIN",
+                status="ACTIVE",
+            )
+            session.add(admin)
+            await session.commit()
+            click.echo(f"Admin user created: {email}")
 
-        team = Team(
-            id="team-001",
-            name="Default Team",
-            description="Default team for personal mode",
-        )
-        session.add(team)
+    asyncio.run(_create())
 
-        session.add(SystemConfig(
-            id="config-001",
-            key="setup_complete",
-            value="true",
-        ))
+@setup_cli.command()
+def wizard():
+    """Interactive first-run setup wizard."""
+    click.echo("Welcome to Mkindayzir Setup!")
+    email = click.prompt("Admin email")
+    password = click.prompt("Admin password", hide_input=True, confirmation_prompt=True)
+    name = click.prompt("Admin display name", default="Admin")
 
-        await session.commit()
+    from app.cli.setup import admin as admin_cmd
+    ctx = click.Context(admin_cmd)
+    admin_cmd.invoke(ctx, email=email, password=password, name=name)
 
-    print("Setup completed successfully!")
-
-
-def main():
-    asyncio.run(run_setup())
-
-
-if __name__ == "__main__":
-    main()
+    click.echo("\nSetup complete! You can now start the server with: mkindayzir start")

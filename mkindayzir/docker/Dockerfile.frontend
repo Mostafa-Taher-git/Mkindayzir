@@ -1,0 +1,17 @@
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Dev server with hot reload
+CMD ["pnpm", "dev"]

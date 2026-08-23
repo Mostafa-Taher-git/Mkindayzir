@@ -5,7 +5,7 @@ from app.config import settings
 from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
-    vault, assistant, settings, reports, guides, search, uploads, admin
+    vault, assistant, settings, reports, guides, search, uploads, admin, system
 )
 
 
@@ -34,7 +34,7 @@ for router in [
     iterations.router, initiatives.router, workflows.router, labels.router,
     spaces.router, boards.router, columns.router, cards.router,
     checklists.router, vault.router, assistant.router, settings.router,
-    reports.router, guides.router, search.router, uploads.router, admin.router
+    reports.router, guides.router, search.router, uploads.router, admin.router, system.router
 ]:
     app.include_router(router, prefix="/api")
 

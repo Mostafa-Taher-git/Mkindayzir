@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ROUTES } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 
 export default function SettingsPage() {
@@ -14,6 +15,8 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [mode, setMode] = useState<string>("personal");
+  const [dbSize, setDbSize] = useState<number>(0);
 
   useEffect(() => {
     // Fetch user session
@@ -35,6 +38,16 @@ export default function SettingsPage() {
         if (data.provider) setAiProvider(data.provider);
         if (data.model) setAiModel(data.model);
         setApiKeyConfigured(Boolean(data.apiKeyConfigured));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/system/migration/status")
+      .then((r) => r.json())
+      .then((data) => {
+        setMode(data.mode);
+        setDbSize(data.database_size_mb || 0);
       })
       .catch(() => {});
   }, []);
@@ -225,6 +238,30 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* System - only visible in personal mode */}
+      {mode === "personal" && (
+        <Card className="border-2 border-accent/30">
+          <CardHeader>
+            <CardTitle>System</CardTitle>
+            <CardDescription>Database and deployment settings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Current Mode: Personal (SQLite)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Database: ./data/mkindayzir.db ({dbSize.toFixed(2)} MB)
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = ROUTES.SETTINGS_SYSTEM}>
+                Manage System
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
     </div>
   );
 }

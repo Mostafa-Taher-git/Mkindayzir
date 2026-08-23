@@ -1,28 +1,35 @@
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
+# Stage 1: Build frontend
+FROM node:20-alpine AS frontend-build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && corepack prepare pnpm@9 --activate
 RUN pnpm install --frozen-lockfile
-
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN corepack enable && corepack prepare pnpm@9 --activate
-RUN pnpm prisma generate
 RUN pnpm build
 
-FROM node:20-alpine AS runner
+# Stage 2: Production image
+FROM python:3.12-slim
 WORKDIR /app
-ENV NODE_ENV=production
-RUN apk add --no-cache openssl
-RUN corepack enable && corepack prepare pnpm@9 --activate
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
-RUN mkdir -p /app/data/uploads /app/data/backups
-EXPOSE 3000
-ENTRYPOINT ["sh", "-c", "pnpm prisma migrate deploy || pnpm prisma db push; pnpm start:server"]
+
+# Install backend
+COPY backend/pyproject.toml backend/
+RUN pip install --no-cache-dir -e ./backend
+
+# Install nginx
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built frontend
+COPY --from=frontend-build /app/public ./public
+COPY --from=frontend-build /app/.next/static ./.next/static
+
+# Copy backend code
+COPY backend/ ./backend/
+COPY docker/entrypoint.sh ./
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+VOLUME /app/data
+ENTRYPOINT ["./entrypoint.sh"]

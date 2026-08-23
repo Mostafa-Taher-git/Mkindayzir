@@ -19,6 +19,7 @@ from app.routers import guides
 from app.routers import search
 from app.routers import uploads
 from app.routers import admin
+from app.routers import system
 
 all_routers = [
     auth.router,
@@ -42,4 +43,5 @@ all_routers = [
     search.router,
     uploads.router,
     admin.router,
+    system.router,
 ]
