@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   mkindayzir:
     build:
@@ -21,6 +22,8 @@ services:
       - upload-data:/app/data/uploads
       - backup-data:/app/data/backups
     depends_on:
+      backend:
+        condition: service_healthy
       db:
         condition: service_healthy
       mkindayzir-ai:
@@ -28,6 +31,27 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_URL=postgresql://mkindayzir:${DB_PASSWORD}@db:5432/mkindayzir
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
