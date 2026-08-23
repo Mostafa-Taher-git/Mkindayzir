@@ -1,9 +1,50 @@
+"""
+Central application configuration.
+
+All tunables live here. Values come from environment variables or a .env
+file (see docs/CONFIGURATION.md for the full reference).
+
+IMPORTANT — path handling:
+    Relative filesystem settings (DATA_DIR, UPLOAD_DIR, BACKUP_DIR) are
+    anchored to the *backend directory*, NOT the current working directory.
+    This makes the app behave identically whether you launch it from
+    `backend/`, the project root, or an installed `mkindayzir` console
+    command. Absolute paths (e.g. /app/data in Docker) are used as-is.
+"""
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+
+
+# Stable anchors derived from THIS file's location:
+#   backend/app/config.py -> parents[1] = backend/, parents[2] = project root
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = BACKEND_DIR.parent
+
+
+def _find_env_file() -> str:
+    """Pick the most specific .env file available.
+
+    Priority: current working directory first (lets a deployment override),
+    then backend/.env, then project-root/.env. Returns '.env' when nothing
+    exists so pydantic keeps its default behaviour.
+    """
+    for candidate in (Path.cwd() / ".env", BACKEND_DIR / ".env", PROJECT_ROOT / ".env"):
+        if candidate.is_file():
+            return str(candidate)
+    return ".env"
+
+
+def _anchor(value: str, base: Path) -> str:
+    """Resolve a possibly-relative path against `base`; absolutes pass through."""
+    p = Path(value)
+    return str(p if p.is_absolute() else (base / p).resolve())
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_find_env_file(), env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Core
     ENV: str = "development"
@@ -52,6 +93,14 @@ class Settings(BaseSettings):
     GUIDE_CENTER_ENABLED: bool = True
     MAX_PROJECTS: int = 0
     MAX_USERS: int = 0
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Anchor every relative filesystem path to the backend directory so
+        # storage locations never depend on where the process was started.
+        self.DATA_DIR = _anchor(self.DATA_DIR, BACKEND_DIR)
+        self.UPLOAD_DIR = _anchor(self.UPLOAD_DIR, BACKEND_DIR)
+        self.BACKUP_DIR = _anchor(self.BACKUP_DIR, BACKEND_DIR)
 
     @property
     def database_url(self) -> str:

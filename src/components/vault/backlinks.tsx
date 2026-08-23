@@ -28,7 +28,7 @@ export function Backlinks({ backlinks }: BacklinksProps) {
       {backlinks.map((link) => (
         <Link
           key={link.id}
-          href={`${VAULT_ROUTES.NOTES}/${link.id}`}
+          to={`${VAULT_ROUTES.NOTES}/${link.id}`}
           className="block group"
         >
           <div className="rounded-md border p-3 hover:bg-accent transition-colors">

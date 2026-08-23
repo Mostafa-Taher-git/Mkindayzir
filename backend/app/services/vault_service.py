@@ -166,12 +166,33 @@ class VaultService:
         }
 
     @staticmethod
+    async def _unique_slug(db: AsyncSession, base_slug: str) -> str:
+        """Return a slug guaranteed free in vault_notes.
+
+        create_note used to insert the raw title-derived slug; the UNIQUE
+        constraint on slug then turned any duplicate title into an unhandled
+        IntegrityError -> HTTP 500.
+        """
+        from sqlalchemy import select, func
+        candidate = base_slug or "note"
+        n = 2
+        while True:
+            exists = await db.execute(
+                select(func.count()).select_from(VaultNote).where(VaultNote.slug == candidate)
+            )
+            if (exists.scalar_one() or 0) == 0:
+                return candidate
+            candidate = f"{base_slug}-{n}"
+            n += 1
+
+    @staticmethod
     async def create_note(db: AsyncSession, data: dict, user: dict) -> dict:
+        base_slug = data.get("slug") or data["title"].lower().replace(" ", "-")
         note = VaultNote(
             id=uuid.uuid4().hex,
             folderId=data.get("folderId"),
             title=data["title"],
-            slug=data.get("slug") or data["title"].lower().replace(" ", "-"),
+            slug=await VaultService._unique_slug(db, base_slug),
             content=data["content"],
             status=data.get("status", "DRAFT"),
             authorId=user["id"],
@@ -204,6 +225,24 @@ class VaultService:
         note = result.scalar_one_or_none()
         if not note:
             raise ValueError("Note not found")
+
+        content_fields = {"title", "content"}
+        # Snapshot the CURRENT state as a version before applying changes,
+        # but only when a content field is actually being modified. Without
+        # this the /versions endpoint always returned an empty list.
+        if content_fields.intersection(data.keys()) and any(
+            data.get(f) is not None and getattr(note, f) != data[f] for f in content_fields
+        ):
+            version_row = NoteVersion(
+                id=uuid.uuid4().hex,
+                noteId=note.id,
+                version=note.version,
+                title=note.title,
+                content=note.content,
+                editedBy=user["id"],
+            )
+            db.add(version_row)
+            note.version = (note.version or 0) + 1
 
         for field in ["title", "content", "folderId", "excerpt", "status"]:
             if field in data and data[field] is not None:

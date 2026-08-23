@@ -29,12 +29,37 @@ async def custom_exception_handler(request: Request, exc: Exception):
             content = detail
         else:
             content = {"error": {"code": str(status_code), "message": str(detail)}}
-        return JSONResponse(status_code=status_code, content=content)
+        headers = getattr(exc, "headers", None)
+        return JSONResponse(status_code=status_code, content=content, headers=headers)
     return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR", "message": str(exc)}})
+
+
+def http_exception_handler(request: Request, exc):
+    """Normalize HTTPException to the SAME {"error": {...}} envelope used by
+    every other error path. Without this, HTTPException responses were
+    double-wrapped as {"detail": {"error": {...}}}, which the frontend's
+    api.ts cannot parse (users saw raw statusText instead of messages)."""
+    detail = getattr(exc, "detail", str(exc))
+    if isinstance(detail, dict) and "error" in detail:
+        content = detail
+    else:
+        content = {"error": {"code": str(getattr(exc, "status_code", 500)), "message": str(detail)}}
+    return JSONResponse(
+        status_code=getattr(exc, "status_code", 500),
+        content=content,
+        headers=getattr(exc, "headers", None),
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Bootstrap storage directories BEFORE the engine opens a connection.
+    # SQLite (and Postgres file paths) refuse to create intermediate
+    # directories, so a missing DATA_DIR crashed first startup with
+    # "unable to open database file".
+    for _dir in (config_settings.data_dir, config_settings.UPLOAD_DIR, config_settings.BACKUP_DIR):
+        Path(_dir).mkdir(parents=True, exist_ok=True)
+
     if config_settings.database_provider == "sqlite":
         from app.database import engine
         from app.models import Base
@@ -47,6 +72,11 @@ app = FastAPI(title="mkindayzir API", lifespan=lifespan)
 
 app.add_exception_handler(RequestValidationError, custom_exception_handler)
 app.add_exception_handler(Exception, custom_exception_handler)
+
+# Register the StarletteHTTPException handler LAST so it wins over FastAPI's
+# built-in default (which would emit the {"detail": ...} shape).
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
 _allowed_origins = os.environ.get(
     "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"

@@ -230,7 +230,7 @@ export default function BoardsPage() {
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {group.boards.map((board: any) => (
-                  <Link key={board.id} href={`${ROUTES.BOARDS}/${board.id}`} className="block">
+                  <Link key={board.id} to={`${ROUTES.BOARDS}/${board.id}`} className="block">
                     <Card className="h-full transition-shadow hover:shadow-md">
                       {board.background && (
                         <div className="h-1.5 w-full rounded-t" style={{ backgroundColor: board.background }} />

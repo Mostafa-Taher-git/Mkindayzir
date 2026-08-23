@@ -59,7 +59,7 @@ export function TagCloud({ tags, selectedTagId, onSelectTag }: TagCloudProps) {
         return (
           <Link
             key={tag.id}
-            href={
+            to={
               isSelected
                 ? VAULT_ROUTES.HOME
                 : `${VAULT_ROUTES.HOME}?tag=${tag.id}`

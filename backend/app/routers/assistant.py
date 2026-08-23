@@ -38,6 +38,8 @@ async def delete_conversation(conv_id: str, user: dict = Depends(get_current_use
 
 @router.post("/conversations/{conv_id}/messages")
 async def send_message(conv_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if not isinstance(data.get("content"), str) or not data["content"].strip():
+        raise HTTPException(status_code=400, detail={"error": {"code": "VALIDATION_ERROR", "message": "'content' (non-empty string) is required"}})
     try:
         conv = await ConversationService.get_conversation(db, conv_id, user)
     except ValueError as e:
@@ -70,7 +72,10 @@ async def send_message(conv_id: str, data: dict, user: dict = Depends(get_curren
                 "onToken": lambda token: queue.append({"event": "token", "data": {"content": token}}),
                 "onToolCall": lambda tc: queue.append({"event": "tool_call", "data": tc}),
                 "onToolResult": lambda tr: queue.append({"event": "tool_result", "data": tr}),
-                "onDone": lambda result: queue.append({"event": "done", "data": {"messageId": "placeholder"}}),
+                # Pass the stream result through: it carries the full reply
+                # content + token usage that get persisted below. Discarding
+                # it used to save assistant messages as empty strings.
+                "onDone": lambda result: queue.append({"event": "done", "data": result or {}}),
                 "onError": lambda err: queue.append({"event": "error", "data": {"message": str(err)}}),
             }
             try:

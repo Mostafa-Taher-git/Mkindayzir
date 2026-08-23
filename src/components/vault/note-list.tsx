@@ -146,7 +146,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
       params.delete("search");
     }
     const qs = params.toString();
-    navigate(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+    navigate(qs ? `?${qs}` : window.location.pathname);
   }, [debouncedSearch, navigate, searchParams]);
 
   const handleStatusChange = (status: NoteStatus) => {

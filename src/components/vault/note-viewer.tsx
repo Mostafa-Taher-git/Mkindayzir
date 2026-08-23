@@ -298,7 +298,7 @@ export function NoteViewer({
             {backlinks.map((link) => (
               <Link
                 key={link.id}
-                href={`${VAULT_ROUTES.NOTES}/${link.id}`}
+                to={`${VAULT_ROUTES.NOTES}/${link.id}`}
                 className="block text-sm hover:text-primary transition-colors"
               >
                 <span className="font-medium">{link.title}</span>

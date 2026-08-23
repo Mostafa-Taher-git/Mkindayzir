@@ -1,16 +1,13 @@
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 import * as React from "react";
 
 import { BoardForm } from "@/components/boards/board-form";
 
-function NewBoardPage({ params }: { params: Promise<{ spaceId: string }> }) {
+export default function NewBoardPage() {
+  // react-router: route params come from useParams(), not a prop.
+  const { spaceId } = useParams<{ spaceId: string }>();
   const navigate = useNavigate();
-  const [spaceId, setSpaceId] = React.useState<string>("");
-
-  React.useEffect(() => {
-    params.then((p) => setSpaceId(p.spaceId));
-  }, [params]);
 
   if (!spaceId) return null;
 
@@ -29,5 +26,3 @@ function NewBoardPage({ params }: { params: Promise<{ spaceId: string }> }) {
     </div>
   );
 }
-
-export default NewBoardPage;
