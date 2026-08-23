@@ -19,7 +19,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             "mkindayzir_session",
             result["token"],
             httponly=True,
-            secure=False,
+            secure=settings.ENV == "production",
             max_age=settings.SESSION_MAX_AGE,
             samesite="lax",
         )
@@ -60,7 +60,16 @@ async def auto_login(db: AsyncSession = Depends(get_db)):
     if not admin:
         raise HTTPException(status_code=302, detail="No admin user")
     token = await AuthService.create_session(db, admin.id)
-    return {"user": AuthService._serialize_user(admin), "token": token}
+    resp = JSONResponse({"user": AuthService._serialize_user(admin)})
+    resp.set_cookie(
+        "mkindayzir_session",
+        token,
+        httponly=True,
+        secure=settings.ENV == "production",
+        max_age=settings.SESSION_MAX_AGE,
+        samesite="lax",
+    )
+    return resp
 
 
 @router.post("/register", status_code=201)

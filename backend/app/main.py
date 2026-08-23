@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
@@ -7,6 +9,23 @@ from app.routers import (
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system
 )
+
+
+async def custom_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, RequestValidationError):
+        return JSONResponse(
+            status_code=400,
+            content={"error": {"code": "VALIDATION_ERROR", "message": str(exc.errors()[0]["msg"]) if exc.errors() else str(exc)}}
+        )
+    if hasattr(exc, "status_code"):
+        status_code = exc.status_code
+        detail = exc.detail
+        if isinstance(detail, dict) and "error" in detail:
+            content = detail
+        else:
+            content = {"error": {"code": str(status_code), "message": str(detail)}}
+        return JSONResponse(status_code=status_code, content=content)
+    return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR", "message": str(exc)}})
 
 
 @asynccontextmanager
@@ -20,6 +39,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="mkindayzir API", lifespan=lifespan)
+
+app.add_exception_handler(RequestValidationError, custom_exception_handler)
+app.add_exception_handler(Exception, custom_exception_handler)
 
 app.add_middleware(
     CORSMiddleware,
