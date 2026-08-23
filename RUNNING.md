@@ -1,110 +1,97 @@
-# Running Mkindayzir
+# Running Mkindayzir (Quick Reference)
+
+Mkindayzir is a single FastAPI process that serves the API (`/api/*`) and the built React SPA on **port 3000** in production. Full details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Prerequisites
-- Node.js 20+ and pnpm
+
 - Python 3.11+ and pip
-- PostgreSQL 16 (for Team/Enterprise mode) — optional for Personal mode
+- Node.js 18+ and pnpm 9+
+- PostgreSQL 16+ (Team mode only; Personal mode uses SQLite)
 
-## Quick Start (Development)
+## Quick start — Personal (no Docker)
 
-### Option A: Docker Compose (recommended)
-
-1. Create `.env` from `.env.example` and set required secrets:
 ```bash
-cp .env.example .env
+pip install mkindayzir
+mkindayzir start                 # http://localhost:3000 (API + SPA)
 ```
 
-2. Edit `.env` and set:
-   - `DB_PASSWORD` — a secure password for PostgreSQL
-   - `SESSION_SECRET` — 64-char hex string (use `openssl rand -hex 32`)
-   - `ENCRYPTION_KEY` — 64-char hex string (use `openssl rand -hex 32`)
+First run opens the setup wizard to create the admin user.
 
-3. Start all services:
+## Quick start — Docker
+
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker/docker-compose.yml up -d
+bash docker/init.sh              # migrations + admin user
+# App: http://localhost:3000  (put :3000 behind your reverse proxy / TLS)
 ```
 
-4. Run database migrations:
+For Team mode with PostgreSQL:
+
 ```bash
-docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
+docker compose -f docker/docker-compose.yml --profile team up -d
+bash docker/init.sh
 ```
 
-5. Access the app at http://localhost:3000
+Or use the guided installer:
 
-### Option B: Local (without Docker)
+```bash
+python3 scripts/easy-install.py deploy --mode=personal          # or --mode=team --domain=... --email=...
+```
+
+## Development (two processes)
 
 **Terminal 1 — FastAPI backend:**
+
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+python -m app.cli.setup
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Terminal 2 — Next.js frontend:**
+**Terminal 2 — Vite frontend:**
+
 ```bash
 pnpm install
-pnpm dev
+pnpm dev                         # http://localhost:3000, proxies /api -> :8000
 ```
 
-6. Access the app at http://localhost:3000
+- App: http://localhost:3000
+- API docs: http://localhost:8000/docs
 
-## Production (Docker Compose)
+## Common CLI commands
 
-1. Create `.env` with production values:
 ```bash
-cp .env.example .env
-# Edit .env: set DB_PASSWORD, SESSION_SECRET, ENCRYPTION_KEY, MKINDAYZIR_MODE=team
+mkindayzir start                                   # production server (API + SPA) on :3000
+mkindayzir setup admin --email ... --password ...  # create admin
+mkindayzir migrate upgrade                          # Alembic migrations
+mkindayzir backup create                           # backup DB + uploads
+mkindayzir backup restore <file.tar.gz> --force    # restore
+mkindayzir password reset <email>                  # reset password
+mkindayzir version
 ```
-
-2. Build and start:
-```bash
-docker compose up -d --build
-```
-
-3. Run migrations:
-```bash
-docker compose exec backend alembic upgrade head
-```
-
-4. Access at http://localhost (port 80)
-
-Services:
-- Frontend + API: http://localhost (port 80, via nginx)
-- Backend API direct: http://localhost:8000
-- PostgreSQL: localhost:5432
 
 ## Database
 
-### SQLite (Personal mode)
-- Tables auto-created on backend startup
-- Database file: `data/mkindayzir.db`
+- **SQLite (Personal):** auto-created on startup; file at `data/mkindayzir.db`.
+- **PostgreSQL (Team):** run `alembic upgrade head` (or `mkindayzir migrate upgrade`).
+- **SQLite -> PostgreSQL:** use the in-app wizard (Settings → System → "Upgrade to Team Mode"), or `mkindayzir migrate migrate-db` (reads `DATABASE_URL`).
 
-### PostgreSQL (Team/Enterprise mode)
-```bash
-cd backend
-alembic upgrade head
-```
+## First run
 
-### Migrate SQLite → PostgreSQL
-```bash
-cd backend
-python -m app.cli.migrate_db --target postgresql://user:pass@host:5432/mkindayzir
-```
+1. Visit http://localhost:3000
+2. Complete the setup wizard / create the admin account.
+3. In Personal mode with `AUTO_LOGIN=true` you are logged in immediately.
 
-## First Run
-1. Visit http://localhost:3000/setup
-2. Choose mode (Personal / Team / Enterprise)
-3. Create admin account
-4. In Personal mode with auto-login, you'll be logged in immediately
+## Key environment variables
 
-## Environment Variables
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Essentials:
 
-Key variables (see `.env.example`):
-- `DATABASE_PROVIDER`: `sqlite` (Personal) or `postgresql` (Team/Enterprise)
-- `DATABASE_URL`: Database connection string
-- `SESSION_SECRET`: 64-char hex string for session signing
-- `ENCRYPTION_KEY`: 64-char hex string (32 bytes) for AI API key encryption
-- `MKINDAYZIR_MODE`: `personal`, `team`, or `enterprise`
-- `DB_PASSWORD`: PostgreSQL password (required for Team/Enterprise)
+- `DATABASE_PROVIDER`: `sqlite` (Personal) or `postgres` (Team)
+- `DATABASE_URL`: database connection string
+- `SESSION_SECRET`: 64-char hex string for the session cookie
+- `ENCRYPTION_KEY`: 64-char hex string for AES-256-GCM encryption
+- `MKINDAYZIR_MODE`: `personal` or `team`

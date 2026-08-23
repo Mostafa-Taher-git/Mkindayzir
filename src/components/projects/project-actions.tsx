@@ -1,7 +1,7 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import {
   Dialog,
@@ -24,7 +24,7 @@ interface ProjectActionsProps {
 }
 
 export function ProjectActions({ projectId, initialName, initialDescription }: ProjectActionsProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -61,7 +61,7 @@ export function ProjectActions({ projectId, initialName, initialDescription }: P
         throw new Error(err?.error?.message ?? "Failed to update project");
       }
       setEditOpen(false);
-      router.refresh();
+      window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update project");
     } finally {
@@ -78,7 +78,7 @@ export function ProjectActions({ projectId, initialName, initialDescription }: P
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? "Failed to delete project");
       }
-      router.push(ROUTES.PROJECTS);
+      navigate(ROUTES.PROJECTS);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete project");
       setDeleting(false);

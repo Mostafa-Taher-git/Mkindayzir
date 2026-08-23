@@ -1,7 +1,7 @@
 "use client";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,8 @@ function Header({
   onMenuClick: () => void;
   onSearchClick: () => void;
 }) {
-  const pathname = usePathname() || "";
-  const router = useRouter();
+  const pathname = useLocation().pathname || "";
+  const navigate = useNavigate();
   const isMobile = useMobile();
   const { user } = useAuth();
   const [notifOpen, setNotifOpen] = React.useState(false);
@@ -194,7 +194,7 @@ function Header({
                     variant="outline"
                     size="sm"
                     className="flex-1 border-2 border-outline"
-                    onClick={() => { router.push(ROUTES.SETTINGS); setProfileOpen(false); }}
+                    onClick={() => { navigate(ROUTES.SETTINGS); setProfileOpen(false); }}
                   >
                     Settings
                   </Button>

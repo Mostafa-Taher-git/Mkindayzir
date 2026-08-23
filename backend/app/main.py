@@ -1,13 +1,17 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from app.config import settings
+from pathlib import Path
+import os
+
+from app.config import settings as config_settings
 from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
-    vault, assistant, settings, reports, guides, search, uploads, admin, system
+    vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard
 )
 
 
@@ -30,7 +34,7 @@ async def custom_exception_handler(request: Request, exc: Exception):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.database_provider == "sqlite":
+    if config_settings.database_provider == "sqlite":
         from app.database import engine
         from app.models import Base
         async with engine.begin() as conn:
@@ -56,11 +60,44 @@ for router in [
     iterations.router, initiatives.router, workflows.router, labels.router,
     spaces.router, boards.router, columns.router, cards.router,
     checklists.router, vault.router, assistant.router, settings.router,
-    reports.router, guides.router, search.router, uploads.router, admin.router, system.router
+    reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
+    dashboard.router,
 ]:
-    app.include_router(router, prefix="/api")
+    app.include_router(router)
 
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/api/config")
+async def public_config():
+    return {
+        "mode": config_settings.MKINDAYZIR_MODE,
+        "registrationEnabled": config_settings.REGISTRATION_ENABLED,
+    }
+
+
+
+
+# --------------------------------------------------------------------------- #
+# Static serving of the built frontend (production single-process mode).
+# Mounted LAST so /api routers take precedence. When the dist directory is
+# absent (dev mode) the API still works and SPA routes simply 404.
+# --------------------------------------------------------------------------- #
+_frontend_dir = Path(os.environ.get("FRONTEND_DIR", "")) if os.environ.get("FRONTEND_DIR") else (
+    Path(__file__).resolve().parent.parent.parent / "dist"
+)
+
+if _frontend_dir.exists() and _frontend_dir.is_dir():
+    _assets_dir = _frontend_dir / "assets"
+    if _assets_dir.exists() and _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir), html=False), name="frontend-assets")
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        # Any real file under dist (other than /assets which is mounted) is served.
+        candidate = _frontend_dir / path
+        if path and candidate.exists() and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_frontend_dir / "index.html"))

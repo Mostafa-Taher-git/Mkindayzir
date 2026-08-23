@@ -36,7 +36,7 @@ function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }: CardDe
   const { data: cardData } = useQuery({
     queryKey: ["cards", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}`, {
+      const res = await fetch(`${""}/api/cards/${cardId}`, {
         cache: "no-store",
       });
       if (!res.ok) return null;
@@ -216,7 +216,7 @@ function ActivityLog({ cardId }: { cardId: string }) {
   const { data } = useQuery({
     queryKey: ["activity", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}/activity`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/activity`, {
         cache: "no-store",
       });
       if (!res.ok) return { activities: [] };

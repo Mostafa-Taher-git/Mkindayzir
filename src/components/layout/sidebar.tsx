@@ -1,7 +1,7 @@
 "use client";
+import { useLocation } from "react-router-dom";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
@@ -41,7 +41,7 @@ function Sidebar({
   onOpenChange: (open: boolean) => void;
   mode: string;
 }) {
-  const pathname = usePathname() || "";
+  const pathname = useLocation().pathname || "";
   const isMobile = useMobile();
   const { user } = useAuth();
 

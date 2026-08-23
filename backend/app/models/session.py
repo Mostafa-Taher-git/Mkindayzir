@@ -8,7 +8,7 @@ from app.database import Base
 class Session(Base):
     __tablename__ = "sessions"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: __import__("uuid").uuid4().hex)
     userId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     expiresAt: Mapped[datetime] = mapped_column("expiresAt", DateTime, nullable=False)

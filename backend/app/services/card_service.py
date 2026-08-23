@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -22,7 +23,7 @@ class CardService:
             "position": card.position,
             "dueDate": card.dueDate.isoformat() if card.dueDate else None,
             "coverColor": card.coverColor,
-            "metadata": card.metadata,
+            "metadata": card.meta,
             "createdById": card.createdById,
             "createdAt": card.createdAt.isoformat() if card.createdAt else None,
             "updatedAt": card.updatedAt.isoformat() if card.updatedAt else None,
@@ -30,7 +31,7 @@ class CardService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, column_id: str, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, column_id: str, user: dict) -> List[dict]:
         result = await db.execute(
             select(Card).where(Card.columnId == column_id, Card.deletedAt.is_(None)).order_by(Card.position.asc())
         )
@@ -38,7 +39,7 @@ class CardService:
         return [CardService._serialize(c) for c in cards]
 
     @staticmethod
-    async def list_by_board(db: AsyncSession, board_id: str) -> list[dict]:
+    async def list_by_board(db: AsyncSession, board_id: str) -> List[dict]:
         result = await db.execute(
             select(Card).join(Column).where(Column.boardId == board_id, Card.deletedAt.is_(None)).order_by(Card.position.asc())
         )
@@ -57,7 +58,7 @@ class CardService:
             position=position,
             dueDate=data.get("dueDate"),
             coverColor=data.get("coverColor"),
-            metadata=str(data.get("metadata") or {}),
+            meta=str(data.get("metadata") or {}),
             createdById=user["id"],
         )
         db.add(card)
@@ -84,7 +85,7 @@ class CardService:
             if field in data and data[field] is not None:
                 setattr(card, field, data[field])
         if "metadata" in data and data["metadata"] is not None:
-            card.metadata = str(data["metadata"])
+            card.meta = str(data["metadata"])
 
         await db.commit()
         await db.refresh(card)

@@ -1,12 +1,11 @@
 "use client";
+import { useNavigate, Link } from "react-router-dom";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { RegisterSchema } from "@/lib/validators";
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +50,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/login");
+      window.location.href = "/login";
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
@@ -61,14 +60,14 @@ export default function RegisterPage() {
   const fieldClass =
     "w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background";
 
-  if (process.env.REGISTRATION_ENABLED !== "true") {
+  if (false) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="panel w-full max-w-md p-8 text-center shadow-panel">
           <img src="/MKINDAYZIR_logo.jpg" alt="Mkindayzir" className="mx-auto h-12 w-12 object-cover border-2 border-outline-strong" />
           <h1 className="mt-4 font-display text-2xl font-extrabold uppercase">Registration Offline</h1>
           <p className="mt-2 text-sm text-muted-foreground">Account registration is currently disabled.</p>
-          <Link href="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary px-5 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red">
+          <Link to="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary px-5 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red">
             Back to login
           </Link>
         </div>
@@ -115,7 +114,7 @@ export default function RegisterPage() {
         </form>
         <div className="mt-5 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Already registered?{" "}
-          <Link href="/login" className="text-primary-light hover:text-foreground underline">Sign in</Link>
+          <Link to="/login" className="text-primary-light hover:text-foreground underline">Sign in</Link>
         </div>
       </div>
     </div>

@@ -1,29 +1,41 @@
 #!/usr/bin/env python3
 """
-One-command production deployment script for mkindayzir.
+Easy-install / deployment script for mkindayzir.
 
-Supports three deployment modes:
-- personal: SQLite, single user, no Docker required
-- team: PostgreSQL, multi-user, Docker required
-- enterprise: Full features, PostgreSQL, Docker required
+Single-process architecture (target):
+- Backend: FastAPI served by the `mkindayzir` CLI; `mkindayzir start` runs uvicorn
+  on port 3000 serving the API + the built Vite frontend.
+- DB: personal = SQLite (default); team/enterprise = PostgreSQL (asyncpg).
+- Migrations: Alembic. First run: `alembic upgrade head`, then `mkindayzir setup admin`.
+- Docker: a SINGLE root Dockerfile builds the frontend and runs FastAPI on :3000.
+  docker/docker-compose.yml defines one `app` service plus an optional `postgres`
+  service under `profiles: [team]`.
+- Session cookie: mkindayzir_session.
+
+Stdlib-only (no pip deps) so it runs on stock Python 3.11+ after a plain download.
+
+Subcommands:
+  local    Personal-mode install without Docker (venv + pip install -e ./backend).
+  deploy   Docker-based deploy for personal / team / enterprise modes.
+
+Note: the admin command is `mkindayzir setup admin --email ... --password ...`
+(the `setup` Click group with an `admin` subcommand).
 """
 
 import argparse
 import base64
-import json
 import os
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-
-# ─── ANSI Colors ───────────────────────────────────────────────────────────────
 
 class Colors:
     RESET = "\033[0m"
@@ -32,505 +44,348 @@ class Colors:
     RED = "\033[91m"
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
-    BLUE = "\033[94m"
-    MAGENTA = "\033[95m"
     CYAN = "\033[96m"
     WHITE = "\033[97m"
+    UNDERLINE = "\033[4m"
 
     @classmethod
-    def ok(cls, text: str) -> str:
+    def ok(cls, text):
         return f"{cls.GREEN}{text}{cls.RESET}"
 
     @classmethod
-    def err(cls, text: str) -> str:
+    def err(cls, text):
         return f"{cls.RED}{text}{cls.RESET}"
 
     @classmethod
-    def warn(cls, text: str) -> str:
+    def warn(cls, text):
         return f"{cls.YELLOW}{text}{cls.RESET}"
 
     @classmethod
-    def info(cls, text: str) -> str:
+    def info(cls, text):
         return f"{cls.CYAN}{text}{cls.RESET}"
 
-
-# ─── Helpers ───────────────────────────────────────────────────────────────────
-
-def generate_secret(bytes_len: int = 32) -> str:
-    """Generate a cryptographically secure random secret, base64 encoded."""
-    return base64.urlsafe_b64encode(secrets.token_bytes(bytes_len)).decode("utf-8")
+    @classmethod
+    def header(cls, text):
+        return f"\n{cls.BOLD}{cls.CYAN}── {text} {cls.RESET}"
 
 
-def project_root() -> Path:
-    """Return the mkindayzir project root directory."""
+def die(message):
+    print(Colors.err(f"✗ {message}"))
+    sys.exit(1)
+
+
+def generate_secret(byte_len=32):
+    return base64.urlsafe_b64encode(secrets.token_bytes(byte_len)).decode("utf-8").rstrip("=")
+
+
+def project_root():
     return Path(__file__).resolve().parent.parent
 
 
-def run_command(cmd: list[str], check: bool = True, capture: bool = True, env: dict | None = None) -> subprocess.CompletedProcess:
-    """Run a shell command with optional env overrides."""
+def docker_dir():
+    return project_root() / "docker"
+
+
+def run_command(cmd, cwd=None, env=None, check=True, capture=True):
     merged_env = {**os.environ}
     if env:
         merged_env.update(env)
-    return subprocess.run(
-        cmd,
-        capture_output=capture,
-        text=True,
-        check=check,
-        env=merged_env,
+    print(Colors.dim(f"  $ {' '.join(cmd)}"))
+    try:
+        return subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            env=merged_env,
+            capture_output=capture,
+            text=True,
+            check=check,
+        )
+    except subprocess.CalledProcessError as exc:
+        out = exc.stderr or exc.stdout or ""
+        die(f"Command failed: {' '.join(cmd)}\n{out[-1500:]}")
+
+
+def command_exists(cmd):
+    return shutil.which(cmd) is not None
+
+
+def print_banner(mode, domain):
+    print(
+        f"\n{Colors.BOLD}{Colors.CYAN}"
+        "====== Mkindayzir — Easy Install / Deploy ======\n"
+        f"  Mode:   {mode.upper()}\n"
+        f"  Domain: {domain or 'localhost'}\n"
+        f"{Colors.RESET}"
     )
 
 
-def command_exists(cmd: str) -> bool:
-    """Check if a command is available on PATH."""
-    result = subprocess.run(["which", cmd], capture_output=True)
-    return result.returncode == 0
-
-
-def print_banner(mode: str, domain: str) -> None:
-    banner = f"""
-{Colors.BOLD}{Colors.CYAN}
-╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {Colors.WHITE}██╗  ██╗██╗███╗   ███╗██████╗ ██╗     ██████╗ ██╗{Colors.CYAN}   ║
-║   {Colors.WHITE}██║ ██╔╝██║████╗ ████║██╔══██╗██║     ██╔══██╗██║{Colors.CYAN}   ║
-║   {Colors.WHITE}█████╔╝ ██║██╔████╔██║██████╔╝██║     ██║  ██║██║{Colors.CYAN}   ║
-║   {Colors.WHITE}██╔═██╗ ██║██║╚██╔╝██║██╔══██╗██║     ██║  ██║██║{Colors.CYAN}   ║
-║   {Colors.WHITE}██║  ██╗██║██║ ╚═╝ ██║██║  ██║███████╗██████╔╝██║{Colors.CYAN}   ║
-║   {Colors.WHITE}╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ ╚═╝{Colors.CYAN}   ║
-║                                                              ║
-║   {Colors.GREEN}Easy Install Script{Colors.CYAN}                                         ║
-║   Mode: {Colors.WHITE}{mode.upper():<10}{Colors.CYAN}  Domain: {Colors.WHITE}{domain:<20}{Colors.CYAN}║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-{Colors.RESET}"""
-    print(banner)
-
-
-# ─── Core Functions ────────────────────────────────────────────────────────────
-
-def write_env(mode: str, domain: str, email: str, db_password: str) -> Path:
-    """Write .env file in the project root with deployment configuration."""
-    root = project_root()
-    env_path = root / ".env"
-
+def build_env_content(mode, domain, db_password):
     session_secret = generate_secret()
     encryption_key = generate_secret()
 
-    domain_url = domain if domain.startswith("http") else f"https://{domain}"
     if mode == "personal":
-        domain_url = "http://localhost:3000"
-
-    db_provider = "sqlite" if mode == "personal" else "postgresql"
-    data_dir = "./data" if mode == "personal" else "/app/data"
-
-    if db_provider == "sqlite":
-        db_url = f"file:{data_dir}/mkindayzir.db"
+        provider = "sqlite"
+        database_url = "sqlite+aiosqlite:///./data/mkindayzir.db"
+        postgres_block = ""
     else:
-        db_url = f"postgresql://mkindayzir:{db_password}@db:5432/mkindayzir"
+        provider = "postgres"
+        database_url = (
+            f"postgresql+asyncpg://mkindayzir:{db_password}@postgres:5432/mkindayzir"
+        )
+        postgres_block = (
+            "\n# PostgreSQL (consumed by the `postgres` compose service)\n"
+            f"POSTGRES_USER=mkindayzir\n"
+            f"POSTGRES_PASSWORD={db_password}\n"
+            f"POSTGRES_DB=mkindayzir\n"
+        )
 
-    auto_login = "true" if mode == "personal" else "false"
-    registration_enabled = "false" if mode == "personal" else "true"
-    max_users = "1" if mode == "personal" else "0"
+    base_url = (
+        "http://localhost:3000"
+        if mode == "personal"
+        else (domain if domain.startswith("http") else f"https://{domain}")
+    )
 
-    env_content = f"""# Auto-generated by easy-install.py on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    return f"""# Auto-generated by easy-install.py on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 MKINDAYZIR_MODE={mode}
-AUTO_LOGIN={auto_login}
-REGISTRATION_ENABLED={registration_enabled}
-MAX_USERS={max_users}
+PORT=3000
+BASE_URL={base_url}
 
 # Database
-DATABASE_PROVIDER={db_provider}
-DATABASE_URL={db_url}
-DATA_DIR={data_dir}
-
+DATABASE_PROVIDER={provider}
+DATABASE_URL={database_url}
+DATA_DIR=./data
+{postgres_block}
 # Security
 SESSION_SECRET={session_secret}
 ENCRYPTION_KEY={encryption_key}
+SESSION_COOKIE_NAME=mkindayzir_session
 SESSION_MAX_AGE=86400
-BCRYPT_ROUNDS=12
 
 # Application
 NODE_ENV=production
-BASE_URL={domain_url}
-PORT=3000
-PYTHON_AI_URL=http://mkindayzir-ai:8000
-
-# Email
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_FROM=noreply@{domain if domain else "mkindayzir.local"}
-
-# Logging
 LOG_LEVEL=info
-LOG_FORMAT=json
-
-# File Storage
-UPLOAD_DIR={data_dir}/uploads
-MAX_UPLOAD_SIZE=26214400
-BACKUP_DIR={data_dir}/backups
 """
 
-    env_path.write_text(env_content)
-    print(Colors.ok(f"✓ Written .env to {env_path}"))
-    return env_path
+
+def write_env_file(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    print(Colors.ok(f"✓ Wrote .env -> {path}"))
 
 
-def check_prerequisites(mode: str) -> None:
-    """Verify system prerequisites based on deployment mode."""
-    print(Colors.header("CHECKING PREREQUISITES"))
-
-    errors = []
-
-    # Python check
+def check_python():
     if sys.version_info < (3, 11):
-        errors.append(f"Python 3.11+ required, found {sys.version}")
-
-    # Docker-dependent modes
-    if mode in ("team", "enterprise"):
-        if not command_exists("docker"):
-            errors.append("Docker is not installed. Install from https://docs.docker.com/get-docker/")
-        if not command_exists("docker"):
-            errors.append("docker compose is not available. Install Docker Compose plugin.")
-
-        # Verify docker daemon is running
-        try:
-            run_command(["docker", "info"], capture=True)
-        except subprocess.CalledProcessError:
-            errors.append("Docker daemon is not running. Start Docker and try again.")
-
-    if errors:
-        for e in errors:
-            print(Colors.err(f"✗ {e}"))
-        print(Colors.err("\nPrerequisites check failed. Please fix the above issues and retry."))
-        sys.exit(1)
-
-    print(Colors.ok("✓ All prerequisites satisfied"))
+        die(f"Python 3.11+ is required (found {sys.version.split()[0]}).")
 
 
-def deploy_personal(domain: str, email: str) -> None:
-    """Deploy in personal (SQLite, single-user, no Docker) mode."""
-    print(Colors.header("DEPLOYING PERSONAL MODE"))
+def check_docker():
+    print(Colors.header("CHECKING PREREQUISITES (Docker)"))
+    if not command_exists("docker"):
+        die("Docker is not installed. Install it from https://docs.docker.com/get-docker/")
 
+    result = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True)
+    if result.returncode != 0:
+        die(
+            "The Docker Compose plugin is missing. Install it via the Docker plugin "
+            "(https://docs.docker.com/compose/install/) -- `docker compose version` must succeed."
+        )
+    print(Colors.ok(f"✓ docker: {result.stdout.strip().splitlines()[0]}"))
+
+    info = subprocess.run(["docker", "info"], capture_output=True, text=True)
+    if info.returncode != 0:
+        die("Docker daemon is not running. Start Docker and retry.")
+    print(Colors.ok("✓ Docker daemon is reachable"))
+
+
+def cmd_local(args):
+    mode = "personal"
+    email = args.email
+    password = args.password or generate_secret(16)
     root = project_root()
+
+    print_banner(mode, "")
     print(Colors.info(f"Project root: {root}"))
+    check_python()
 
-    # Create data directories
-    data_dir = root / "data"
-    for subdir in ("uploads", "backups"):
-        (data_dir / subdir).mkdir(parents=True, exist_ok=True)
-    print(Colors.ok(f"✓ Created data directories at {data_dir}"))
+    venv_dir = root / ".venv"
+    venv_bin = venv_dir / "bin"
+    if sys.platform == "win32":
+        venv_bin = venv_dir / "Scripts"
 
-    # Check if package.json exists
-    pkg_json = root / "package.json"
-    if not pkg_json.exists():
-        print(Colors.err(f"✗ package.json not found at {pkg_json}"))
-        sys.exit(1)
-
-    # Check if pnpm is available
-    pnpm_available = command_exists("pnpm")
-    npm_available = command_exists("npm")
-    pkg_manager = "pnpm" if pnpm_available else ("npm" if npm_available else None)
-
-    if not pkg_manager:
-        print(Colors.warn("Neither pnpm nor npm found. Please install one."))
-
-    print(Colors.header("PERSONAL MODE SETUP COMPLETE"))
-    print(Colors.ok("✓ Configuration generated"))
-    print(Colors.info("\nNext steps:\n"))
-
-    if pkg_manager:
-        print(f"  {Colors.BOLD}1.{Colors.RESET} Install dependencies:")
-        print(f"     {Colors.CYAN}{pkg_manager} install{Colors.RESET}")
-        print(f"\n  {Colors.BOLD}2.{Colors.RESET} Run database migrations:")
-        print(f"     {Colors.CYAN}{pkg_manager} prisma generate && {pkg_manager} prisma migrate deploy{Colors.RESET}")
-        print(f"\n  {Colors.BOLD}3.{Colors.RESET} Start development server:")
-        print(f"     {Colors.CYAN}{pkg_manager} dev{Colors.RESET}")
+    print(Colors.header("CREATING VIRTUALENV & INSTALLING"))
+    if venv_dir.exists():
+        print(Colors.warn(f"Reusing existing venv at {venv_dir}"))
     else:
-        print(f"  {Colors.BOLD}1.{Colors.RESET} Install pnpm: https://pnpm.io/installation")
-        print(f"  {Colors.BOLD}2.{Colors.RESET} Install dependencies: {Colors.CYAN}pnpm install{Colors.RESET}")
-        print(f"  {Colors.BOLD}3.{Colors.RESET} Generate Prisma client: {Colors.CYAN}pnpm prisma generate{Colors.RESET}")
-        print(f"  {Colors.BOLD}4.{Colors.RESET} Run migrations: {Colors.CYAN}pnpm prisma migrate deploy{Colors.RESET}")
-        print(f"  {Colors.BOLD}5.{Colors.RESET} Start development server: {Colors.CYAN}pnpm dev{Colors.RESET}")
+        run_command([sys.executable, "-m", "venv", str(venv_dir)])
+        print(Colors.ok(f"✓ Created venv at {venv_dir}"))
 
-    print(f"\n  {Colors.BOLD}Alternative:{Colors.RESET} Install as a CLI tool:")
-    print(f"     {Colors.CYAN}npm install -g mkindayzir{Colors.RESET}")
-    print(f"     {Colors.CYAN}mkindayzir start{Colors.RESET}")
+    pip = str(venv_bin / "pip")
+    run_command([pip, "install", "--upgrade", "pip"])
+    print(Colors.info("Installing backend (editable) -- provides `mkindayzir` and `alembic`..."))
+    run_command([pip, "install", "-e", "./backend"])
 
-    print(Colors.header("ACCESS INFORMATION"))
+    (root / "data").mkdir(parents=True, exist_ok=True)
+
+    print(Colors.header("WRITING CONFIG"))
+    write_env_file(root / ".env", build_env_content(mode=mode, domain="", db_password=""))
+
+    print(Colors.header("RUNNING MIGRATIONS"))
+    run_command([str(venv_bin / "alembic"), "upgrade", "head"], cwd=root / "backend")
+    print(Colors.ok("✓ Migrations applied"))
+
+    print(Colors.header("CREATING ADMIN"))
+    run_command(
+        [
+            str(venv_bin / "mkindayzir"), "setup", "admin",
+            "--email", email,
+            "--password", password,
+            "--name", "Admin",
+        ]
+    )
+    print(Colors.ok("✓ Admin created"))
+
+    print(Colors.header("DONE -- PERSONAL MODE (LOCAL)"))
     print(f"  {Colors.BOLD}URL:{Colors.RESET}       http://localhost:3000")
     print(f"  {Colors.BOLD}Email:{Colors.RESET}     {email}")
-    print(f"  {Colors.BOLD}Default Password:{Colors.RESET} Set during first-run setup wizard")
-    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      Personal (SQLite, single-user)")
+    print(f"  {Colors.BOLD}Password:{Colors.RESET}  {password}")
+    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      Personal (SQLite, single process on :3000)")
+    print()
+    print(Colors.info("Start the server with:"))
+    print(f"     {Colors.CYAN}source .venv/bin/activate && mkindayzir start{Colors.RESET}")
+    print(f"  or simply: {Colors.CYAN}.venv/bin/mkindayzir start{Colors.RESET}")
     print()
 
 
-def docker_compose_files(mode: str) -> tuple[Path, str | None]:
-    """Return the compose file path and profile for a given mode."""
-    root = project_root()
-
-    # Check for docker/ directory first (preferred)
-    docker_dir = root / "docker"
-    if docker_dir.is_dir():
-        if mode == "enterprise":
-            return (docker_dir / "docker-compose.prod.yml", "enterprise")
-        elif mode == "team":
-            return (docker_dir / "docker-compose.prod.yml", "team")
-    else:
-        # Fall back to project root compose files
-        if mode == "enterprise":
-            return (root / "docker-compose.yml", "enterprise")
-        elif mode == "team":
-            return (root / "docker-compose.yml", "team")
-
-    return (root / "docker-compose.yml", None)
+def compose_file_path():
+    p = docker_dir() / "docker-compose.yml"
+    if not p.exists():
+        die(f"Compose file not found: {p}")
+    return p
 
 
-def deploy_docker(mode: str, domain: str, email: str, db_password: str) -> None:
-    """Deploy using Docker Compose (team or enterprise mode)."""
-    print(Colors.header(f"DEPLOYING {mode.upper()} MODE (Docker)"))
-
-    root = project_root()
-    compose_file, profile = docker_compose_files(mode)
-
-    if not compose_file.exists():
-        print(Colors.err(f"Docker compose file not found: {compose_file}"))
-        print(Colors.warn("Ensure docker-compose.yml exists in project root or docker/ directory."))
-        sys.exit(1)
-
-    print(Colors.info(f"Compose file: {compose_file}"))
+def compose_base_cmd(compose_file, profile):
+    cmd = ["docker", "compose", "-f", str(compose_file)]
     if profile:
-        print(Colors.info(f"Profile: {profile}"))
-
-    env_path = write_env(mode, domain, email, db_password)
-
-    # Prepare docker compose command
-    compose_cmd = ["docker", "compose", "-f", str(compose_file)]
-    if profile:
-        compose_cmd += ["--profile", profile]
-
-    # Create volumes if needed
-    print(Colors.info("Ensuring Docker volumes exist..."))
-    run_command(compose_cmd + ["up", "-d", "--create-volumes"], check=False)
-
-    # Pull images
-    print(Colors.info("Pulling Docker images..."))
-    result = run_command(compose_cmd + ["pull"], check=False)
-    if result.returncode != 0:
-        print(Colors.warn(f"Image pull had issues (will attempt build instead): {result.stderr[:200]}"))
-
-    # Build images (if Dockerfile exists locally)
-    print(Colors.info("Building images..."))
-    result = run_command(compose_cmd + ["build"], check=False)
-    if result.returncode != 0:
-        print(Colors.err(f"Docker build failed:\n{result.stderr}"))
-        sys.exit(1)
-    print(Colors.ok("Images built successfully"))
-
-    # Start services
-    print(Colors.info("Starting services..."))
-    result = run_command(compose_cmd + ["up", "-d"], check=False)
-    if result.returncode != 0:
-        print(Colors.err(f"docker compose up failed:\n{result.stderr}"))
-        sys.exit(1)
-    print(Colors.ok("Services started"))
-
-    # Wait for health
-    wait_for_health(compose_cmd)
-
-    # Run migrations
-    run_migrations(compose_cmd)
-
-    # Create admin user
-    create_admin(domain, email, mode)
-
-    # Determine URL
-    if domain:
-        url = domain if domain.startswith("http") else f"https://{domain}"
-    else:
-        url = "http://localhost:3000"
-
-    print(Colors.header("DEPLOYMENT COMPLETE"))
-    print(Colors.ok(f"{mode.capitalize()} mode deployed successfully"))
-    print()
-    print(f"  {Colors.BOLD}URL:{Colors.RESET}       {Colors.UNDERLINE}{url}{Colors.RESET}")
-    print(f"  {Colors.BOLD}Email:{Colors.RESET}     {email}")
-    print(f"  {Colors.BOLD}Password:{Colors.RESET}  Set during first login / setup wizard")
-    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      {mode.capitalize()}")
-    print()
-    print(Colors.info("Services:"))
-    print(f"  Frontend:  {Colors.CYAN}http://localhost:3000{Colors.RESET}")
-    print(f"  Backend:   {Colors.CYAN}http://localhost:8000{Colors.RESET}")
-    print(f"  Database:  {Colors.CYAN}PostgreSQL (via Docker){Colors.RESET}")
-    print()
-    print(Colors.info("Management commands:"))
-    print(f"  View logs:     {Colors.CYAN}docker compose -f {compose_file} {'--profile ' + profile + ' ' if profile else ''}logs -f{Colors.RESET}")
-    print(f"  Stop:          {Colors.CYAN}docker compose -f {compose_file} {'--profile ' + profile + ' ' if profile else ''}down{Colors.RESET}")
-    print(f"  Restart:       {Colors.CYAN}docker compose -f {compose_file} {'--profile ' + profile + ' ' if profile else ''}restart{Colors.RESET}")
-    print()
+        cmd += ["--profile", profile]
+    return cmd
 
 
-def wait_for_health(compose_cmd: list[str], timeout: int = 300) -> None:
-    """Wait for all services to become healthy."""
-    print(Colors.header("WAITING FOR HEALTH CHECK"))
-
-    start = time.time()
-    all_healthy = False
-
-    while time.time() - start < timeout:
-        try:
-            req = urllib.request.Request("http://localhost:3000/api/health")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    all_healthy = True
-                    break
-        except (urllib.error.URLError, ConnectionRefusedError, TimeoutError, OSError):
-            pass
-
-        elapsed = int(time.time() - start)
-        sys.stdout.write(f"\r{Colors.DIM}Waiting for services... {elapsed}s elapsed{Colors.RESET}")
-        sys.stdout.flush()
-        time.sleep(5)
-
-    print()
-    if all_healthy:
-        print(Colors.ok("All services healthy"))
-    else:
-        print(Colors.warn("Health check timed out -- services may still be starting."))
-        print(Colors.info("Check status with: docker compose ps"))
-
-
-def run_migrations(compose_cmd: list[str]) -> None:
-    """Run Alembic database migrations via docker compose exec."""
-    print(Colors.header("RUNNING DATABASE MIGRATIONS"))
-
-    # Run migrations using the backend service
-    result = run_command(
-        compose_cmd + ["exec", "-T", "backend", "alembic", "upgrade", "head"],
-        check=False,
-    )
-
-    if result.returncode == 0:
-        print(Colors.ok("Migrations applied successfully"))
-        return
-
-    # Fallback: try prisma migrate deploy
-    print(Colors.warn("Alembic migration failed, trying Prisma deploy..."))
-    result = run_command(
-        compose_cmd + ["exec", "-T", "mkindayzir", "pnpm", "prisma", "migrate", "deploy"],
-        check=False,
-    )
-
-    if result.returncode == 0:
-        print(Colors.ok("Prisma migrations applied successfully"))
-    else:
-        print(Colors.warn(f"Migration step encountered issues:\n{result.stderr[:500]}"))
-        print(Colors.info("You may need to run migrations manually after deployment."))
-
-
-def create_admin(domain: str, email: str, mode: str) -> str | None:
-    """Create admin user via the /api/setup endpoint."""
-    print(Colors.header("CREATING ADMIN USER"))
-
-    admin_password = generate_secret(16)
-    admin_display_name = email.split("@")[0].replace(".", " ").replace("-", " ").title()
-    admin_display_name = "".join(c for c in admin_display_name if c.isalpha() or c == " ").strip() or "Admin"
-
-    payload = json.dumps({
-        "mode": mode,
-        "email": email,
-        "displayName": admin_display_name,
-        "password": admin_password,
-        "confirmPassword": admin_password,
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "http://localhost:3000/api/setup",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            print(Colors.ok("Admin user created successfully"))
-            print(f"\n  {Colors.BOLD}Email:{Colors.RESET}     {email}")
-            print(f"  {Colors.BOLD}Password:{Colors.RESET}  {admin_password}")
-            print(f"  {Colors.BOLD}Name:{Colors.RESET}      {admin_display_name}")
-            print(f"\n  {Colors.YELLOW}Save this password -- it won't be shown again!{Colors.RESET}")
-            print()
-            return admin_password
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8") if e.fp else ""
-        if "ALREADY_SETUP" in body or e.code == 400:
-            print(Colors.warn("Setup already completed -- admin user may already exist."))
-            return None
-        print(Colors.err(f"Failed to create admin user (HTTP {e.code}): {body[:300]}"))
-        return None
-    except Exception as e:
-        print(Colors.err(f"Error creating admin user: {e}"))
-        return None
-
-
-# ─── Main ──────────────────────────────────────────────────────────────────────
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="easy-install.py",
-        description="One-command production deployment for mkindayzir",
-    )
-    parser.add_argument(
-        "action",
-        choices=["deploy"],
-        help="Action to perform (currently only 'deploy' is supported)",
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["personal", "team", "enterprise"],
-        required=True,
-        help="Deployment mode: personal (SQLite, no Docker), team (PostgreSQL, Docker), enterprise (full features, Docker)",
-    )
-    parser.add_argument(
-        "--domain",
-        default="",
-        help="Domain name for the application (e.g. ops.mycompany.local)",
-    )
-    parser.add_argument(
-        "--email",
-        required=True,
-        help="Admin email address",
-    )
-    parser.add_argument(
-        "--db-password",
-        default=None,
-        help="Database password (for Docker modes). Auto-generated if not provided.",
-    )
-
-    args = parser.parse_args()
-
-    if args.action != "deploy":
-        print(Colors.err("Only 'deploy' action is currently supported."))
-        sys.exit(1)
-
+def cmd_deploy(args):
     mode = args.mode
-    domain = args.domain
+    domain = args.domain or ""
     email = args.email
     db_password = args.db_password or generate_secret(24)
+    root = project_root()
 
     print_banner(mode, domain)
-    print(Colors.info(f"Deployment mode: {mode}"))
-    print(Colors.info(f"Admin email:     {email}"))
-    print(Colors.info(f"Domain:          {domain or '(default localhost)'}"))
+    print(Colors.info(f"Project root: {root}"))
+
+    check_docker()
+
+    if mode in ("team", "enterprise") and not domain:
+        print(Colors.warn("No --domain supplied; TLS/reverse-proxy guidance assumes a domain."))
+
+    print(Colors.header("WRITING CONFIG"))
+    env_path = docker_dir() / ".env"
+    write_env_file(
+        env_path,
+        build_env_content(mode=mode, domain=domain, db_password=db_password),
+    )
+
+    compose_file = compose_file_path()
+    profile = "team" if mode in ("team", "enterprise") else None
+    base = compose_base_cmd(compose_file, profile)
+
+    print(Colors.header(f"BUILDING & STARTING ({mode.upper()})"))
+    run_command(base + ["build"])
+    print(Colors.ok("✓ Images built"))
+    run_command(base + ["up", "-d"])
+    print(Colors.ok("✓ Services started"))
+
+    wait_for_health()
+
+    print(Colors.header("RUNNING MIGRATIONS"))
+    run_command(base + ["exec", "-T", "app", "alembic", "upgrade", "head"])
+    print(Colors.ok("✓ Migrations applied"))
+
+    print(Colors.header("CREATING ADMIN"))
+    admin_password = generate_secret(16)
+    run_command(
+        base
+        + ["exec", "-T", "app", "mkindayzir", "setup", "admin",
+           "--email", email, "--password", admin_password, "--name", "Admin"]
+    )
+    print(Colors.ok("✓ Admin created"))
+
+    url = (
+        (domain if domain.startswith("http") else f"https://{domain}")
+        if domain
+        else "http://localhost:3000"
+    )
+    print(Colors.header("DEPLOYMENT COMPLETE"))
+    print(f"  {Colors.BOLD}URL:{Colors.RESET}       {Colors.UNDERLINE}{url}{Colors.RESET}")
+    print(f"  {Colors.BOLD}Email:{Colors.RESET}     {email}")
+    print(f"  {Colors.BOLD}Password:{Colors.RESET}  {admin_password}")
+    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      {mode.capitalize()} (single process on :3000)")
+    print()
+    print(Colors.info("Management:"))
+    print(f"  Logs:    {Colors.CYAN}{' '.join(base)} logs -f{Colors.RESET}")
+    print(f"  Stop:    {Colors.CYAN}{' '.join(base)} down{Colors.RESET}")
+    print(f"  Restart: {Colors.CYAN}{' '.join(base)} restart{Colors.RESET}")
     print()
 
-    check_prerequisites(mode)
 
-    if mode == "personal":
-        deploy_personal(domain, email)
-    else:
-        deploy_docker(mode, domain, email, db_password)
+def wait_for_health(timeout=300, port=3000):
+    print(Colors.header("WAITING FOR HEALTH (http://localhost:3000/api/health)"))
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            req = urllib.request.Request(f"http://localhost:{port}/api/health")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    print(Colors.ok("\n✓ App is healthy"))
+                    return
+        except (urllib.error.URLError, OSError):
+            pass
+        elapsed = int(time.time() - start)
+        sys.stdout.write(f"\r{Colors.DIM}  waiting... {elapsed}s{Colors.RESET}")
+        sys.stdout.flush()
+        time.sleep(5)
+    print()
+    die("Health check timed out. Inspect logs with: docker compose -f docker/docker-compose.yml ps")
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="easy-install.py",
+        description="One-command install/deploy for mkindayzir (FastAPI + Vite SPA, single process on :3000).",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    local = sub.add_parser("local", help="Install personal mode locally (venv + pip, no Docker).")
+    local.add_argument("--mode", default="personal", const="personal", nargs="?",
+                       choices=["personal"], help="Local install is personal (SQLite) mode.")
+    local.add_argument("--email", required=True, help="Admin email address.")
+    local.add_argument("--password", default=None,
+                       help="Admin password (auto-generated and printed if omitted).")
+    local.set_defaults(func=cmd_local)
+
+    deploy = sub.add_parser("deploy", help="Deploy via Docker Compose (personal/team/enterprise).")
+    deploy.add_argument("--mode", required=True, choices=["personal", "team", "enterprise"],
+                        help="personal=SQLite (no postgres), team/enterprise=PostgreSQL.")
+    deploy.add_argument("--email", required=True, help="Admin email address.")
+    deploy.add_argument("--domain", default="", help="Public domain (team/enterprise).")
+    deploy.add_argument("--db-password", default=None,
+                        help="PostgreSQL password (auto-generated if omitted).")
+    deploy.set_defaults(func=cmd_deploy)
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    args.func(args)
 
 
 if __name__ == "__main__":

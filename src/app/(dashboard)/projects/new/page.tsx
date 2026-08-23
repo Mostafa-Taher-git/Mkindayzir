@@ -1,7 +1,7 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ type FormData = {
 };
 
 function NewProjectPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [form, setForm] = React.useState<FormData>({
@@ -50,7 +50,7 @@ function NewProjectPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      router.push(ROUTES.PROJECTS);
+      navigate(ROUTES.PROJECTS);
     },
   });
 
@@ -134,7 +134,7 @@ function NewProjectPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.back()}
+                onClick={() => navigate(-1)}
                 disabled={mutation.isPending}
               >
                 Cancel

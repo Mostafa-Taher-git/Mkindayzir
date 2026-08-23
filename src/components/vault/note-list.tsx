@@ -1,8 +1,7 @@
 "use client";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +28,7 @@ function NoteCard({ note }: { note: VaultNote }) {
   };
 
   return (
-    <Link
-      href={`${VAULT_ROUTES.NOTES}/${note.id}`}
+    <Link to={`${VAULT_ROUTES.NOTES}/${note.id}`}
       className="block group"
     >
       <div className="rounded-lg border bg-card p-4 hover:shadow-md transition-all cursor-pointer h-full">
@@ -86,8 +84,7 @@ function NoteTableRow({ note }: { note: VaultNote }) {
   return (
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-4 py-3">
-        <Link
-          href={`${VAULT_ROUTES.NOTES}/${note.id}`}
+        <Link to={`${VAULT_ROUTES.NOTES}/${note.id}`}
           className="text-sm font-medium hover:text-primary transition-colors"
         >
           {note.title || "Untitled"}
@@ -125,8 +122,8 @@ function NoteTableRow({ note }: { note: VaultNote }) {
 }
 
 export function NoteList({ notes, loading = false }: NoteListProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = React.useState<"grid" | "table">("grid");
   const [searchQuery, setSearchQuery] = React.useState(
     searchParams.get("search") || ""
@@ -150,8 +147,8 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
       params.delete("search");
     }
     const qs = params.toString();
-    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
-  }, [debouncedSearch, router, searchParams]);
+    navigate(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  }, [debouncedSearch, navigate, searchParams]);
 
   const handleStatusChange = (status: NoteStatus) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -161,7 +158,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
       params.delete("status");
     }
     const qs = params.toString();
-    router.push(qs ? `?${qs}` : window.location.pathname);
+    navigate(qs ? `?${qs}` : window.location.pathname);
   };
 
   if (loading) {
@@ -205,7 +202,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
         <p className="text-sm text-muted-foreground mb-4">
           Get started by creating your first note.
         </p>
-        <Link href={VAULT_ROUTES.NEW_NOTE}>
+        <Link to={VAULT_ROUTES.NEW_NOTE}>
           <Button>Create Note</Button>
         </Link>
       </div>

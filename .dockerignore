@@ -7,3 +7,4 @@ prisma/migrations/
 tests/
 playwright-report/
 test-results/
+dist

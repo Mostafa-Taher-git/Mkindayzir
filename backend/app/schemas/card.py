@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Any
 from datetime import datetime
 
@@ -31,7 +31,7 @@ class CardResponse(BaseModel):
     position: int
     dueDate: Optional[str] = None
     coverColor: Optional[str] = None
-    metadata: str
+    metadata: str = Field(validation_alias="meta", serialization_alias="metadata")
     createdById: str
     createdAt: str
     updatedAt: str

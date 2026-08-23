@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-echo "Waiting for services to be ready..."
+echo "Waiting for the app service to be ready..."
 sleep 5
 
 echo "Running database migrations..."
-docker compose exec backend alembic upgrade head
+docker compose -f docker/docker-compose.yml exec app alembic upgrade head
 
 echo "Creating admin user..."
-docker compose exec backend python -m app.cli.setup --email admin@localhost --password admin || true
+docker compose -f docker/docker-compose.yml exec app mkindayzir setup admin --email admin@localhost --password admin
 
 echo ""
 echo "============================================"

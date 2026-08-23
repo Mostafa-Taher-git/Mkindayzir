@@ -17,7 +17,7 @@ function CardMembers({ cardId }: CardMembersProps) {
   const { data } = useQuery({
     queryKey: ["card-members", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}/members`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/members`, {
         cache: "no-store",
       });
       if (!res.ok) return { members: [] };
@@ -28,7 +28,7 @@ function CardMembers({ cardId }: CardMembersProps) {
   const { data: usersData } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/users`, {
+      const res = await fetch(`${""}/api/users`, {
         cache: "no-store",
       });
       if (!res.ok) return { users: [] };

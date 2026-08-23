@@ -18,7 +18,7 @@ function CardChecklists({ cardId }: CardChecklistsProps) {
   const { data } = useQuery({
     queryKey: ["checklists", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}/checklists`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/checklists`, {
         cache: "no-store",
       });
       if (!res.ok) return { checklists: [] };

@@ -1,43 +1,28 @@
-import { getSessionUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-import { notFound } from "next/navigation";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
 
-async function getInitialConversations(userId: string) {
-  return prisma.conversation.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    include: { messages: { take: 1, orderBy: { createdAt: "desc" } } },
+export default function ConversationPage() {
+  const { conversationId } = useParams<{ conversationId: string }>();
+
+  const { data, isLoading } = useQuery<{ conversations: any[] }>({
+    queryKey: ["assistant", "conversations"],
+    queryFn: async () => {
+      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch conversations");
+      return res.json();
+    },
   });
-}
 
-async function getConversation(id: string, userId: string) {
-  return prisma.conversation.findFirst({
-    where: { id, userId },
-    include: { messages: { orderBy: { createdAt: "asc" } } },
-  });
-}
+  const conversations = data?.conversations ?? [];
 
-export default async function ConversationPage({
-  params,
-}: {
-  params: Promise<{ conversationId: string }>;
-}) {
-  const { conversationId } = await params;
-  const user = await getSessionUser();
-  if (!user) notFound();
-
-  const [conversation, conversations] = await Promise.all([
-    getConversation(conversationId, user.id),
-    getInitialConversations(user.id),
-  ]);
-
-  if (!conversation) notFound();
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading conversation...</div>;
+  }
 
   return (
-    <AssistantLayout
-      initialConversations={conversations as any}
-      conversationId={conversationId}
-    />
+    <AssistantLayout initialConversations={conversations} conversationId={conversationId} />
   );
 }

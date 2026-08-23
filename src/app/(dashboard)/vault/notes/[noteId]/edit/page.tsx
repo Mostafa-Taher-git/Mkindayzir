@@ -1,81 +1,55 @@
+"use client";
 
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder, Tag } from "@/types";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteEditor } from "@/components/vault/note-editor";
-import { notFound } from "next/navigation";
+import { api } from "@/lib/api";
 
-async function getNote(id: string) {
-  try {
-    return await api.get<{ note: any }>(`/api/vault/notes/${id}`);
-  } catch {
-    return null;
-  }
-}
+export default function EditNotePage() {
+  const { noteId } = useParams<{ noteId: string }>();
 
-async function getFolders() {
-  try {
-    const data = await api.get<{ folders: VaultFolder[] }>("/api/vault/folders");
-    return data.folders || [];
-  } catch {
-    return [];
-  }
-}
+  const { data: noteData } = useQuery<{ note: any }>({
+    queryKey: ["vault", "note", noteId],
+    enabled: Boolean(noteId),
+    queryFn: () => api.get<{ note: any }>(`/api/vault/notes/${noteId}`),
+  });
 
-async function getTags() {
-  try {
-    const data = await api.get<{ tags: Tag[] }>("/api/vault/tags");
-    return data.tags || [];
-  } catch {
-    return [];
-  }
-}
+  const { data: foldersData } = useQuery<{ folders: VaultFolder[] }>({
+    queryKey: ["vault", "folders"],
+    queryFn: () => api.get<{ folders: VaultFolder[] }>("/api/vault/folders"),
+  });
 
-export default async function EditNotePage({
-  params,
-}: {
-  params: Promise<{ noteId: string }>;
-}) {
-  
-  const resolvedParams = await params;
-  const noteId = resolvedParams.noteId;
+  const { data: tagsData } = useQuery<{ tags: Tag[] }>({
+    queryKey: ["vault", "tags"],
+    queryFn: () => api.get<{ tags: Tag[] }>("/api/vault/tags"),
+  });
 
-  const [noteData, folders, tags] = await Promise.all([
-    getNote(noteId),
-    getFolders(),
-    getTags(),
-  ]);
-
-  if (!noteData || !noteData.note) {
-    notFound();
+  if (!noteData?.note) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-muted-foreground">Note not found.</p>
+      </div>
+    );
   }
 
   const note = noteData.note;
+  const folders = foldersData?.folders ?? [];
+  const tags = tagsData?.tags ?? [];
 
   return (
     <div className="flex h-full">
-      <VaultSidebar
-        folders={folders}
-        currentFolderId={note.folderId}
-      />
+      <VaultSidebar folders={folders} currentFolderId={note.folderId} />
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
-            <a
-              href={VAULT_ROUTES.HOME}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Vault
-            </a>
+            <a href={VAULT_ROUTES.HOME} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Vault</a>
             <span className="text-muted-foreground">/</span>
             <span className="text-sm">Edit Note</span>
           </div>
-          <NoteEditor
-            note={note}
-            folders={folders}
-            availableTags={tags}
-          />
+          <NoteEditor note={note} folders={folders} availableTags={tags} />
         </div>
       </div>
     </div>

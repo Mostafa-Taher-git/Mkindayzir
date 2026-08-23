@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,7 +19,7 @@ class LabelService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, project_id: str, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, project_id: str, user: dict) -> List[dict]:
         result = await db.execute(
             select(Label).where(Label.projectId == project_id).order_by(Label.name.asc())
         )

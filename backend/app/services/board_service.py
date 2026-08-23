@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -26,7 +27,7 @@ class BoardService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, space_id: str, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, space_id: str, user: dict) -> List[dict]:
         result = await db.execute(
             select(Board).where(Board.spaceId == space_id, Board.deletedAt.is_(None)).order_by(Board.position.asc())
         )
@@ -34,7 +35,7 @@ class BoardService:
         return [BoardService._serialize(b) for b in boards]
 
     @staticmethod
-    async def list_all(db: AsyncSession, user: dict) -> list[dict]:
+    async def list_all(db: AsyncSession, user: dict) -> List[dict]:
         result = await db.execute(select(Board).where(Board.deletedAt.is_(None)).order_by(Board.position.asc()))
         boards = result.scalars().all()
         return [BoardService._serialize(b) for b in boards]

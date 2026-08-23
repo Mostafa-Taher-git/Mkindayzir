@@ -1,29 +1,23 @@
-import { getSessionUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
 
-export default async function AssistantPage() {
-  const user = await getSessionUser();
-  let conversations: any[] = [];
-  if (user) {
-    try {
-      const rows = await prisma.conversation.findMany({
-        where: { userId: user.id },
-        orderBy: { updatedAt: "desc" },
-        include: { messages: { take: 1, orderBy: { createdAt: "desc" } } },
-      });
-      conversations = rows.map((c) => ({
-        ...c,
-        createdAt: c.createdAt.toISOString(),
-        updatedAt: c.updatedAt.toISOString(),
-        messages: c.messages.map((m: any) => ({
-          ...m,
-          createdAt: m.createdAt.toISOString(),
-        })),
-      }));
-    } catch {
-      conversations = [];
-    }
+export default function AssistantPage() {
+  const { data, isLoading } = useQuery<{ conversations: any[] }>({
+    queryKey: ["assistant", "conversations"],
+    queryFn: async () => {
+      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch conversations");
+      return res.json();
+    },
+  });
+
+  const conversations = data?.conversations ?? [];
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading assistant...</div>;
   }
+
   return <AssistantLayout initialConversations={conversations} />;
 }

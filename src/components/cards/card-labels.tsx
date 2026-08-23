@@ -16,7 +16,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
   const { data } = useQuery({
     queryKey: ["card-labels", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}/labels`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/labels`, {
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };
@@ -27,7 +27,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
   const { data: boardLabelsData } = useQuery({
     queryKey: ["labels", boardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards/${boardId}/labels`, {
+      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };

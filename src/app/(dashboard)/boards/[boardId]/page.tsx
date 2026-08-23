@@ -1,47 +1,48 @@
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROUTES } from "@/lib/constants";
 import { BoardDetailClient } from "./board-detail-client";
 
-interface BoardDetailPageProps {
-  params: Promise<{ boardId: string }>;
-}
+export default function BoardDetailPage() {
+  const { boardId } = useParams<{ boardId: string }>();
+  const { user } = useAuth();
 
-async function getBoard(boardId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards/${boardId}`, {
-    cache: "no-store",
+  const { data: boardData } = useQuery<{ board: any }>({
+    queryKey: ["board", boardId],
+    enabled: Boolean(boardId),
+    queryFn: async () => {
+      const res = await fetch(`/api/boards/${boardId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch board");
+      return res.json();
+    },
   });
-  if (!res.ok) return null;
-  return res.json();
-}
 
-async function getColumns(boardId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards/${boardId}/columns`, {
-    cache: "no-store",
+  const { data: columnsData } = useQuery<{ columns: any[] }>({
+    queryKey: ["board", boardId, "columns"],
+    enabled: Boolean(boardId),
+    queryFn: async () => {
+      const res = await fetch(`/api/boards/${boardId}/columns`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch columns");
+      return res.json();
+    },
   });
-  if (!res.ok) return { columns: [] };
-  return res.json();
-}
 
-async function getCards(boardId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards?boardId=${boardId}`, {
-    cache: "no-store",
+  const { data: cardsData } = useQuery<{ cards: any[] }>({
+    queryKey: ["board", boardId, "cards"],
+    enabled: Boolean(boardId),
+    queryFn: async () => {
+      const res = await fetch(`/api/cards?boardId=${boardId}`, { credentials: "include" });
+      if (!res.ok) return { cards: [] };
+      return res.json();
+    },
   });
-  if (!res.ok) return { cards: [] };
-  return res.json();
-}
 
-export default async function BoardDetailPage({ params }: BoardDetailPageProps) {
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(ROUTES.LOGIN);
-  }
-
-  const { boardId } = await params;
-  const { board } = await getBoard(boardId);
-  const { columns } = await getColumns(boardId);
-  const { cards } = await getCards(boardId);
+  const board = boardData?.board;
+  const columns = columnsData?.columns ?? [];
+  const cards = cardsData?.cards ?? [];
 
   if (!board) {
     return (
@@ -55,12 +56,5 @@ export default async function BoardDetailPage({ params }: BoardDetailPageProps) 
     );
   }
 
-  return (
-    <BoardDetailClient
-      board={board}
-      columns={columns}
-      cards={cards}
-      currentUserId={user.id}
-    />
-  );
+  return <BoardDetailClient board={board} columns={columns} cards={cards} currentUserId={user?.id ?? ""} />;
 }

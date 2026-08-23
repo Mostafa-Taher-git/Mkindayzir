@@ -1,13 +1,13 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { SpaceForm } from "@/components/spaces/space-form";
 import { ROUTES } from "@/lib/constants";
 
 function NewSpacePage() {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -17,7 +17,7 @@ function NewSpacePage() {
           Create a new workspace to organize your boards
         </p>
       </div>
-      <SpaceForm onSuccess={() => router.push(ROUTES.SPACES)} />
+      <SpaceForm onSuccess={() => navigate(ROUTES.SPACES)} />
     </div>
   );
 }

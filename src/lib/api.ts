@@ -1,21 +1,32 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
+
+  const headers: Record<string, string> = {};
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (options.headers) {
+    for (const [k, v] of Object.entries(options.headers)) {
+      if (v !== undefined) headers[k] = String(v);
+    }
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
+    credentials: "include",
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message ?? "Request failed");
+    const error = await response
+      .json()
+      .catch(() => ({ message: response.statusText }));
+    throw new Error(error?.message ?? error?.error?.message ?? "Request failed");
   }
 
   if (response.status === 204) {
@@ -30,12 +41,17 @@ export const api = {
   post: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: data === undefined ? undefined : JSON.stringify(data),
     }),
   patch: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      body: data === undefined ? undefined : JSON.stringify(data),
+    }),
+  put: <T>(endpoint: string, data?: unknown) =>
+    request<T>(endpoint, {
+      method: "PUT",
+      body: data === undefined ? undefined : JSON.stringify(data),
     }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: "DELETE" }),
 };

@@ -1,4 +1,5 @@
 "use client";
+import { Link } from "react-router-dom";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,7 +27,6 @@ import { KanbanBoard } from "@/components/boards/kanban-board";
 import { Board, BoardColumn, BoardCard, BoardLabel } from "@/types";
 import { ROUTES } from "@/lib/constants";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
-import Link from "next/link";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceIndicator } from "@/components/shared/presence-indicator";
 
@@ -122,7 +122,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
   const { data: columnsData } = useQuery({
     queryKey: ["columns", board.id],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards/${board.id}/columns`, {
+      const res = await fetch(`${""}/api/boards/${board.id}/columns`, {
         cache: "no-store",
       });
       if (!res.ok) return { columns: [] };
@@ -134,7 +134,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
   const { data: cardsData } = useQuery({
     queryKey: ["cards", board.id],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards?boardId=${board.id}`, {
+      const res = await fetch(`${""}/api/cards?boardId=${board.id}`, {
         cache: "no-store",
       });
       if (!res.ok) return { cards: [] };
@@ -238,7 +238,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`${ROUTES.SPACES}/${board.spaceId}`}>Back to Space</Link>
+            <Link to={`${ROUTES.SPACES}/${board.spaceId}`}>Back to Space</Link>
           </Button>
         </div>
       </div>

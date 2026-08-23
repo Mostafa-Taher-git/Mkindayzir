@@ -10,6 +10,17 @@ from app.config import settings
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+@router.get("/config")
+async def public_config():
+    """Public, non-sensitive instance configuration used by the SPA auth
+    screen and dashboard layout (mode + registration availability)."""
+    return {
+        "mode": settings.MKINDAYZIR_MODE,
+        "registrationEnabled": settings.REGISTRATION_ENABLED,
+    }
+
+
+
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     try:

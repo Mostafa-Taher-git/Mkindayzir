@@ -1,13 +1,13 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MigrationWizard } from "@/components/settings/migration-wizard";
 
 export default function SystemSettingsPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<string>("personal");
   const [dbProvider, setDbProvider] = useState<string>("sqlite");
   const [dbUrl, setDbUrl] = useState<string>("");
@@ -79,7 +79,7 @@ export default function SystemSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <MigrationWizard onComplete={() => router.refresh()} />
+            <MigrationWizard onComplete={() => window.location.reload()} />
           </CardContent>
         </Card>
       )}

@@ -1,53 +1,60 @@
 import asyncio
 import sys
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine
 from app.config import settings
-from app.database import DATABASE_URL, Base as AppBase
+from app.database import DATABASE_URL, Base as AppBase, coerce_async_url
 from app.models import Base
-import aiosqlite
 import json
 
 
 async def migrate_sqlite_to_postgres(target_url: str):
     sqlite_engine = create_async_engine(f"sqlite+aiosqlite:///{settings.data_dir}/mkindayzir.db")
-
-    postgres_engine = create_async_engine(target_url)
+    postgres_engine = create_async_engine(coerce_async_url(target_url))
 
     async with postgres_engine.begin() as conn:
         await conn.run_sync(AppBase.metadata.create_all)
 
     async with sqlite_engine.connect() as sqlite_conn:
-        tables = list(AppBase.metadata.tables.keys())
-        for table_name in tables:
-            table = AppBase.metadata.tables[table_name]
-            result = await sqlite_conn.execute(table.select())
-            rows = result.fetchall()
+        tables = AppBase.metadata.sorted_tables
+        for table in tables:
+            table_name = table.name
+            json_cols = {c.name for c in table.columns if isinstance(c.type, sa.JSON)}
+            stmt = table.select()
+            if list(table.primary_key.columns):
+                stmt = stmt.order_by(*table.primary_key.columns)
 
-            if rows:
+            offset = 0
+            total = 0
+            while True:
+                batch = await sqlite_conn.execute(stmt.limit(1000).offset(offset))
+                rows = batch.mappings().all()
+                if not rows:
+                    break
+                records = []
+                for r in rows:
+                    row_dict = dict(r)
+                    for key in json_cols:
+                        val = row_dict.get(key)
+                        if isinstance(val, str):
+                            try:
+                                row_dict[key] = json.loads(val)
+                            except (json.JSONDecodeError, ValueError):
+                                pass
+                    records.append(row_dict)
                 async with postgres_engine.begin() as pg_conn:
-                    for row in rows:
-                        row_dict = dict(row._mapping)
-                        for key, value in list(row_dict.items()):
-                            if isinstance(value, str):
-                                col = table.c.get(key)
-                                if col and isinstance(col.type, sa.JSON):
-                                    try:
-                                        row_dict[key] = json.loads(value)
-                                    except Exception:
-                                        pass
-                        await pg_conn.execute(table.insert().values(**row_dict))
+                    await pg_conn.execute(table.insert(), records)
+                total += len(records)
+                offset += 1000
+            if total:
+                print(f"{table_name}: migrated {total} rows")
 
     async with postgres_engine.connect() as pg_conn:
-        for table_name in tables:
-            table = AppBase.metadata.tables[table_name]
-            result = await pg_conn.execute(sa.select(sa.func.count()).select_from(table))
-            pg_count = result.scalar()
-
-            result = await sqlite_conn.execute(sa.select(sa.func.count()).select_from(table))
-            sqlite_count = result.scalar()
-
+        for table in tables:
+            r = await pg_conn.execute(sa.select(sa.func.count()).select_from(table))
+            pg_count = r.scalar() or 0
+            r = await sqlite_conn.execute(sa.select(sa.func.count()).select_from(table))
+            sqlite_count = r.scalar() or 0
             print(f"{table_name}: SQLite={sqlite_count}, PostgreSQL={pg_count}")
             if pg_count != sqlite_count:
                 print(f"WARNING: Row count mismatch for {table_name}")

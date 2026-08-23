@@ -1,9 +1,8 @@
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 // src/app/(auth)/login/login-form.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { LoginSchema } from "@/lib/validators";
 
 export function LoginForm({
@@ -13,8 +12,8 @@ export function LoginForm({
   registrationEnabled: boolean;
   isPersonal: boolean;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +52,7 @@ export function LoginForm({
         return;
       }
 
-      router.push(callbackUrl);
-      router.refresh();
+      window.location.href = callbackUrl;
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
@@ -168,14 +166,12 @@ export function LoginForm({
             </button>
           </form>
           <div className="mt-6 flex flex-col items-center gap-3">
-            <Link
-              href="/forgot-password"
+            <Link to="/forgot-password"
               className="text-xs font-mono uppercase tracking-wider underline hover:text-foreground"
             >
               Forgot password?
             </Link>
-            <Link
-              href="/setup"
+            <Link to="/setup"
               className="w-full border-2 border-outline bg-surface px-4 py-2 text-center font-mono text-sm text-foreground uppercase tracking-wider hover:bg-surface-container-low chamfer"
             >
               Setup New Instance
@@ -184,8 +180,7 @@ export function LoginForm({
           {showRegistration && (
             <div className="mt-4 text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <Link
-                href="/register"
+              <Link to="/register"
                 className="text-xs font-mono uppercase tracking-wider underline hover:text-foreground"
               >
                 Register

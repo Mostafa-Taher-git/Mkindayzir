@@ -1,35 +1,55 @@
-# Stage 1: Build frontend
+# =============================================================================
+# Mkindayzir — single-process production image
+#
+# Stage 1 builds the Vite React SPA (project root) -> dist/
+# Stage 2 runs FastAPI which serves /api/* AND the static dist/ on :3000
+# (via the `mkindayzir` console script + FRONTEND_DIR).
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: Frontend build (Vite React SPA at the project root)
+# ---------------------------------------------------------------------------
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+
+# Install deps first (better layer caching) — copy lockfile + manifest first.
 RUN corepack enable && corepack prepare pnpm@9 --activate
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
+
+# Copy the rest of the repo (frontend sources at root) and build.
 COPY . .
 RUN pnpm build
 
-# Stage 2: Production image
-FROM python:3.12-slim
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime — single Python process serving API + static frontend
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim
 WORKDIR /app
 
-# Install backend
-COPY backend/pyproject.toml backend/
-RUN pip install --no-cache-dir -e ./backend
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Install nginx
+# Build tooling for cryptography / bcrypt wheels if needed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    curl \
+        build-essential \
+        libffi-dev \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy built frontend
-COPY --from=frontend-build /app/public ./public
-COPY --from=frontend-build /app/.next/static ./.next/static
-
-# Copy backend code
+# Install the backend (editable) — provides `mkindayzir` and `alembic`.
 COPY backend/ ./backend/
-COPY docker/entrypoint.sh ./
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+RUN pip install -e ./backend
 
-EXPOSE 80
-VOLUME /app/data
-ENTRYPOINT ["./entrypoint.sh"]
+# Bring in the built SPA from stage 1.
+COPY --from=frontend-build /app/dist /app/dist
+
+# FastAPI mounts this dir to serve the SPA; default when unset is <root>/dist.
+ENV FRONTEND_DIR=/app/dist
+
+EXPOSE 3000
+
+# alembic.ini lives in backend/, so run migrations from there, then start.
+WORKDIR /app/backend
+CMD ["sh", "-c", "alembic upgrade head && mkindayzir start --host 0.0.0.0 --port 3000"]

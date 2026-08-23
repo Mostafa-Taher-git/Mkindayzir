@@ -2,56 +2,56 @@
 
 **Your Operations, Your Server, Your Control.**
 
-Mkindayzir is a self-hosted, local-first, offline-capable Work OS that unifies project management, visual task boards, knowledge management, and AI assistance into a single independent application.
+Mkindayzir is a self-hosted, local-first Work OS that unifies project management, visual task boards, knowledge management, and AI assistance into a single independent application.
 
 ## Tech Stack
 
-- **Runtime**: Node.js 20 LTS
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript 5.x
-- **Database**: PostgreSQL 16+ with Prisma ORM
-- **Auth**: NextAuth.js (Auth.js)
-- **Styling**: Tailwind CSS 4.x
-- **State**: Zustand + TanStack Query
-- **Offline**: Dexie.js + Workbox
-- **Real-time**: Socket.io
+- **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+) — async REST API, SQLAlchemy 2.0 (async), Alembic migrations, console CLI (`mkindayzir`, built with Click).
+- **Database**: SQLite (Personal mode) or PostgreSQL + asyncpg (Team mode). Migrate between the two from the UI.
+- **Frontend**: [Vite](https://vitejs.dev/) + React (SPA at the project root) — React Router, TanStack Query (React Query), Zustand, Tailwind CSS.
+- **Static serving**: In production the FastAPI process also serves the built SPA (`dist/`) and a SPA catch-all, so a single process handles API + UI on port `3000`.
+- **Auth & security**: Session cookie (`mkindayzir_session`), AES-256-GCM encryption for sensitive fields (API keys, etc.).
 
-## Getting Started
+## Quick Start
+
+### Personal (no Docker)
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Copy environment file
-cp .env.example .env
-
-# Generate Prisma client
-pnpm prisma:generate
-
-# Run database migrations
-pnpm prisma:migrate
-
-# Seed database
-pnpm prisma:seed
-
-# Start development server
-pnpm dev
+pip install mkindayzir
+mkindayzir start            # serves API + built frontend on http://localhost:3000
 ```
 
-## Scripts
+Open **http://localhost:3000**. On first run, the setup wizard creates the admin account.
 
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production
-- `pnpm start` - Start production server
-- `pnpm lint` - Run ESLint
-- `pnpm format` - Format code with Prettier
-- `pnpm test` - Run tests
-- `pnpm test:unit` - Run unit tests
-- `pnpm test:e2e` - Run E2E tests
-- `pnpm prisma:generate` - Generate Prisma client
-- `pnpm prisma:migrate` - Run database migrations
-- `pnpm prisma:seed` - Seed database
-- `pnpm db:push` - Push schema changes to database
+### Docker (single container)
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+bash docker/init.sh         # runs migrations + creates the admin user
+```
+
+The app is then available on **http://localhost:3000** (put it behind your reverse proxy / TLS terminator).
+
+> To build the SPA yourself before `mkindayzir start` (or for local dev), see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Features
+
+- **Projects & Work OS**: projects, work items, iterations, initiatives, workflows, labels, spaces.
+- **Visual boards**: drag-and-drop boards, columns, cards, checklists, comments, labels.
+- **Knowledge vault**: nested folders and notes with rich-text editing.
+- **AI assistance**: optional AI provider integration for in-app help.
+- **Team collaboration**: multi-user Team mode with PostgreSQL and role-based access.
+- **Local-first & self-hosted**: runs on your own hardware; SQLite by default, upgrade to PostgreSQL in-place.
+- **Migration wizard**: Settings -> System -> "Upgrade to Team Mode" migrates SQLite -> PostgreSQL live, with SSE progress and rollback — no terminal needed.
+
+## Documentation
+
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev (uvicorn + Vite), backend & frontend setup.
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — personal / team deployment via `pip`, `easy-install.py`, or Docker.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design, routing, services, persistence, security.
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — environment variables reference.
+- [RUNNING.md](RUNNING.md) — quick-run cheat-sheet.
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — how to contribute.
 
 ## License
 

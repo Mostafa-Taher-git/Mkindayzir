@@ -1,6 +1,6 @@
 "use client";
+import { Link } from "react-router-dom";
 
-import Link from "next/link";
 import { VAULT_ROUTES } from "@/lib/constants";
 
 

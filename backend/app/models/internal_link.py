@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import String, DateTime, text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base

@@ -1,12 +1,12 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { BoardForm } from "@/components/boards/board-form";
 
 function NewBoardPage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [spaceId, setSpaceId] = React.useState<string>("");
 
   React.useEffect(() => {
@@ -25,7 +25,7 @@ function NewBoardPage({ params }: { params: Promise<{ spaceId: string }> }) {
       </div>
       <BoardForm
         spaceId={spaceId}
-        onSuccess={(board) => router.push(`/boards/${board.id}`)}
+        onSuccess={(board) => navigate(`/boards/${board.id}`)}
       />
     </div>
   );

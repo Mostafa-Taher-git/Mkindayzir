@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -20,7 +21,7 @@ class ColumnService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, board_id: str, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, board_id: str, user: dict) -> List[dict]:
         result = await db.execute(
             select(Column).where(Column.boardId == board_id).order_by(Column.position.asc())
         )
@@ -75,7 +76,7 @@ class ColumnService:
         return {"ok": True}
 
     @staticmethod
-    async def reorder(db: AsyncSession, board_id: str, ordered_ids: list[str], user: dict) -> dict:
+    async def reorder(db: AsyncSession, board_id: str, ordered_ids: List[str], user: dict) -> dict:
         for idx, column_id in enumerate(ordered_ids):
             result = await db.execute(select(Column).where(Column.id == column_id))
             column = result.scalar_one_or_none()

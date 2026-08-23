@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -21,7 +22,7 @@ class ConversationService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, user: dict) -> List[dict]:
         result = await db.execute(
             select(Conversation).where(Conversation.userId == user["id"], Conversation.deletedAt.is_(None)).order_by(Conversation.updatedAt.desc())
         )

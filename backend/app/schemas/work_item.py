@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Any
 from datetime import datetime
 
@@ -49,7 +49,7 @@ class WorkItemResponse(BaseModel):
     storyPoints: Optional[int] = None
     dueDate: Optional[str] = None
     resolvedAt: Optional[str] = None
-    metadata: str
+    metadata: str = Field(validation_alias="meta", serialization_alias="metadata")
     position: int
     createdAt: str
     updatedAt: str

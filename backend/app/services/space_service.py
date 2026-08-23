@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from app.models.space import Space
@@ -23,7 +24,7 @@ class SpaceService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, user: dict) -> List[dict]:
         result = await db.execute(
             select(Space).where(Space.deletedAt.is_(None)).order_by(Space.createdAt.desc())
         )
@@ -78,7 +79,7 @@ class SpaceService:
         return {"ok": True}
 
     @staticmethod
-    async def update_members(db: AsyncSession, space_id: str, members_data: list[dict], user: dict) -> dict:
+    async def update_members(db: AsyncSession, space_id: str, members_data: List[dict], user: dict) -> dict:
         result = await db.execute(select(Space).where(Space.id == space_id, Space.deletedAt.is_(None)))
         space = result.scalar_one_or_none()
         if not space:

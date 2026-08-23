@@ -1,7 +1,7 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,7 +76,7 @@ export function NoteEditor({
   onSave,
   saving = false,
 }: NoteEditorProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [title, setTitle] = React.useState(note?.title || "");
   const [content, setContent] = React.useState(note?.content || "");
   const [folderId, setFolderId] = React.useState<string>(note?.folderId || "none");
@@ -194,7 +194,7 @@ export function NoteEditor({
           {note ? "Edit Note" : "New Note"}
         </h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.back()}>
+          <Button variant="outline" onClick={() => navigate(-1)}>
             Cancel
           </Button>
           <Button variant="secondary" onClick={() => handleSave(false)} disabled={saving}>

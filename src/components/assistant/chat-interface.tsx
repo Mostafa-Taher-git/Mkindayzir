@@ -1,8 +1,8 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { EmptyState } from "@/components/assistant/empty-state";
@@ -16,10 +16,10 @@ function useConversationMessages(conversationId: string | null) {
     queryKey: ["assistant", "messages", conversationId],
     queryFn: async () => {
       if (!conversationId) return [];
-      const res = await fetch(`/api/assistant/conversations/${conversationId}/messages`);
+      const res = await fetch(`/api/assistant/conversations/${conversationId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch messages");
       const data = await res.json() as { messages: Message[] };
-      return data.messages;
+      return data.messages ?? [];
     },
     enabled: Boolean(conversationId),
   });
@@ -30,7 +30,7 @@ function ChatInterface({
 }: {
   conversationId: string | null;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const [streamingMessage, setStreamingMessage] = React.useState<string>("");
@@ -132,7 +132,7 @@ function ChatInterface({
 
   const handleSend = (content: string) => {
     if (!conversationId) {
-      router.push(ROUTES.ASSISTANT);
+      navigate(ROUTES.ASSISTANT);
       return;
     }
     setErrorMessage(null);

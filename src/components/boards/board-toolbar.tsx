@@ -33,7 +33,7 @@ function BoardToolbar({
   const { data: labelsData } = useQuery({
     queryKey: ["labels", boardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards/${boardId}/labels`, {
+      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };

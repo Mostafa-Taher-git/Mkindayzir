@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Any
 from datetime import datetime
 
@@ -49,7 +49,7 @@ class VaultNoteResponse(BaseModel):
     excerpt: Optional[str] = None
     status: str
     authorId: str
-    metadata: str
+    metadata: str = Field(validation_alias="meta", serialization_alias="metadata")
     version: int
     createdAt: str
     updatedAt: str

@@ -14,7 +14,7 @@ class Project(Base):
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String(50), server_default=text("ACTIVE"), nullable=False)
     leadId: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
-    teamId: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    teamId: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("teams.id"), nullable=True)
     settings: Mapped[str] = mapped_column(String, server_default=text("'{}'"), nullable=False)
     createdById: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

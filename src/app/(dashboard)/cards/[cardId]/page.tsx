@@ -1,29 +1,28 @@
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROUTES } from "@/lib/constants";
 import { CardDetailClient } from "./card-detail-client";
 
-interface CardDetailPageProps {
-  params: Promise<{ cardId: string }>;
-}
+export default function CardDetailPage() {
+  const { cardId } = useParams<{ cardId: string }>();
 
-async function getCard(cardId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}`, {
-    cache: "no-store",
+  const { data, isLoading } = useQuery<{ card: any }>({
+    queryKey: ["card", cardId],
+    enabled: Boolean(cardId),
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${cardId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch card");
+      return res.json();
+    },
   });
-  if (!res.ok) return null;
-  return res.json();
-}
 
-export default async function CardDetailPage({ params }: CardDetailPageProps) {
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(ROUTES.LOGIN);
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading card...</div>;
   }
 
-  const { cardId } = await params;
-  const { card } = await getCard(cardId);
+  const card = data?.card;
 
   if (!card) {
     return (

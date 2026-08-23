@@ -1,129 +1,92 @@
 # Deployment Guide
 
-## Personal Mode (Single User, Old Laptop)
+Mkindayzir runs as a **single FastAPI process** that serves both the REST API (under `/api/*`) and the built React SPA (`dist/`) on port **3000** in production. There are three supported deployment methods.
 
-### Installation
+> In production, put the `:3000` listener behind your own reverse proxy / TLS terminator (nginx, Caddy, Traefik, etc.). The app itself does not terminate TLS.
 
-```bash
-npx mkindayzir
-```
-
-This creates `~/mkindayzir-data/`, initializes SQLite, and opens the browser to the setup wizard.
-
-Or clone and run:
+## Method 1 — `pip install` (Personal, no Docker)
 
 ```bash
-git clone <repo-url> && cd mkindayzir
-cp .env.example .env
-pnpm install
-pnpm prisma:generate
-pnpm dev
+pip install mkindayzir
+mkindayzir start                   # serves http://localhost:3000
 ```
 
-### Configuration
-
-```env
-MKINDAYZIR_MODE=personal
-DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:./data/mkindayzir.db
-DATA_DIR=./data
-AUTO_LOGIN=false
-```
-
----
-
-## Team Mode (2-20 Users, LAN Server)
-
-### Docker Compose
+On first start, `mkindayzir start` runs `alembic upgrade head` automatically and then launches the server. Open http://localhost:3000 and complete the setup wizard to create the admin account. Backups and restores use the CLI:
 
 ```bash
-curl -O https://get.mkindayzir.dev/docker-compose.yml
-docker compose up -d
+mkindayzir backup create
+mkindayzir backup restore <file.tar.gz> --force
+mkindayzir migrate migrate-db      # SQLite -> PostgreSQL (reads DATABASE_URL)
 ```
 
-### Manual Setup
+This method is recommended for a single-user, local-first install on a laptop or small server.
+
+## Method 2 — `easy-install.py` (Docker, guided)
 
 ```bash
-git clone <repo-url> && cd mkindayzir
-cp .env.example .env
-# Edit DATABASE_URL to point to PostgreSQL
-pnpm install
-pnpm prisma:generate
-pnpm prisma:migrate
-pnpm build
-pnpm start:server
+python3 scripts/easy-install.py deploy --mode=personal
 ```
 
-### Configuration
-
-```env
-MKINDAYZIR_MODE=team
-DATABASE_PROVIDER=postgresql
-DATABASE_URL=postgresql://mkindayzir:password@localhost:5432/mkindayzir
-DATA_DIR=/app/data
-```
-
----
-
-## Enterprise Mode (20+ Users, Dedicated Server)
-
-### Docker Compose with nginx SSL
+For Team mode with a managed PostgreSQL container and a domain:
 
 ```bash
-curl -O https://get.mkindayzir.dev/docker-compose.yml
-docker compose up -d
+python3 scripts/easy-install.py deploy --mode=team --domain=app.example.com --email=admin@example.com
 ```
 
-### Requirements
+The script:
 
-- PostgreSQL 16+ (dedicated, tuned)
-- 4+ CPU cores
-- 8GB+ RAM
-- 10GB+ disk space
-- SSL termination (nginx/Caddy)
+1. Generates `SESSION_SECRET` / `ENCRYPTION_KEY` secrets.
+2. Writes `.env` (mode, database provider, domain, email, etc.).
+3. Builds the image(s).
+4. Runs `docker compose up -d`.
+5. Waits for the health check.
+6. Runs migrations (`mkindayzir migrate upgrade` inside the container).
+7. Creates the admin user (or prints setup instructions).
 
-### Configuration
-
-```env
-MKINDAYZIR_MODE=enterprise
-DATABASE_PROVIDER=postgresql
-DATABASE_URL=postgresql://mkindayzir:password@db:5432/mkindayzir
-DATA_DIR=/app/data
-```
-
----
-
-## Bare Metal
+## Method 3 — Docker Compose (manual)
 
 ```bash
-git clone <repo-url> && cd mkindayzir
-cp .env.example .env
-pnpm install
-pnpm build
-pnpm start:server
+docker compose -f docker/docker-compose.yml up -d
+bash docker/init.sh                # migrations + admin user creation
 ```
 
----
+The compose file defines a single `app` service on port `3000`. An optional `postgres` service is enabled under the `team` profile.
 
-## Environment Variables
+### Team mode
 
-See [docs/CONFIGURATION.md](./CONFIGURATION.md) for all available environment variables.
+```bash
+docker compose -f docker/docker-compose.yml --profile team up -d
+bash docker/init.sh
+```
 
----
+When using the `team` profile, set `MKINDAYZIR_MODE=team`, `DATABASE_PROVIDER=postgres`, and point `DATABASE_URL` at the `postgres` service. See [docs/CONFIGURATION.md](./CONFIGURATION.md) for the full variable list.
+
+## Upgrading Personal -> Team (in-place, no terminal)
+
+Once the app is running, open **Settings → System → "Upgrade to Team Mode"** in the UI. The wizard walks you through:
+
+1. Entering the PostgreSQL connection string.
+2. A pre-check (connectivity, version, disk space).
+3. A live migration with Server-Sent-Events progress.
+4. Automatic rollback on failure.
+
+No CLI or terminal access is required. The endpoints live in `backend/app/routers/system.py`.
+
+## Operations
+
+```bash
+mkindayzir start                   # start (API + SPA) on :3000
+mkindayzir migrate upgrade         # apply Alembic migrations
+mkindayzir backup create           # backup DB + uploads to a tarball
+mkindayzir backup restore <file> --force
+mkindayzir password reset <email>  # reset a user password
+```
 
 ## Updating
 
-```bash
-git pull
-pnpm install
-pnpm build
-pnpm prisma:migrate
-pnpm start:server
-```
+- `pip` install: `pip install -U mkindayzir && mkindayzir start`.
+- Docker: `docker compose -f docker/docker-compose.yml pull && docker compose -f docker/docker-compose.yml up -d`, then `bash docker/init.sh`.
 
-Docker:
+## Configuration
 
-```bash
-docker compose pull
-docker compose up -d
-```
+See [docs/CONFIGURATION.md](./CONFIGURATION.md) for all environment variables (secrets, database, AI, SMTP, logging, rate limits, features).

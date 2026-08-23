@@ -1,7 +1,7 @@
 "use client";
+import { Link } from "react-router-dom";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ForgotPasswordSchema } from "@/lib/validators";
 
 export default function ForgotPasswordPage() {
@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             If an account exists with that email, we&apos;ve sent password reset instructions.
           </p>
-          <Link href="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary px-5 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red">
+          <Link to="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary px-5 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red">
             Back to login
           </Link>
         </div>
@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
           </button>
         </form>
         <div className="mt-5 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <Link href="/login" className="text-primary-light hover:text-foreground underline">Back to login</Link>
+          <Link to="/login" className="text-primary-light hover:text-foreground underline">Back to login</Link>
         </div>
       </div>
     </div>

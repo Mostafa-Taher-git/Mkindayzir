@@ -37,7 +37,7 @@ class VaultService:
             "excerpt": note.excerpt,
             "status": note.status,
             "authorId": note.authorId,
-            "metadata": note.metadata,
+            "metadata": note.meta,
             "version": note.version,
             "createdAt": note.createdAt.isoformat() if note.createdAt else None,
             "updatedAt": note.updatedAt.isoformat() if note.updatedAt else None,
@@ -175,7 +175,7 @@ class VaultService:
             content=data["content"],
             status=data.get("status", "DRAFT"),
             authorId=user["id"],
-            metadata=str(data.get("metadata") or {}),
+            meta=str(data.get("metadata") or {}),
         )
         db.add(note)
         await db.commit()
@@ -209,7 +209,7 @@ class VaultService:
             if field in data and data[field] is not None:
                 setattr(note, field, data[field])
         if "metadata" in data and data["metadata"] is not None:
-            note.metadata = str(data["metadata"])
+            note.meta = str(data["metadata"])
 
         await db.commit()
         await db.refresh(note)

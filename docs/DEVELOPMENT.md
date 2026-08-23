@@ -1,83 +1,87 @@
 # Development Guide
 
+Mkindayzir is a single FastAPI backend (`backend/`) plus a Vite + React SPA at the project root. In development two processes run: the FastAPI API on `:8000` and the Vite dev server on `:3000` (which proxies `/api` -> `:8000`). In production a single FastAPI process serves both the API and the built SPA on `:3000`.
+
 ## Prerequisites
 
-- Node.js 20 LTS
+- Python 3.11+
+- Node.js 18+
 - pnpm 9.x
-- PostgreSQL 16+ (for Team/Enterprise mode) or SQLite (for Personal mode)
+- PostgreSQL 16+ (only required for Team mode; Personal mode uses SQLite)
 
-## Setup
+## Backend setup
 
 ```bash
-# Clone repository
-git clone <repo-url> && cd mkindayzir
-
-# Install dependencies
-pnpm install
-
-# Copy environment file
-cp .env.example .env
-
-# Generate Prisma client
-pnpm prisma:generate
-
-# Run database migrations
-pnpm prisma:migrate
-
-# Seed database
-pnpm prisma:seed
-
-# Start development server
-pnpm dev
+cd backend
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+cp .env.example .env               # or rely on the root .env
+alembic upgrade head               # apply migrations
+python -m app.cli.setup            # create the admin user (interactive wizard)
+uvicorn app.main:app --reload --port 8000
 ```
 
-## Scripts
+- API: http://localhost:8000
+- Interactive API docs (Swagger): http://localhost:8000/docs
 
-- `pnpm dev` - Start development server (Next.js)
-- `pnpm dev:server` - Start custom server with WebSocket
-- `pnpm build` - Build for production
-- `pnpm start` - Start production server (custom server)
-- `pnpm lint` - Run ESLint
-- `pnpm format` - Format code with Prettier
-- `pnpm test` - Run tests
-- `pnpm test:unit` - Run unit tests
-- `pnpm prisma:generate` - Generate Prisma client
-- `pnpm prisma:migrate` - Run database migrations
-- `pnpm prisma:seed` - Seed database
-- `pnpm db:push` - Push schema changes to database
+## Frontend setup
 
-## Project Structure
+```bash
+pnpm install
+pnpm dev                           # Vite dev server on :3000, proxies /api -> :8000
+```
 
-See `mkindayzir_implementation_updateplan.md` section 6 for the complete project structure.
+- App: http://localhost:3000
+
+The Vite dev proxy is configured in `vite.config.ts` (`server.proxy["/api"] -> http://localhost:8000`), so all `fetch("/api/...")` calls from the SPA reach the FastAPI backend during development.
+
+## Useful CLI commands
+
+```bash
+mkindayzir start                   # run the production single-process server (API + dist/)
+mkindayzir setup admin --email ... --password ...   # create admin non-interactively
+mkindayzir migrate upgrade         # run Alembic migrations
+mkindayzir backup create           # create a backup tarball
+mkindayzir password reset <email>  # reset a user's password
+mkindayzir version
+```
+
+## Project layout
+
+- `backend/app/` — FastAPI app (`main.py`), routers (`/api/*`), services layer, SQLAlchemy models, `cli/` (Click CLI), `middleware/`.
+- `backend/alembic/` — Alembic migrations.
+- `src/` — React SPA source (router, queries, stores, components).
+- `vite.config.ts`, `tailwind.config.ts`, `index.html` — frontend tooling; build output goes to `dist/`.
+- `scripts/easy-install.py` — Docker deployment helper.
 
 ## Database
 
-### Personal Mode (SQLite)
+### Personal mode (SQLite)
 
 ```env
 DATABASE_PROVIDER=sqlite
 DATABASE_URL=file:./data/mkindayzir.db
 ```
 
-### Team/Enterprise Mode (PostgreSQL)
+Tables are auto-created on backend startup for SQLite; run `alembic upgrade head` for a clean migration history.
+
+### Team mode (PostgreSQL)
 
 ```env
-DATABASE_PROVIDER=postgresql
+DATABASE_PROVIDER=postgres
 DATABASE_URL=postgresql://mkindayzir:password@localhost:5432/mkindayzir
 ```
 
 ## Testing
 
 ```bash
-# Unit tests
-pnpm test:unit
-
-# E2E tests
-pnpm test:e2e
+pnpm test:unit                    # Vitest unit tests
+pnpm test:e2e                    # Playwright E2E tests
 ```
 
-## Code Style
+## Code style
 
-- TypeScript strict mode
-- ESLint with strict rules
-- Prettier for formatting
+- Python: follow existing FastAPI/async patterns; `mypy`/`ruff` if configured in the backend.
+- Frontend: TypeScript strict mode, ESLint, Prettier.
+- Run `pnpm lint` / `pnpm format` and backend `ruff`/`black` before committing.

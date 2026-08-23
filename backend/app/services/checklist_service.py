@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,7 +19,7 @@ class ChecklistService:
         }
 
     @staticmethod
-    async def list(db: AsyncSession, card_id: str, user: dict) -> list[dict]:
+    async def list(db: AsyncSession, card_id: str, user: dict) -> List[dict]:
         result = await db.execute(
             select(Checklist).where(Checklist.cardId == card_id).order_by(Checklist.position.asc())
         )

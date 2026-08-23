@@ -1,8 +1,7 @@
 "use client";
+import { Link, useLocation } from "react-router-dom";
 
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder } from "@/types";
@@ -26,7 +25,7 @@ function FolderTreeItem({
   onCreateFolder?: (parentId: string | null) => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
   const isActive = pathname === `${VAULT_ROUTES.FOLDERS}/${folder.id}`;
 
   return (
@@ -149,7 +148,7 @@ export function VaultSidebar({
             </svg>
           </Button>
         </div>
-        <Link href={VAULT_ROUTES.HOME}>
+        <Link to={VAULT_ROUTES.HOME}>
           <Button
             variant={currentFolderId === null || currentFolderId === undefined ? "secondary" : "ghost"}
             size="sm"
@@ -175,7 +174,7 @@ export function VaultSidebar({
             All Notes
           </Button>
         </Link>
-        <Link href={VAULT_ROUTES.GRAPH}>
+        <Link to={VAULT_ROUTES.GRAPH}>
           <Button
             variant="ghost"
             size="sm"
@@ -204,7 +203,7 @@ export function VaultSidebar({
             Knowledge Graph
           </Button>
         </Link>
-        <Link href={VAULT_ROUTES.TAGS}>
+        <Link to={VAULT_ROUTES.TAGS}>
           <Button
             variant="ghost"
             size="sm"

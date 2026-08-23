@@ -19,7 +19,6 @@ export default function SettingsPage() {
   const [dbSize, setDbSize] = useState<number>(0);
 
   useEffect(() => {
-    // Fetch user session
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
@@ -31,7 +30,6 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    // Fetch AI settings from the correct endpoint
     fetch("/api/assistant/settings")
       .then((r) => r.json())
       .then((data) => {
@@ -40,9 +38,7 @@ export default function SettingsPage() {
         setApiKeyConfigured(Boolean(data.apiKeyConfigured));
       })
       .catch(() => {});
-  }, []);
 
-  useEffect(() => {
     fetch("/api/system/migration/status")
       .then((r) => r.json())
       .then((data) => {
@@ -86,7 +82,7 @@ export default function SettingsPage() {
         const data = await res.json();
         setApiKeyConfigured(Boolean(data.apiKeyConfigured));
         setAiApiKey("");
-        setMessage({ text: "AI settings saved! Your API key is encrypted and stored securely.", type: "success" });
+        setMessage({ text: "AI settings saved!", type: "success" });
       } else {
         const data = await res.json().catch(() => ({}));
         setMessage({ text: data?.error?.message || "Failed to save AI settings.", type: "error" });
@@ -114,16 +110,17 @@ export default function SettingsPage() {
       </div>
 
       {message && (
-        <div className={`px-4 py-2 border-2 text-sm ${
-          message.type === "success"
-            ? "bg-primary/10 border-primary/30 text-foreground"
-            : "bg-destructive/10 border-destructive/30 text-destructive-foreground"
-        }`}>
+        <div
+          className={`px-4 py-2 border-2 text-sm ${
+            message.type === "success"
+              ? "bg-primary/10 border-primary/30 text-foreground"
+              : "bg-destructive/10 border-destructive/30 text-destructive-foreground"
+          }`}
+        >
           {message.text}
         </div>
       )}
 
-      {/* Profile */}
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -148,7 +145,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Appearance */}
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
@@ -167,7 +163,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* AI Configuration */}
       <Card>
         <CardHeader>
           <CardTitle>AI Assistant</CardTitle>
@@ -198,12 +193,10 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 mt-1">
               {apiKeyConfigured ? (
                 <span className="inline-flex items-center gap-1 text-xs text-primary">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                   API key configured and encrypted
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
                   No API key configured yet
                 </span>
               )}
@@ -214,11 +207,14 @@ export default function SettingsPage() {
             <Input
               value={aiModel}
               onChange={(e) => setAiModel(e.target.value)}
-              placeholder={aiProvider === "openrouter" ? "e.g., anthropic/claude-sonnet-4-20250514" : aiProvider === "openai" ? "e.g., gpt-4o-mini" : "e.g., claude-3-haiku-20240307"}
+              placeholder={
+                aiProvider === "openrouter"
+                  ? "e.g., anthropic/claude-sonnet-4-20250514"
+                  : aiProvider === "openai"
+                  ? "e.g., gpt-4o-mini"
+                  : "e.g., claude-3-haiku-20240307"
+              }
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              You can also choose a model per conversation in the Assistant.
-            </p>
           </div>
           <Button onClick={saveAiSettings} disabled={saving}>
             {saving ? "Saving..." : "Save AI Settings"}
@@ -226,7 +222,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Password */}
       <Card>
         <CardHeader>
           <CardTitle>Security</CardTitle>
@@ -239,7 +234,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* System - only visible in personal mode */}
       {mode === "personal" && (
         <Card className="border-2 border-accent/30">
           <CardHeader>
@@ -254,14 +248,17 @@ export default function SettingsPage() {
                   Database: ./data/mkindayzir.db ({dbSize.toFixed(2)} MB)
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => window.location.href = ROUTES.SETTINGS_SYSTEM}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => (window.location.href = ROUTES.SETTINGS_SYSTEM)}
+              >
                 Manage System
               </Button>
             </div>
           </CardContent>
         </Card>
-      ))}
-
+      )}
     </div>
   );
 }

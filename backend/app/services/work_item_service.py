@@ -27,7 +27,7 @@ class WorkItemService:
             "storyPoints": item.storyPoints,
             "dueDate": item.dueDate.isoformat() if item.dueDate else None,
             "resolvedAt": item.resolvedAt.isoformat() if item.resolvedAt else None,
-            "metadata": item.metadata,
+            "metadata": item.meta,
             "position": item.position,
             "createdAt": item.createdAt.isoformat() if item.createdAt else None,
             "updatedAt": item.updatedAt.isoformat() if item.updatedAt else None,
@@ -92,7 +92,7 @@ class WorkItemService:
             parentId=data.get("parentId"),
             storyPoints=data.get("storyPoints"),
             dueDate=data.get("dueDate"),
-            metadata=str(data.get("metadata") or {}),
+            meta=str(data.get("metadata") or {}),
         )
         db.add(item)
         await db.commit()
@@ -118,7 +118,7 @@ class WorkItemService:
             if field in data and data[field] is not None:
                 setattr(item, field, data[field])
         if "metadata" in data and data["metadata"] is not None:
-            item.metadata = str(data["metadata"])
+            item.meta = str(data["metadata"])
 
         await db.commit()
         await db.refresh(item)

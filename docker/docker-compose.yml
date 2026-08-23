@@ -1,57 +1,58 @@
-version: '3.8'
-
+# =============================================================================
+# Mkindayzir — canonical single-process compose
+#
+# One `app` service builds the root Dockerfile (FastAPI + built Vite SPA) and
+# publishes a single port 3000. SQLite (personal) is the default; PostgreSQL
+# (team/enterprise) is opt-in via `docker compose --profile team up`.
+#
+# Usage:
+#   Personal : docker compose -f docker/docker-compose.yml up -d
+#   Team     : docker compose -f docker/docker-compose.yml --profile team up -d
+# =============================================================================
 services:
-  backend:
+  app:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ../backend:/app
-      - mkindayzir_data:/app/data
-    environment:
-      - MKINDAYZIR_MODE=personal
-      - DATABASE_PROVIDER=sqlite
-      - DATABASE_URL=sqlite+aiosqlite:///data/mkindayzir.db
-    env_file:
-      - ../.env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
+      dockerfile: Dockerfile
+    image: mkindayzir:latest
     ports:
       - "3000:3000"
-    volumes:
-      - ../src:/app/src
-      - ../public:/app/public
     environment:
-      - API_URL=http://backend:8000
-    depends_on:
-      backend:
-        condition: service_healthy
-    command: pnpm dev
+      # Override the relative default so SQLite lives on the named volume.
+      - DATA_DIR=/app/data
+      - FRONTEND_DIR=/app/dist
+    volumes:
+      - mkindayzir_data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Only for Team/Enterprise mode:
-  db:
+  # Only for Team/Enterprise mode (opt-in via --profile team):
+  postgres:
     image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: mkindayzir
-      POSTGRES_USER: mkindayzir
-      POSTGRES_PASSWORD: mkindayzir
+      - POSTGRES_DB=${POSTGRES_DB:-mkindayzir}
+      - POSTGRES_USER=${POSTGRES_USER:-mkindayzir}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-mkindayzir}}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    env_file:
+      - .env
     profiles:
       - team
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mkindayzir} -d ${POSTGRES_DB:-mkindayzir}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mkindayzir_data:

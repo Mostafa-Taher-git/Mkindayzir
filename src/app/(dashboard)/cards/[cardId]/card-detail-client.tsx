@@ -1,4 +1,5 @@
 "use client";
+import { Link } from "react-router-dom";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +13,6 @@ import { CardLabels } from "@/components/cards/card-labels";
 import { CardChecklists } from "@/components/cards/card-checklists";
 import { BoardCard } from "@/types";
 import { ROUTES } from "@/lib/constants";
-import Link from "next/link";
 
 interface CardDetailClientProps {
   card: BoardCard;
@@ -26,7 +26,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
   const { data: checklistsData } = useQuery({
     queryKey: ["checklists", card.id],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${card.id}/checklists`, {
+      const res = await fetch(`${""}/api/cards/${card.id}/checklists`, {
         cache: "no-store",
       });
       if (!res.ok) return { checklists: [] };
@@ -97,7 +97,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={ROUTES.BOARDS}>Back to Boards</Link>
+            <Link to={ROUTES.BOARDS}>Back to Boards</Link>
           </Button>
           <Button
             variant="destructive"
@@ -195,7 +195,7 @@ function ActivityLog({ cardId }: { cardId: string }) {
   const { data } = useQuery({
     queryKey: ["activity", cardId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/cards/${cardId}/activity`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/activity`, {
         cache: "no-store",
       });
       if (!res.ok) return { activities: [] };

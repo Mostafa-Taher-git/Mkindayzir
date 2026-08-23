@@ -1,31 +1,32 @@
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import prisma from "@/lib/prisma";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProjectActions } from "@/components/projects/project-actions";
 import { ROUTES } from "@/lib/constants";
-import Link from "next/link";
 
-interface ProjectDetailPageProps {
-  params: Promise<{ projectId: string }>;
-}
+export default function ProjectDetailPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
 
-async function getProject(projectId: string) {
-  try {
-    return await prisma.project.findUnique({ where: { id: projectId, deletedAt: null } });
-  } catch {
-    return null;
+  const { data, isLoading } = useQuery<{ project: any; stats: any }>({
+    queryKey: ["project", projectId],
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch project");
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading project...</div>;
   }
-}
 
-export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
-  const user = await getSessionUser();
-  if (!user) redirect(ROUTES.LOGIN);
-
-  const { projectId } = await params;
-  const project = await getProject(projectId);
+  const project = data?.project;
 
   if (!project) {
     return (
@@ -34,7 +35,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <CardContent className="pt-6">
             <p className="text-muted-foreground">Project not found.</p>
             <Button asChild className="mt-4">
-              <Link href={ROUTES.PROJECTS}>Back to Projects</Link>
+              <Link to={ROUTES.PROJECTS}>Back to Projects</Link>
             </Button>
           </CardContent>
         </Card>
@@ -50,9 +51,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <Badge variant="secondary">{project.key}</Badge>
           </div>
-          <p className="text-muted-foreground mt-1">
-            {project.description || "No description"}
-          </p>
+          <p className="text-muted-foreground mt-1">{project.description || "No description"}</p>
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
             <span className="capitalize">{project.status?.toLowerCase() ?? "active"}</span>
           </div>
@@ -63,6 +62,9 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           initialDescription={project.description ?? ""}
         />
       </div>
+      <Button variant="outline" onClick={() => navigate(ROUTES.PROJECTS)}>
+        Back to Projects
+      </Button>
     </div>
   );
 }

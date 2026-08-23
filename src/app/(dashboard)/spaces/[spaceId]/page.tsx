@@ -1,51 +1,50 @@
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useParams, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ROUTES, VISIBILITIES } from "@/lib/constants";
 import { Board } from "@/types";
 import { SpaceForm } from "@/components/spaces/space-form";
-import Link from "next/link";
 
-interface SpaceDetailPageProps {
-  params: Promise<{ spaceId: string }>;
-}
+export default function SpaceDetailPage() {
+  const { spaceId } = useParams<{ spaceId: string }>();
 
-async function getSpace(spaceId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/spaces/${spaceId}`, {
-    cache: "no-store",
+  const { data: spaceData } = useQuery<{ space: any }>({
+    queryKey: ["space", spaceId],
+    enabled: Boolean(spaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/spaces/${spaceId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch space");
+      return res.json();
+    },
   });
-  if (!res.ok) return null;
-  return res.json();
-}
 
-async function getBoards(spaceId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/boards?spaceId=${spaceId}`, {
-    cache: "no-store",
+  const { data: boardsData } = useQuery<{ boards: any[] }>({
+    queryKey: ["boards", "bySpace", spaceId],
+    enabled: Boolean(spaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/boards?spaceId=${spaceId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch boards");
+      return res.json();
+    },
   });
-  if (!res.ok) return { boards: [] };
-  return res.json();
-}
 
-async function getMembers(spaceId: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/spaces/${spaceId}/members`, {
-    cache: "no-store",
+  const { data: membersData } = useQuery<{ members: any[] }>({
+    queryKey: ["space", spaceId, "members"],
+    enabled: Boolean(spaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/spaces/${spaceId}/members`, { credentials: "include" });
+      if (!res.ok) return { members: [] };
+      return res.json();
+    },
   });
-  if (!res.ok) return { members: [] };
-  return res.json();
-}
 
-export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) {
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(ROUTES.LOGIN);
-  }
-
-  const { spaceId } = await params;
-  const { space } = await getSpace(spaceId);
-  const { boards } = await getBoards(spaceId);
-  const { members } = await getMembers(spaceId);
+  const space = spaceData?.space;
+  const boards = boardsData?.boards ?? [];
+  const members = membersData?.members ?? [];
 
   if (!space) {
     return (
@@ -53,7 +52,7 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
         <Card>
           <CardContent className="pt-6">
             <p className="text-muted-foreground">Space not found.</p>
-            <Link href={ROUTES.SPACES} className="text-primary hover:underline mt-4 inline-block">
+            <Link to={ROUTES.SPACES} className="text-primary hover:underline mt-4 inline-block">
               Back to Spaces
             </Link>
           </CardContent>
@@ -72,16 +71,12 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
             <h1 className="text-3xl font-bold">{space.name}</h1>
             <Badge variant="secondary" className="text-xs">{visibilityLabel}</Badge>
           </div>
-          <p className="text-muted-foreground mt-1">
-            {space.description || "No description provided"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            {space.memberCount} members
-          </p>
+          <p className="text-muted-foreground mt-1">{space.description || "No description provided"}</p>
+          <p className="text-xs text-muted-foreground mt-2">{space.memberCount} members</p>
         </div>
         <div className="flex gap-2">
           <Button asChild>
-            <Link href={`${ROUTES.SPACES}/${spaceId}/boards/new`}>New Board</Link>
+            <Link to={`${ROUTES.SPACES}/${spaceId}/boards/new`}>New Board</Link>
           </Button>
         </div>
       </div>
@@ -95,22 +90,15 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
             </CardHeader>
             <CardContent>
               {boards.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  No boards yet. Create your first board to get started.
-                </div>
+                <div className="text-sm text-muted-foreground">No boards yet. Create your first board to get started.</div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {boards.map((board: Board) => (
-                    <Link key={board.id} href={`/boards/${board.id}`}>
+                    <Link key={board.id} to={`/boards/${board.id}`}>
                       <div className="border-2 border-outline p-3 hover:border-primary transition-colors cursor-pointer">
-                        <div
-                          className="h-2 rounded-full mb-2"
-                          style={{ backgroundColor: board.background }}
-                        />
+                        <div className="h-2 rounded-full mb-2" style={{ backgroundColor: board.background }} />
                         <p className="text-sm font-medium">{board.name}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-1">
-                          {board.description || "No description"}
-                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{board.description || "No description"}</p>
                       </div>
                     </Link>
                   ))}

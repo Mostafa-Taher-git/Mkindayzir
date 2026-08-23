@@ -1,8 +1,8 @@
+import { useNavigate } from "react-router-dom";
 // src/app/(auth)/setup/page.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { SetupSchema } from "@/lib/validators";
 
 type Mode = "personal" | "team" | "enterprise";
@@ -29,7 +29,7 @@ const MODES: { value: Mode; label: string; spec: string; description: string }[]
 ];
 
 export default function SetupPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode | null>(null);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -84,7 +84,7 @@ export default function SetupPage() {
         return;
       }
 
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);

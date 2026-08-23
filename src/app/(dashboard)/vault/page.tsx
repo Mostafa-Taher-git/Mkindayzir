@@ -1,91 +1,43 @@
-import { getSessionUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 
-async function getFolders() {
-  try {
-    const folders = await prisma.vaultFolder.findMany({
-      where: { deletedAt: null },
-      orderBy: { position: "asc" },
-    });
-    return folders.map((f) => ({
-      ...f,
-      createdAt: f.createdAt.toISOString(),
-      updatedAt: f.updatedAt.toISOString(),
-      deletedAt: f.deletedAt?.toISOString() ?? null,
-    }));
-  } catch {
-    return [];
-  }
-}
+export default function VaultPage() {
+  const [searchParams] = useSearchParams();
+  const folderId = searchParams.get("folder") || undefined;
+  const statusParam = searchParams.get("status") || undefined;
+  const search = searchParams.get("search") || undefined;
 
-async function getNotes(folderId?: string, status?: string, search?: string) {
-  try {
-    const where: any = { deletedAt: null };
-    if (folderId) where.folderId = folderId;
-    if (status) where.status = status;
-    if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { content: { contains: search } },
-      ];
-    }
+  const { data: foldersData } = useQuery<{ folders: any[] }>({
+    queryKey: ["vault", "folders"],
+    queryFn: async () => {
+      const res = await fetch("/api/vault/folders", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch folders");
+      return res.json();
+    },
+  });
 
-    const [notes, total] = await Promise.all([
-      prisma.vaultNote.findMany({
-        where,
-        orderBy: { updatedAt: "desc" },
-        include: { folder: true, tags: { include: { tag: true } }, author: true },
-        take: 50,
-      }),
-      prisma.vaultNote.count({ where }),
-    ]);
+  const { data: notesData, isLoading } = useQuery<{ notes: any[]; pagination: any }>({
+    queryKey: ["vault", "notes", folderId, statusParam, search],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (folderId) qs.set("folderId", folderId);
+      if (statusParam) qs.set("status", statusParam);
+      if (search) qs.set("search", search);
+      const res = await fetch(`/api/vault/notes?${qs.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch notes");
+      return res.json();
+    },
+  });
 
-    const serialized = notes.map((n) => ({
-      ...n,
-      createdAt: n.createdAt.toISOString(),
-      updatedAt: n.updatedAt.toISOString(),
-      deletedAt: n.deletedAt?.toISOString() ?? null,
-      publishedAt: n.publishedAt?.toISOString() ?? null,
-      folder: n.folder ? {
-        ...n.folder,
-        createdAt: n.folder.createdAt.toISOString(),
-        updatedAt: n.folder.updatedAt.toISOString(),
-        deletedAt: n.folder.deletedAt?.toISOString() ?? null,
-      } : null,
-      author: n.author ? {
-        ...n.author,
-        createdAt: n.author.createdAt.toISOString(),
-        updatedAt: n.author.updatedAt.toISOString(),
-      } : null,
-    }));
-
-    return { notes: serialized, pagination: { total } };
-  } catch {
-    return { notes: [], pagination: { total: 0 } };
-  }
-}
-
-export default async function VaultPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
-  const folderId = params.folder as string | undefined;
-  const statusParam = params.status as string | undefined;
-  const search = params.search as string | undefined;
-
-  const [folders, notesData] = await Promise.all([
-    getFolders(),
-    getNotes(folderId, statusParam, search),
-  ]);
-
-  const notes = notesData.notes || [];
+  const folders = foldersData?.folders ?? [];
+  const notes = notesData?.notes ?? [];
   const currentFolder = folderId ? folders.find((f) => f.id === folderId) : null;
 
   return (
@@ -98,20 +50,18 @@ export default async function VaultPage({
               {currentFolder ? currentFolder.name : "Knowledge Vault"}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {currentFolder
-                ? `Folder: ${currentFolder.path}`
-                : "Team knowledge base - all notes"}
+              {currentFolder ? `Folder: ${currentFolder.path}` : "Team knowledge base - all notes"}
             </p>
           </div>
           <Button asChild>
-            <Link href={VAULT_ROUTES.NEW_NOTE}>New Note</Link>
+            <Link to={VAULT_ROUTES.NEW_NOTE}>New Note</Link>
           </Button>
         </div>
 
         {currentFolder && (
           <div className="flex items-center gap-2 mb-4">
             <Link
-              href={VAULT_ROUTES.HOME}
+              to={VAULT_ROUTES.HOME}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               All Notes
@@ -119,7 +69,11 @@ export default async function VaultPage({
           </div>
         )}
 
-        <NoteList notes={notes as any} />
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading notes...</p>
+        ) : (
+          <NoteList notes={notes as any} />
+        )}
       </div>
     </div>
   );

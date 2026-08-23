@@ -1,7 +1,7 @@
 "use client";
+import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { ConversationList } from "@/components/assistant/conversation-list";
 import { ChatInterface } from "@/components/assistant/chat-interface";
 import type { Conversation } from "@/types";
@@ -13,7 +13,7 @@ function AssistantLayout({
   initialConversations: Conversation[];
   conversationId?: string;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = React.useState<string | null>(conversationId ?? null);
   const [selectedModel, setSelectedModel] = React.useState<string>("");
 
@@ -29,7 +29,7 @@ function AssistantLayout({
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
-    router.push(`/assistant/${id}`);
+    navigate(`/assistant/${id}`);
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
+import { Link } from "react-router-dom";
 
 import * as React from "react";
-import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,7 +115,7 @@ export default function BoardsPage() {
         </div>
         {spaces.length === 0 ? (
           <Button asChild>
-            <Link href={`${ROUTES.SPACES}/new`}>Create a Space first</Link>
+            <Link to={`${ROUTES.SPACES}/new`}>Create a Space first</Link>
           </Button>
         ) : (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -139,7 +139,7 @@ export default function BoardsPage() {
               {spaces.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   You need to create a Space first.{" "}
-                  <Link href={`${ROUTES.SPACES}/new`} className="text-primary underline">
+                  <Link to={`${ROUTES.SPACES}/new`} className="text-primary underline">
                     Go to Spaces
                   </Link>
                 </p>
@@ -216,7 +216,7 @@ export default function BoardsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="mt-2">
-              <Link href={spaces.length === 0 ? `${ROUTES.SPACES}/new` : "#"} onClick={() => spaces.length > 0 && setOpen(true)}>
+              <Link to={spaces.length === 0 ? `${ROUTES.SPACES}/new` : "#"} onClick={() => spaces.length > 0 && setOpen(true)}>
                 {spaces.length === 0 ? "Create Space" : "Create your first board"}
               </Link>
             </Button>
