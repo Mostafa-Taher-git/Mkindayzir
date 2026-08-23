@@ -29,8 +29,12 @@ import VaultTagsPage from "@/app/(dashboard)/vault/tags/page";
 import VaultGraphPage from "@/app/(dashboard)/vault/graph/page";
 import AssistantPage from "@/app/(dashboard)/assistant/page";
 import ConversationPage from "@/app/(dashboard)/assistant/[conversationId]/page";
+import TicketsPage from "@/app/(dashboard)/tickets/page";
+import NewTicketPage from "@/app/(dashboard)/tickets/new/page";
+import TicketDetailPage from "@/app/(dashboard)/tickets/[ticketId]/page";
 import GuidesPage from "@/app/(dashboard)/guides/page";
 import ReportsPage from "@/app/(dashboard)/reports/page";
+import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 import SystemSettingsPage from "@/app/(dashboard)/settings/system/page";
 
@@ -165,6 +169,36 @@ export default function App() {
         }
       />
       <Route
+        path="/tickets"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <TicketsPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tickets/new"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <NewTicketPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tickets/:ticketId"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <TicketDetailPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/cards/:cardId"
         element={
           <ProtectedRoute>
@@ -280,6 +314,16 @@ export default function App() {
           <ProtectedRoute>
             <DashboardRoute>
               <ReportsPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <RoadmapPage />
             </DashboardRoute>
           </ProtectedRoute>
         }

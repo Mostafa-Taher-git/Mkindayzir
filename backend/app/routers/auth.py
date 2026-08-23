@@ -1,12 +1,16 @@
+import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.auth import LoginRequest, RegisterRequest
+from app.schemas.auth import LoginRequest, RegisterRequest, ChangeRoleRequest
 from app.services.auth_service import AuthService
 from app.middleware.auth import get_current_user
 from app.config import settings
+from app.models.user import User
+from app.models.audit_log import AuditLog
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -85,3 +89,50 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         "role": result["user"]["role"],
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }}
+
+
+@router.patch("/role")
+async def change_own_role(
+    req: ChangeRoleRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if settings.MKINDAYZIR_MODE == "personal":
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": "Cannot change role in personal mode"}})
+
+    if req.confirmation != "DEMOTE":
+        raise HTTPException(status_code=400, detail={"error": {"code": "INVALID_CONFIRMATION", "message": "Confirmation text 'DEMOTE' is required"}})
+
+    if req.newRole not in ["ADMIN", "MANAGER", "MEMBER", "VIEWER"]:
+        raise HTTPException(status_code=400, detail={"error": {"code": "INVALID_ROLE", "message": "Invalid role specified"}})
+
+    if user.get("role") == "ADMIN" and req.newRole != "ADMIN":
+        admin_count = await db.scalar(
+            select(func.count()).select_from(User).where(
+                User.role == "ADMIN",
+                User.status == "ACTIVE",
+                User.id != user["id"],
+                User.deletedAt.is_(None)
+            )
+        )
+        if (admin_count or 0) == 0:
+            raise HTTPException(status_code=400, detail={"error": {"code": "LAST_ADMIN", "message": "Cannot demote: you are the last admin"}})
+
+    await db.execute(
+        update(User)
+        .where(User.id == user["id"])
+        .values(role=req.newRole, updatedAt=datetime.now(timezone.utc))
+    )
+
+    audit = AuditLog(
+        id=uuid.uuid4().hex,
+        userId=user["id"],
+        action="USER_DEMOTION",
+        resource="User",
+        resourceId=user["id"],
+        details=f"User changed role from {user.get('role')} to {req.newRole}",
+    )
+    db.add(audit)
+    await db.commit()
+
+    return {"data": {"role": req.newRole}}

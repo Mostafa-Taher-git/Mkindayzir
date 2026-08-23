@@ -43,3 +43,8 @@ class SetupResponse(BaseModel):
     displayName: str
     role: str
     autoLoggedIn: bool
+
+
+class ChangeRoleRequest(BaseModel):
+    newRole: str
+    confirmation: str

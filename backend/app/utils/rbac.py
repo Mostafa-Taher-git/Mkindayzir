@@ -23,6 +23,14 @@ PERMISSIONS = {
     "CREATE_WORK_ITEMS": "create:work_items",
     "EDIT_WORK_ITEMS": "edit:work_items",
     "DELETE_WORK_ITEMS": "delete:work_items",
+    # NEW — Tickets
+    "MANAGE_TICKETS": "manage:tickets",
+    "VIEW_TICKETS": "view:tickets",
+    "CREATE_TICKETS": "create:tickets",
+    "REPLY_TICKETS": "reply:tickets",
+    # FUTURE — Customers
+    "MANAGE_CUSTOMERS": "manage:customers",
+    "VIEW_CUSTOMERS": "view:customers",
 }
 
 ROLE_PERMISSIONS: Dict[str, List[str]] = {
@@ -40,6 +48,12 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
         PERMISSIONS["CREATE_WORK_ITEMS"],
         PERMISSIONS["EDIT_WORK_ITEMS"],
         PERMISSIONS["DELETE_WORK_ITEMS"],
+        PERMISSIONS["MANAGE_TICKETS"],
+        PERMISSIONS["VIEW_TICKETS"],
+        PERMISSIONS["CREATE_TICKETS"],
+        PERMISSIONS["REPLY_TICKETS"],
+        PERMISSIONS["MANAGE_CUSTOMERS"],
+        PERMISSIONS["VIEW_CUSTOMERS"],
     ],
     "MEMBER": [
         PERMISSIONS["VIEW_DASHBOARD"],
@@ -48,6 +62,10 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
         PERMISSIONS["VIEW_VAULT"],
         PERMISSIONS["CREATE_WORK_ITEMS"],
         PERMISSIONS["EDIT_WORK_ITEMS"],
+        PERMISSIONS["VIEW_TICKETS"],
+        PERMISSIONS["CREATE_TICKETS"],
+        PERMISSIONS["REPLY_TICKETS"],
+        PERMISSIONS["VIEW_CUSTOMERS"],
     ],
     "VIEWER": [
         PERMISSIONS["VIEW_DASHBOARD"],
@@ -55,6 +73,7 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
         PERMISSIONS["VIEW_BOARDS"],
         PERMISSIONS["VIEW_VAULT"],
         PERMISSIONS["VIEW_REPORTS"],
+        PERMISSIONS["VIEW_TICKETS"],
     ],
 }
 

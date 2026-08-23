@@ -11,7 +11,8 @@ from app.config import settings as config_settings
 from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
-    vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard
+    vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
+    tickets
 )
 
 
@@ -65,7 +66,7 @@ for router in [
     spaces.router, boards.router, columns.router, cards.router,
     checklists.router, vault.router, assistant.router, settings.router,
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
-    dashboard.router,
+    dashboard.router, tickets.router,
 ]:
     app.include_router(router)
 

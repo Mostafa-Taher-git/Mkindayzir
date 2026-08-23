@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.models import Project, WorkItem, Activity, User
+from app.models import Project, WorkItem, Activity, User, Ticket
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -20,6 +20,18 @@ async def dashboard_stats(
     )
     work_item_count = await db.scalar(
         select(func.count()).select_from(WorkItem).where(WorkItem.deletedAt.is_(None))
+    )
+    ticket_count = await db.scalar(
+        select(func.count()).select_from(Ticket).where(
+            Ticket.deletedAt.is_(None),
+            Ticket.status.in_(["OPEN", "IN_PROGRESS"])
+        )
+    )
+    waiting_tickets_count = await db.scalar(
+        select(func.count()).select_from(Ticket).where(
+            Ticket.deletedAt.is_(None),
+            Ticket.status.in_(["WAITING_ON_CUSTOMER", "WAITING_ON_TEAM"])
+        )
     )
 
     result = await db.execute(
@@ -60,5 +72,7 @@ async def dashboard_stats(
     return {
         "projectCount": int(project_count or 0),
         "workItemCount": int(work_item_count or 0),
+        "ticketCount": int(ticket_count or 0),
+        "ticketsAwaitingResponse": int(waiting_tickets_count or 0),
         "recentActivities": recent_activities,
     }

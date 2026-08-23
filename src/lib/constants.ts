@@ -17,7 +17,33 @@ export const ROUTES = {
   ADMIN: "/admin",
   SETTINGS: "/settings",
   SETTINGS_SYSTEM: "/settings/system",
+  TICKETS: "/tickets",
+  ROADMAP: "/roadmap",
 } as const;
+
+export const TICKET_STATUSES = [
+  { value: "OPEN", label: "Open" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "WAITING_ON_CUSTOMER", label: "Waiting on Customer" },
+  { value: "WAITING_ON_TEAM", label: "Waiting on Team" },
+  { value: "RESOLVED", label: "Resolved" },
+  { value: "CLOSED", label: "Closed" },
+] as const;
+
+export const TICKET_CATEGORIES = [
+  { value: "GENERAL", label: "General" },
+  { value: "BILLING", label: "Billing" },
+  { value: "TECHNICAL", label: "Technical" },
+  { value: "FEATURE_REQUEST", label: "Feature Request" },
+  { value: "BUG_REPORT", label: "Bug Report" },
+] as const;
+
+export const TICKET_SOURCES = [
+  { value: "INTERNAL", label: "Internal" },
+  { value: "PORTAL", label: "Portal" },
+  { value: "EMAIL", label: "Email" },
+  { value: "API", label: "API" },
+] as const;
 
 export const PROJECT_STATUSES = [
   { value: "ACTIVE", label: "Active" },

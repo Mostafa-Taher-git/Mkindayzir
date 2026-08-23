@@ -37,3 +37,6 @@ from app.models.notification import Notification
 from app.models.audit_log import AuditLog
 from app.models.guide import Guide
 from app.models.system_config import SystemConfig
+from app.models.customer import Customer
+from app.models.ticket import Ticket
+from app.models.ticket_reply import TicketReply

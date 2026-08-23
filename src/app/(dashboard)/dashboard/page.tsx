@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 interface DashboardStats {
   projectCount: number;
   workItemCount: number;
+  ticketCount?: number;
+  ticketsAwaitingResponse?: number;
   recentActivities: Array<{
     id: string;
     action: string;
@@ -26,25 +28,33 @@ export default function DashboardPage() {
       const res = await fetch("/api/dashboard/stats", { credentials: "include" });
       if (res.status === 401) {
         window.location.href = "/login";
-        return { projectCount: 0, workItemCount: 0, recentActivities: [] };
+        return { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };
       }
       if (!res.ok) {
-        return { projectCount: 0, workItemCount: 0, recentActivities: [] };
+        return { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };
       }
       return res.json();
     },
   });
 
-  const stats = data ?? { projectCount: 0, workItemCount: 0, recentActivities: [] };
+  const stats = data ?? { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };
 
   const statCards = [
     { title: "Projects", value: String(stats.projectCount), description: "Active projects", critical: false },
     { title: "Work Items", value: String(stats.workItemCount), description: "Open tasks", critical: false },
+    { title: "Support Tickets", value: String(stats.ticketCount ?? 0), description: "Active tickets", critical: false },
+    {
+      title: "Waiting Response",
+      value: String(stats.ticketsAwaitingResponse ?? 0),
+      description: "Customer / team action",
+      critical: (stats.ticketsAwaitingResponse ?? 0) > 0,
+    },
   ];
 
   const quickActions = [
     { label: "Projects", href: ROUTES.PROJECTS, description: "Manage your projects and work items" },
     { label: "Boards", href: ROUTES.BOARDS, description: "Visual task boards" },
+    { label: "Tickets", href: ROUTES.TICKETS, description: "Support tickets & helpdesk" },
     { label: "Vault", href: ROUTES.VAULT, description: "Team knowledge base" },
     { label: "Assistant", href: ROUTES.ASSISTANT, description: "AI-powered assistant" },
   ];

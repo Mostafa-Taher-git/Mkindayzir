@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
+import { RoleDemotionSection } from "@/components/settings/role-demotion";
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -232,6 +233,20 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {mode !== "personal" && user?.role === "ADMIN" && (
+        <Card className="border-2 border-destructive/30">
+          <CardHeader>
+            <CardTitle>Account Role</CardTitle>
+            <CardDescription>
+              Change your system role (irreversible without another active admin)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RoleDemotionSection currentRole={user.role} />
+          </CardContent>
+        </Card>
+      )}
 
       {mode === "personal" && (
         <Card className="border-2 border-accent/30">

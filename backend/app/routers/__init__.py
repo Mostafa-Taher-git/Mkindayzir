@@ -21,6 +21,7 @@ from app.routers import uploads
 from app.routers import admin
 from app.routers import system
 from app.routers import dashboard
+from app.routers import tickets
 
 all_routers = [
     auth.router,
@@ -46,4 +47,5 @@ all_routers = [
     admin.router,
     system.router,
     dashboard.router,
+    tickets.router,
 ]
