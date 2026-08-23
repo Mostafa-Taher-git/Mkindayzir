@@ -19,6 +19,7 @@ All configuration is via environment variables. The backend reads these from the
 |----------|---------|-------------|
 | `DATABASE_PROVIDER` | `sqlite` | Database provider: `sqlite` or `postgres`. |
 | `DATABASE_URL` | `file:./data/mkindayzir.db` | Connection string. `postgresql://user:pass@host:5432/dbname` for Team mode. |
+| `DB_PASSWORD` | `change-me-in-production` | Fallback PostgreSQL password used by Docker Compose when `POSTGRES_PASSWORD` is not explicitly set. |
 
 ## Security
 
@@ -28,6 +29,7 @@ All configuration is via environment variables. The backend reads these from the
 | `ENCRYPTION_KEY` | (auto-generated if absent) | 32-byte key (hex) for AES-256-GCM encryption of sensitive fields. |
 | `SESSION_MAX_AGE` | `86400` | Session expiry in seconds (24h). |
 | `BCRYPT_ROUNDS` | `12` | Bcrypt cost factor for password hashing. |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated list of allowed origins for CORS. |
 
 ## File storage
 
@@ -51,6 +53,7 @@ All configuration is via environment variables. The backend reads these from the
 |----------|---------|-------------|
 | `DEFAULT_AI_PROVIDER` | `openrouter` | Default AI provider. |
 | `DEFAULT_AI_MODEL` | `anthropic/claude-sonnet-4-20250514` | Default AI model. |
+| `PYTHON_AI_URL` | `http://localhost:8000` | Python AI service URL (used internally for AI provider integration). |
 
 ## Email (optional)
 
@@ -98,6 +101,7 @@ ENCRYPTION_KEY=<32-byte-hex-string>
 MKINDAYZIR_MODE=team
 DATABASE_PROVIDER=postgres
 DATABASE_URL=postgresql://mkindayzir:password@localhost:5432/mkindayzir
+DB_PASSWORD=change-me-in-production
 DATA_DIR=/app/data
 SESSION_SECRET=<64-char-random-string>
 ENCRYPTION_KEY=<32-byte-hex-string>

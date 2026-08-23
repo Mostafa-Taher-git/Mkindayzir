@@ -2,7 +2,7 @@
 
 **Version:** 2.0.0  
 **Status:** Aligned with FastAPI backend migration  
-**Tech Stack:** Next.js 14 (frontend only) + React 18 + TypeScript 5 + Tailwind 3 + FastAPI + SQLAlchemy 2.0 + Alembic
+**Tech Stack:** Vite + React 18 + TypeScript 5 + Tailwind 3 + FastAPI + SQLAlchemy 2.0 + Alembic
 
 ---
 
@@ -33,17 +33,17 @@
 
 ## 1. High-Level Overview
 
-Mkindayzir is a dual-service full-stack application: a Next.js 14 frontend serving the React UI, and a separate FastAPI backend handling all API logic, authentication, and data access.
+Mkindayzir is a full-stack application with a **Vite + React SPA** frontend and a **FastAPI** backend. In production, FastAPI serves both the REST API and the built SPA from a single process on port 3000.
 
 ```
 +-------------------------------------------------------------------+
 |                     Client (Desktop Browser)                        |
 |  +---------------------------------------------------------------+ |
-|  |  Next.js React App (SSR + Client Components)                  | |
-|  |  /api/* requests proxied to FastAPI backend                   | |
+|  |  Vite + React SPA (Client-Side Routing)                      | |
+|  |  /api/* requests proxied to FastAPI backend in dev            | |
 |  +---------------------------------------------------------------+ |
 +------------------------------+------------------------------------+
-                                 | HTTP /api/* (proxied)
+                                  | HTTP /api/* (proxied in dev)
 +------------------------------v------------------------------------+
 |                     FastAPI Backend (Python)                       |
 |  +---------------------------------------------------------------+
@@ -77,89 +77,82 @@ Mkindayzir is a dual-service full-stack application: a Next.js 14 frontend servi
 
 ```
 mkindayzir/
-├── frontend/ (was src/)
-│   ├── app/
-│   │   ├── (auth)/               # Auth route group (login, register, forgot-password, setup)
-│   │   ├── (dashboard)/          # Protected dashboard route group
-│   │   ├── [[...slug]]/route.ts  # Catch-all page route
-│   │   ├── layout.tsx            # Root HTML layout
-│   │   ├── page.tsx              # Landing page
-│   │   └── globals.css           # Global styles + design tokens
+├── src/                          # React SPA source (Vite + React)
+│   ├── main.tsx                  # React entry point
+│   ├── App.tsx                   # React Router DOM routes
+│   ├── app/                      # Route pages (folder convention)
+│   │   ├── (auth)/               # Auth pages (login, register, forgot-password, setup)
+│   │   └── (dashboard)/          # Protected dashboard pages
 │   ├── components/               # React components
 │   │   ├── layout/               # Dashboard shell (sidebar, header, command palette)
 │   │   ├── shared/               # Providers, banners, registrars
 │   │   ├── ui/                   # shadcn/ui primitives
-│   │   ├── boards/               # Board views (kanban, table)
+│   │   ├── boards/               # Board views
 │   │   ├── cards/                # Card detail, checklists, labels
-│   │   ├── vault/                # Knowledge vault editor, sidebar, graph
+│   │   ├── vault/                # Knowledge vault
 │   │   ├── features/             # Reports, guides, search
 │   │   ├── spaces/               # Space management
 │   │   ├── work-items/           # Work item table, form, filters
 │   │   └── assistant/            # AI assistant chat UI
 │   ├── config/                   # App configuration
-│   │   ├── navigation.ts         # Sidebar nav items
-│   │   ├── permissions.ts        # RBAC re-exports
-│   │   ├── defaults.ts           # Default workflows, board templates
-│   │   └── features.ts           # Feature flags by mode
+│   │   ├── navigation.ts
+│   │   ├── permissions.ts
+│   │   ├── defaults.ts
+│   │   └── features.ts
 │   ├── hooks/                    # Custom React hooks
-│   │   ├── use-auth.ts           # Current user fetch
-│   │   ├── use-socket.ts         # WebSocket lifecycle (deferred)
-│   │   ├── use-presence.ts       # Real-time presence (deferred)
-│   │   ├── use-sync.ts           # Offline sync status
-│   │   ├── use-online.ts         # Browser online state
-│   │   ├── use-mobile.ts         # Responsive breakpoint
+│   │   ├── use-auth.ts
+│   │   ├── use-socket.ts         # Exists but inactive (WebSocket deferred)
+│   │   ├── use-presence.ts       # Exists but inactive
+│   │   ├── use-sync.ts
+│   │   ├── use-online.ts
+│   │   ├── use-mobile.ts
+│   │   ├── use-config.ts
 │   │   └── use-optimistic-mutation.ts
-│   ├── lib/                      # Core utilities & config
-│   │   ├── auth.ts               # Client-side auth helpers
-│   │   ├── auth.config.ts        # Auth config
-│   │   ├── config.ts             # Runtime config (Zod validated)
-│   │   ├── constants.ts          # Routes, enums, statuses
-│   │   ├── validators.ts         # Zod schemas
+│   ├── lib/                      # Core utilities
+│   │   ├── api.ts                # Generic fetch wrapper using VITE_API_URL env var
+│   │   ├── constants.ts          # ROUTES map, enums
 │   │   ├── rbac.ts               # Roles + permissions
-│   │   ├── crypto.ts             # bcrypt + AES-256-GCM
-│   │   ├── encryption.ts         # PBKDF2 key derivation
-│   │   ├── logger.ts             # Pino structured logger
-│   │   ├── api.ts                # Generic fetch wrapper
-│   │   ├── helpers.ts            # Audit helper
-│   │   └── optimistic.ts         # Optimistic update helpers
+│   │   ├── validators.ts         # Zod schemas
+│   │   ├── optimistic.ts
+│   │   ├── utils.ts
+│   │   ├── crypto.ts             # bcrypt + AES-256-GCM (frontend)
+│   │   └── encryption.ts         # PBKDF2 key derivation (frontend)
 │   ├── offline/                  # Offline-first layer
 │   │   ├── db.ts                 # Dexie schema
-│   │   ├── sync-engine.ts        # Queue + retry sync
-│   │   ├── conflict-resolver.ts  # Last-write-wins
-│   │   └── cache-strategy.ts     # Entity caching with TTL
-│   ├── repositories/             # Data access (Repository Pattern — frontend cache layer)
-│   │   ├── base.repository.ts    # Generic CRUD + pagination
-│   │   └── ...
-│   ├── services/                 # Frontend service adapters
+│   │   ├── sync-engine.ts
+│   │   ├── conflict-resolver.ts
+│   │   └── cache-strategy.ts
 │   ├── stores/                   # Zustand global state
-│   │   ├── app.store.ts          # Theme, sidebar
-│   │   ├── offline.store.ts      # Online, sync status
-│   │   └── notification.store.ts # Notifications
+│   │   ├── app.store.ts
+│   │   ├── offline.store.ts
+│   │   └── notification.store.ts
 │   ├── types/                    # TypeScript types
-│   └── sw.ts                     # Serwist service worker
-├── backend/
+│   └── app/globals.css
+├── backend/                      # FastAPI backend
 │   ├── app/
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── database.py
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── routers/
-│   │   ├── services/
-│   │   ├── middleware/
-│   │   ├── utils/
-│   │   └── cli/
-│   ├── alembic/
-│   ├── pyproject.toml
-│   └── Dockerfile
-├── prisma/
-│   ├── schema.prisma             # Reference schema (not actively used by backend)
-│   ├── migrations/               # PostgreSQL migration history
-│   ├── sqlite-migrations/        # SQLite migration history
-│   └── seed.ts                   # Initial seed data
-├── docker-compose.yml
-├── next.config.mjs
+│   │   ├── main.py               # FastAPI app entry point
+│   │   ├── config.py             # Central config (pydantic-settings)
+│   │   ├── database.py           # SQLAlchemy async engine + session
+│   │   ├── models/               # SQLAlchemy ORM models
+│   │   ├── schemas/              # Pydantic schemas
+│   │   ├── routers/              # FastAPI routers (/api/*)
+│   │   ├── services/             # Business logic layer
+│   │   ├── middleware/           # auth, rate_limit
+│   │   ├── utils/                # rbac, encryption, helpers
+│   │   └── cli/                  # Click CLI (mkindayzir)
+│   ├── alembic/                  # Alembic migrations
+│   └── pyproject.toml
+├── prisma/                       # Reference schema (not actively used by backend)
+│   ├── schema.prisma
+│   ├── migrations/               # Reference migrations
+│   └── seed.ts
+├── docker/
+│   └── docker-compose.yml        # Single app service + optional postgres (team profile)
+├── Dockerfile                    # Multi-stage: Node builds SPA, Python runs FastAPI
+├── vite.config.ts                # Vite config with proxy
 ├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
 └── ...
 ```
 
@@ -169,29 +162,29 @@ mkindayzir/
 
 | File | Responsibility |
 |------|----------------|
-| `next.config.mjs` | Configures React Strict Mode, security headers, bcrypt as webpack external, proxy rewrites (`/api/:path*` -> `http://localhost:8000/api/:path*`), and Serwist service worker wrapper. |
-| `backend/app/main.py` | FastAPI application entry point. Creates app, registers routers, mounts middleware, starts Uvicorn. |
-| `src/app/layout.tsx` | Root HTML layout wrapping children in Providers (React Query), plus global OfflineBanner, SyncStatus, and ServiceWorkerRegistrar. |
-| `src/app/page.tsx` | Landing page (simple welcome text). |
+| `vite.config.ts` | Configures Vite dev server on port 3000, proxies `/api` to `http://localhost:8000`, build outDir `dist`, React plugin. |
+| `backend/app/main.py` | FastAPI application entry point. Creates app, registers routers, mounts middleware, serves static SPA from `dist/` in production. |
+| `src/main.tsx` | React entry point, BrowserRouter + Providers + App. |
+| `src/App.tsx` | React Router DOM v6 client-side routes. |
 
 ---
 
 ## 4. Request Flow
 
-### SSR / Page Navigation
-1. Request hits Next.js dev server or static export.
-2. Next.js handles SSR via App Router.
-3. Server Components render page shell.
-4. Client Components hydrate and call `/api/*` via `src/lib/api.ts`.
+### Development
+1. Browser requests `http://localhost:3000`.
+2. Vite dev server serves the React SPA and HMR.
+3. Client-side React Router handles navigation.
+4. API requests to `/api/*` are proxied by Vite to `http://localhost:8000`.
+5. FastAPI router handles the request.
+6. JSON response returned to client.
 
-### API Request
-1. Client calls `/api/*` endpoint via `src/lib/api.ts`.
-2. Next.js proxy (next.config.mjs rewrites) forwards to `http://localhost:8000/api/:path*`.
-3. FastAPI router handles request.
-4. Auth middleware validates session cookie.
-5. Service layer enforces RBAC, business logic, audit logging.
-6. SQLAlchemy ORM executes query.
-7. JSON response returned to client.
+### Production
+1. Browser requests `http://localhost:3000`.
+2. FastAPI serves the built SPA from `dist/` (static assets + `index.html` catch-all).
+3. Client-side React Router handles navigation.
+4. API requests to `/api/*` hit FastAPI routers directly.
+5. JSON response returned to client.
 
 ### AI SSE Streaming
 1. Client POSTs to `/api/assistant/conversations/{id}/messages`.
@@ -207,7 +200,7 @@ mkindayzir/
 ## 5. Authentication & Authorization
 
 ### Auth Stack
-- Custom auth (no NextAuth in production).
+- Custom auth (no external auth provider).
 - Password hashing: bcrypt (cost 12).
 - Session storage: Database (Session model) + HTTP-only cookie (`mkindayzir_session`).
 - Token: 64-char random hex string.
@@ -290,6 +283,7 @@ All routes are implemented as FastAPI routers under `backend/app/routers/`.
 | **Auth** | `/api/auth` | Login, register, forgot-password, session, logout |
 | **Setup** | `/api/setup` | Check setup status / create first admin |
 | **Health** | `/api/health` | Health check + DB status |
+| **Config** | `/api/config` | Public config (mode, registration enabled) |
 | **Projects** | `/api/projects` | CRUD, stats, workflows, labels |
 | **Work Items** | `/api/work-items` | CRUD, transitions, bulk operations |
 | **Iterations** | `/api/iterations` | CRUD, start/complete lifecycle |
@@ -309,8 +303,11 @@ All routes are implemented as FastAPI routers under `backend/app/routers/`.
 | **Guides** | `/api/guides` | Guide center |
 | **Settings** | `/api/settings` | User settings |
 | **Uploads** | `/api/uploads` | File upload/download |
+| **Admin** | `/api/admin` | Admin operations |
+| **System** | `/api/system` | System operations |
+| **Dashboard** | `/api/dashboard` | Dashboard data |
 
-> All `/api/*` requests are proxied from Next.js to `http://localhost:8000` via `next.config.mjs` rewrites.
+> In development, `/api/*` requests are proxied from Vite to `http://localhost:8000`. In production, FastAPI serves both `/api/*` and the static SPA on the same port.
 
 ---
 
@@ -338,6 +335,7 @@ All files under `backend/app/services/`. Each service encapsulates business logi
 | `backend/app/services/checklist.py` | Checklist CRUD. |
 | `backend/app/services/iteration.py` | Iteration lifecycle. |
 | `backend/app/services/initiative.py` | Initiative CRUD. |
+| `backend/app/services/migration_service.py` | SQLite -> PostgreSQL live migration with SSE progress. |
 
 ---
 
@@ -349,19 +347,46 @@ The repository pattern is simplified into service methods with direct SQLAlchemy
 
 ## 10. Client Components
 
-(Unchanged - see previous version)
+| File/Directory | Responsibility |
+|------|----------------|
+| `src/components/layout/` | Dashboard shell (sidebar, header, command palette) |
+| `src/components/shared/` | Providers, offline banner, sync status, service worker registrar |
+| `src/components/ui/` | shadcn/ui primitives (button, card, dialog, toast, etc.) |
+| `src/components/boards/` | Kanban board, columns, cards, table view, board form |
+| `src/components/cards/` | Card detail modal, form, checklists, labels, members |
+| `src/components/vault/` | Note editor, viewer, sidebar, graph view, tag cloud, version history, backlinks, feedback |
+| `src/components/features/` | Reports (summary cards, trends, velocity, workload), guides (list, detail) |
+| `src/components/spaces/` | Space management, space form |
+| `src/components/work-items/` | Work item table, form, filters |
+| `src/components/assistant/` | AI assistant chat (layout, interface, input, message bubble, conversation list, settings, model selector) |
+| `src/components/settings/` | Migration wizard for SQLite -> PostgreSQL upgrade |
 
 ---
 
 ## 11. Custom Hooks
 
-(Unchanged - see previous version)
+| File | Responsibility |
+|------|----------------|
+| `src/hooks/use-auth.ts` | Fetches current user from `/api/auth/session` on mount |
+| `src/hooks/use-config.ts` | Fetches public config from `/api/config` (mode, registration flag) |
+| `src/hooks/use-socket.ts` | WebSocket lifecycle hook (exists but inactive — deferred) |
+| `src/hooks/use-presence.ts` | Real-time presence hook (exists but inactive — deferred) |
+| `src/hooks/use-sync.ts` | Offline sync status and queue processing |
+| `src/hooks/use-online.ts` | Browser online/offline state |
+| `src/hooks/use-mobile.ts` | Responsive breakpoint detection |
+| `src/hooks/use-optimistic-mutation.ts` | Optimistic update helpers for mutations |
 
 ---
 
 ## 12. State Management
 
-(Unchanged - see previous version)
+Zustand stores in `src/stores/`.
+
+| File | Responsibility |
+|------|----------------|
+| `src/stores/app.store.ts` | Theme, sidebar collapsed state. |
+| `src/stores/offline.store.ts` | Online status, sync status, pending count. |
+| `src/stores/notification.store.ts` | Notifications list, unread count. |
 
 ---
 
@@ -380,7 +405,16 @@ WebSocket support is **deferred** for future FastAPI implementation.
 
 ## 14. Offline / Sync Strategy
 
-(Unchanged - client-side only, no changes needed)
+Mkindayzir implements a client-side offline-first layer using Dexie (IndexedDB wrapper) in `src/offline/`.
+
+| File | Responsibility |
+|------|----------------|
+| `src/offline/db.ts` | Dexie database schema (`mkindayzir-offline`) with tables for queued mutations, cached entities, and settings |
+| `src/offline/sync-engine.ts` | Singleton sync engine that queues mutations when offline and processes them when back online |
+| `src/offline/conflict-resolver.ts` | Last-write-wins conflict resolution |
+| `src/offline/cache-strategy.ts` | Entity caching with TTL |
+
+The offline layer stores mutations in IndexedDB and replays them via the API client when connectivity is restored. Zustand stores (`offline.store.ts`) track sync status and pending counts.
 
 ---
 
@@ -396,12 +430,8 @@ WebSocket support is **deferred** for future FastAPI implementation.
 | `src/config/defaults.ts` | DEFAULT_WORKFLOW and DEFAULT_BOARD_TEMPLATES. |
 | `src/config/navigation.ts` | Navigation items. |
 | `src/config/permissions.ts` | Re-exports PERMISSIONS, ROLES. |
-| `src/lib/api.ts` | Generic fetch wrapper using relative URLs (proxied to FastAPI). |
-| `src/lib/helpers.ts` | Frontend audit helper. |
+| `src/lib/api.ts` | Generic fetch wrapper using `import.meta.env.VITE_API_URL ?? ""`. In dev with Vite proxy, this is empty string so requests go to same origin (`:3000/api/...`). |
 | `src/lib/optimistic.ts` | Optimistic update helpers. |
-| `src/lib/logger.ts` | Pino logger. |
-| `src/lib/crypto.ts` | bcrypt + AES-256-GCM (frontend). |
-| `src/lib/encryption.ts` | PBKDF2 key derivation (frontend). |
 
 ---
 
@@ -421,9 +451,8 @@ WebSocket support is **deferred** for future FastAPI implementation.
 
 | File | Responsibility |
 |------|----------------|
-| `backend/Dockerfile` | Multi-stage Python build. Installs dependencies, runs Alembic migrations on startup. |
-| `Dockerfile` | Next.js frontend build. Serves static export + API proxy. |
-| `docker-compose.yml` | Three services: mkindayzir (Next.js frontend on port 3000), backend (FastAPI on port 8000), db (PostgreSQL 16 on port 5432). |
+| `Dockerfile` | Multi-stage: Node builds Vite SPA (dist/), Python runs FastAPI serving API + static SPA on port 3000. |
+| `docker/docker-compose.yml` | Single `app` service on port 3000, optional `postgres` under `team` profile. |
 | `backend/pyproject.toml` | Python dependencies (FastAPI, Uvicorn, SQLAlchemy, Alembic, etc.). |
 | `package.json` | Scripts: dev, build, lint, format, test. |
 
@@ -431,28 +460,38 @@ WebSocket support is **deferred** for future FastAPI implementation.
 
 ## 18. Testing
 
-(Unchanged - frontend tests remain the same)
+Frontend: Vitest + Playwright. Backend: pytest in `backend/pyproject.toml` optional-dependencies.
 
 ---
 
 ## 19. CI/CD
 
-(Unchanged - add backend tests to CI pipeline as needed)
+| File | Responsibility |
+|------|----------------|
+| `.github/workflows/ci.yml` | Lint, typecheck, test-sqlite, test-postgres, build. |
+| `.github/workflows/release.yml` | Docker image push to ghcr.io on tags. |
 
 ---
 
 ## 20. Key Architecture Decisions
 
-1. **Dual-Service Architecture**: Next.js frontend + FastAPI backend separated. Frontend handles SSR/UI; backend handles all API logic, auth, and data access.
-2. **Proxy Pattern**: Next.js proxy rewrites (`/api/:path*` -> `http://localhost:8000/api/:path*`) allow the frontend to call relative `/api/*` URLs while the FastAPI backend handles them.
-3. **Service Layer Pattern**: All business logic in `backend/app/services/`. FastAPI routers are thin wrappers.
-4. **SQLAlchemy 2.0 + Alembic**: Replaces Prisma for the backend. Async-first ORM with migration version control.
-5. **Local-First Offline**: Dexie-based IndexedDB with sync engine (unchanged from previous architecture).
-6. **Security**: httpOnly cookies, bcrypt password hashing (cost 12), AES-256-GCM encryption for AI keys, security headers.
-7. **Multi-Database**: SQLite (Personal) and PostgreSQL (Team/Enterprise) supported via DATABASE_PROVIDER env var.
-8. **No External Auth**: Custom bcrypt + DB sessions for full control.
-9. **SSE Streaming**: FastAPI handles AI assistant streaming via `text/event-stream`.
-10. **WebSocket Deferred**: Real-time features deferred to future FastAPI implementation.
+1. **Vite + React SPA**: Frontend is a Vite-built React SPA served statically by FastAPI in production on port 3000.
+2. **Single-Process Production**: FastAPI serves both `/api/*` REST API and the built SPA from `dist/` on port 3000. No separate Node process.
+3. **Two-Process Development**: FastAPI on `:8000` and Vite dev server on `:3000`. Vite proxies `/api` to `:8000`.
+4. **Client-Side Routing**: React Router DOM v6 in `src/App.tsx`. No server-side routing.
+5. **SPA Catch-All**: `backend/app/main.py` serves `dist/index.html` for unmatched routes in production.
+6. **API Client**: `src/lib/api.ts` uses `import.meta.env.VITE_API_URL ?? ""` for base URL. In dev with Vite proxy, this is empty string so requests go to same origin (`:3000/api/...`).
+7. **CORS**: Configured in `backend/app/main.py` via `ALLOWED_ORIGINS` env var (default: `http://localhost:3000,http://127.0.0.1:3000`).
+8. **Docker**: Root `Dockerfile` is multi-stage: Node builds frontend, Python runs FastAPI. `docker/docker-compose.yml` defines `app` service on port 3000, optional `postgres` under `team` profile.
+9. **Service Layer Pattern**: All business logic in `backend/app/services/`. FastAPI routers are thin wrappers.
+10. **SQLAlchemy 2.0 + Alembic**: Replaces Prisma for the backend. Async-first ORM with migration version control.
+11. **Local-First Offline**: Dexie-based IndexedDB with sync engine (unchanged from previous architecture).
+12. **Security**: httpOnly cookies, bcrypt password hashing (cost 12), AES-256-GCM encryption for AI keys, security headers.
+13. **Multi-Database**: SQLite (Personal) and PostgreSQL (Team/Enterprise) supported via DATABASE_PROVIDER env var.
+14. **No External Auth**: Custom bcrypt + DB sessions for full control.
+15. **SSE Streaming**: FastAPI handles AI assistant streaming via `text/event-stream`.
+16. **WebSocket Deferred**: Real-time features deferred to future FastAPI implementation.
+17. **Prisma Reference Only**: `prisma/` folder exists at root with schema, migrations, and seed script, but is NOT actively used by the backend. SQLAlchemy models replace it. Some legacy scripts still reference Prisma CLI commands.
 
 ---
 
