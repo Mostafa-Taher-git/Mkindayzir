@@ -59,6 +59,7 @@ export default function SetupPage() {
       email,
       displayName,
       password,
+      confirmPassword,
       mode,
     });
 
@@ -83,7 +84,7 @@ export default function SetupPage() {
         return;
       }
 
-      router.push("/login");
+      router.push("/dashboard");
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);

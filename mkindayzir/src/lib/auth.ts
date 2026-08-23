@@ -1,20 +1,13 @@
 import 'server-only';
 
 import { cookies } from 'next/headers';
-import bcrypt from 'bcrypt';
 import prisma from './prisma';
 import { getConfig } from './config';
+import { hashPassword, verifyPassword } from './crypto';
 
 const SESSION_COOKIE = 'mkindayzir_session';
 
-export async function hashPassword(password: string): Promise<string> {
-  const rounds = getConfig().bcryptRounds;
-  return bcrypt.hash(password, rounds);
-}
-
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
+export { hashPassword, verifyPassword };
 
 export async function createSession(userId: string): Promise<string> {
   const token = generateSecureToken(64);

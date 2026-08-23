@@ -7,59 +7,67 @@ import { NoteList } from "@/components/vault/note-list";
 import Link from "next/link";
 
 async function getFolders() {
-  const folders = await prisma.vaultFolder.findMany({
-    where: { deletedAt: null },
-    orderBy: { position: "asc" },
-  });
-  return folders.map((f) => ({
-    ...f,
-    createdAt: f.createdAt.toISOString(),
-    updatedAt: f.updatedAt.toISOString(),
-    deletedAt: f.deletedAt?.toISOString() ?? null,
-  }));
+  try {
+    const folders = await prisma.vaultFolder.findMany({
+      where: { deletedAt: null },
+      orderBy: { position: "asc" },
+    });
+    return folders.map((f) => ({
+      ...f,
+      createdAt: f.createdAt.toISOString(),
+      updatedAt: f.updatedAt.toISOString(),
+      deletedAt: f.deletedAt?.toISOString() ?? null,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 async function getNotes(folderId?: string, status?: string, search?: string) {
-  const where: any = { deletedAt: null };
-  if (folderId) where.folderId = folderId;
-  if (status) where.status = status;
-  if (search) {
-    where.OR = [
-      { title: { contains: search } },
-      { content: { contains: search } },
-    ];
+  try {
+    const where: any = { deletedAt: null };
+    if (folderId) where.folderId = folderId;
+    if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { title: { contains: search } },
+        { content: { contains: search } },
+      ];
+    }
+
+    const [notes, total] = await Promise.all([
+      prisma.vaultNote.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        include: { folder: true, tags: { include: { tag: true } }, author: true },
+        take: 50,
+      }),
+      prisma.vaultNote.count({ where }),
+    ]);
+
+    const serialized = notes.map((n) => ({
+      ...n,
+      createdAt: n.createdAt.toISOString(),
+      updatedAt: n.updatedAt.toISOString(),
+      deletedAt: n.deletedAt?.toISOString() ?? null,
+      publishedAt: n.publishedAt?.toISOString() ?? null,
+      folder: n.folder ? {
+        ...n.folder,
+        createdAt: n.folder.createdAt.toISOString(),
+        updatedAt: n.folder.updatedAt.toISOString(),
+        deletedAt: n.folder.deletedAt?.toISOString() ?? null,
+      } : null,
+      author: n.author ? {
+        ...n.author,
+        createdAt: n.author.createdAt.toISOString(),
+        updatedAt: n.author.updatedAt.toISOString(),
+      } : null,
+    }));
+
+    return { notes: serialized, pagination: { total } };
+  } catch {
+    return { notes: [], pagination: { total: 0 } };
   }
-
-  const [notes, total] = await Promise.all([
-    prisma.vaultNote.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      include: { folder: true, tags: { include: { tag: true } }, author: true },
-      take: 50,
-    }),
-    prisma.vaultNote.count({ where }),
-  ]);
-
-  const serialized = notes.map((n) => ({
-    ...n,
-    createdAt: n.createdAt.toISOString(),
-    updatedAt: n.updatedAt.toISOString(),
-    deletedAt: n.deletedAt?.toISOString() ?? null,
-    publishedAt: n.publishedAt?.toISOString() ?? null,
-    folder: n.folder ? {
-      ...n.folder,
-      createdAt: n.folder.createdAt.toISOString(),
-      updatedAt: n.folder.updatedAt.toISOString(),
-      deletedAt: n.folder.deletedAt?.toISOString() ?? null,
-    } : null,
-    author: n.author ? {
-      ...n.author,
-      createdAt: n.author.createdAt.toISOString(),
-      updatedAt: n.author.updatedAt.toISOString(),
-    } : null,
-  }));
-
-  return { notes: serialized, pagination: { total } };
 }
 
 export default async function VaultPage({

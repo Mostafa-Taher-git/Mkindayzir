@@ -1,8 +1,9 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { getConfig } from './config';
 
 export async function hashPassword(password: string): Promise<string> {
-  const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+  const rounds = getConfig().bcryptRounds;
   return bcrypt.hash(password, rounds);
 }
 

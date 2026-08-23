@@ -22,10 +22,12 @@ function ConversationList({
   initialConversations,
   selectedId,
   onSelect,
+  selectedModel,
 }: {
   initialConversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  selectedModel?: string;
 }) {
   const queryClient = useQueryClient();
 
@@ -56,7 +58,7 @@ function ConversationList({
     const res = await fetch("/api/assistant/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ model: selectedModel || undefined }),
     });
     if (!res.ok) throw new Error("Failed to create conversation");
     const data = await res.json() as { conversation: Conversation };
@@ -88,7 +90,7 @@ function ConversationList({
           New Chat
         </Button>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-1 p-2">
           {conversations.length === 0 ? (
             <p className="text-muted-foreground px-2 py-4 text-center text-sm">

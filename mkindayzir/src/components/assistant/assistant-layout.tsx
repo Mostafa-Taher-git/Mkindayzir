@@ -15,6 +15,17 @@ function AssistantLayout({
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = React.useState<string | null>(conversationId ?? null);
+  const [selectedModel, setSelectedModel] = React.useState<string>("");
+
+  // Load default model from settings
+  React.useEffect(() => {
+    fetch("/api/assistant/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.model) setSelectedModel(data.model);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
@@ -22,11 +33,12 @@ function AssistantLayout({
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       <ConversationList
         initialConversations={initialConversations}
         selectedId={selectedId}
         onSelect={handleSelect}
+        selectedModel={selectedModel}
       />
       <div className="flex-1">
         {selectedId ? (

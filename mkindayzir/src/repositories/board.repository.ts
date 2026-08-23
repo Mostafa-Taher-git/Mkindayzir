@@ -25,6 +25,29 @@ export class BoardRepository extends BaseRepository<any> {
     }
   }
 
+  async findAllForUser(userId: string) {
+    try {
+      return await prisma.board.findMany({
+        where: {
+          deletedAt: null,
+          space: {
+            deletedAt: null,
+            members: { some: { userId } },
+          },
+        },
+        include: {
+          space: { select: { id: true, name: true } },
+          _count: { select: { columns: true } },
+          boardLabels: true,
+        },
+        orderBy: [{ space: { name: "asc" } }, { position: "asc" }],
+      });
+    } catch (error) {
+      console.error("Failed to find boards for user:", error);
+      throw error;
+    }
+  }
+
   async findById(id: string) {
     try {
       return await prisma.board.findUnique({
@@ -68,7 +91,7 @@ export class BoardRepository extends BaseRepository<any> {
           name: data.name,
           description: data.description,
           background: data.background,
-          settings: (data.settings ?? {}) as any,
+          settings: JSON.stringify(data.settings ?? {}),
         },
         include: {
           space: true,

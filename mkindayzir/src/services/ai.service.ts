@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { getEncryptionKey, decrypt } from "@/lib/encryption";
-import { requirePermission } from "@/lib/rbac.server";
 import { audit } from "@/lib/helpers";
 
 export type ProviderType = "openrouter" | "openai" | "anthropic" | "custom";
@@ -54,16 +53,10 @@ async function streamChatInternal(
   messages: Array<{ role: string; content: string }>,
   providerConfig: ProviderConfig,
   tools?: Array<Record<string, unknown>> | any[],
-  callbacks?: StreamCallbacks
+  callbacks?: StreamCallbacks,
+  userId?: string
 ): Promise<void> {
-  const auth = await requirePermission("view:dashboard");
-  if (!auth.authorized || !auth.session) {
-    throw auth.error || new Error("Unauthorized");
-  }
-
-  const userId = auth.session.user.id;
-
-  if (!checkRateLimit(userId)) {
+  if (userId && !checkRateLimit(userId)) {
     const error = new Error("Rate limit exceeded. Please try again later.");
     callbacks?.onError?.(error);
     throw error;
@@ -126,13 +119,20 @@ async function streamChatInternal(
   let buffer = "";
   let totalTokens = 0;
   let fullContent = "";
+  let onDoneCalled = false;
+
+  const fireOnDone = (result: { content: string; tokensUsed?: number }) => {
+    if (onDoneCalled) return;
+    onDoneCalled = true;
+    callbacks?.onDone?.(result);
+  };
 
   try {
     while (true) {
       const { done, value } = await reader.read();
 
       if (done) {
-        callbacks?.onDone?.({ content: fullContent, tokensUsed: totalTokens || undefined });
+        fireOnDone({ content: fullContent, tokensUsed: totalTokens || undefined });
         break;
       }
 
@@ -149,10 +149,10 @@ async function streamChatInternal(
 
         const data = trimmed.slice(6);
 
-        if (data === "[DONE]") {
-          callbacks?.onDone?.({ content: fullContent, tokensUsed: totalTokens || undefined });
-          return;
-        }
+          if (data === "[DONE]") {
+            fireOnDone({ content: fullContent, tokensUsed: totalTokens || undefined });
+            return;
+          }
 
         try {
           const parsed = JSON.parse(data);
@@ -204,7 +204,7 @@ async function streamChatInternal(
             if (usage) {
               totalTokens = (usage.prompt_tokens || 0) + (usage.completion_tokens || 0);
             }
-            callbacks?.onDone?.({ content: fullContent, tokensUsed: totalTokens || undefined });
+            fireOnDone({ content: fullContent, tokensUsed: totalTokens || undefined });
           }
         } catch {
           // skip unparseable chunks
@@ -227,12 +227,23 @@ export class AIService {
     const providerName = (user.aiProvider || "openrouter") as ProviderType;
     const providerDefaults = DEFAULT_PROVIDERS[providerName] || DEFAULT_PROVIDERS.openrouter;
 
-    if (!user.aiApiKey) {
-      throw new Error("No API key configured. Please add your API key in settings.");
+    // If aiApiKey is not on the user object (not selected in session query),
+    // fetch it directly from the database
+    let encryptedApiKey = user.aiApiKey;
+    if (!encryptedApiKey) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { aiApiKey: true },
+      });
+      encryptedApiKey = dbUser?.aiApiKey;
+    }
+
+    if (!encryptedApiKey) {
+      throw new Error("No API key configured. Please add your API key in Settings.");
     }
 
     const encryptionKey = getEncryptionKey();
-    const apiKey = decrypt(user.aiApiKey, encryptionKey);
+    const apiKey = decrypt(encryptedApiKey, encryptionKey);
 
     return {
       name: providerName,
@@ -273,9 +284,10 @@ export class AIService {
     messages: Array<{ role: string; content: string }>,
     providerConfig: ProviderConfig,
     tools?: Array<Record<string, unknown>> | any[],
-    callbacks?: StreamCallbacks
+    callbacks?: StreamCallbacks,
+    userId?: string
   ): Promise<void> {
-    return streamChatInternal(messages, providerConfig, tools, callbacks);
+    return streamChatInternal(messages, providerConfig, tools, callbacks, userId);
   }
 
   async callTool(

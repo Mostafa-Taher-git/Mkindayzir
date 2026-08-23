@@ -6,7 +6,7 @@ import { BoardService } from "@/services/board.service";
 const boardService = new BoardService();
 
 const listQuerySchema = z.object({
-  spaceId: z.string(),
+  spaceId: z.string().optional(),
 });
 
 const createBodySchema = z.object({
@@ -28,7 +28,9 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(searchParams.entries());
     const parsed = listQuerySchema.parse(params);
 
-    const boards = await boardService.list(parsed.spaceId, user);
+    const boards = parsed.spaceId
+      ? await boardService.list(parsed.spaceId, user)
+      : await boardService.listAll(user);
     return NextResponse.json({ boards });
   } catch (error) {
     if (error instanceof z.ZodError) {

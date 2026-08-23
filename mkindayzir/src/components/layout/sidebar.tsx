@@ -7,10 +7,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@radix-ui/react-dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,7 +24,7 @@ const navItems = [
   { href: ROUTES.VAULT, label: "Vault", icon: VaultIcon },
   { href: ROUTES.ASSISTANT, label: "Assistant", icon: BotIcon },
   { href: ROUTES.GUIDES, label: "Guides", icon: BookIcon },
-  { href: ROUTES.REPORTS, label: "Reports", icon: ChartIcon },
+  { href: ROUTES.REPORTS, label: "Reports", icon: ChartIcon, teamOnly: true },
   { href: ROUTES.SETTINGS, label: "Settings", icon: SettingsIcon },
 ];
 
@@ -34,11 +33,13 @@ function Sidebar({
   onToggle,
   open,
   onOpenChange,
+  mode,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode: string;
 }) {
   const pathname = usePathname() || "";
   const isMobile = useMobile();
@@ -92,6 +93,7 @@ function Sidebar({
       </div>
       <nav className="flex-1 space-y-1 px-2 py-2">
         {navItems.map((item) => {
+          if (item.teamOnly && mode === "personal") return null;
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <a

@@ -10,6 +10,7 @@ const aiService = new AIService();
 
 const sendBodySchema = z.object({
   content: z.string().min(1),
+  model: z.string().optional(),
 });
 
 export async function GET(
@@ -58,9 +59,14 @@ export async function POST(
       providerConfig = await aiService.getProviderConfig(user);
     } catch {
       return NextResponse.json(
-        { error: { code: "CONFIG_ERROR", message: "AI provider not configured" } },
+        { error: { code: "CONFIG_ERROR", message: "AI provider not configured. Please add your API key in Settings." } },
         { status: 400 }
       );
+    }
+
+    // Override model if specified in the request
+    if (parsed.model) {
+      providerConfig.model = parsed.model;
     }
 
     const toolDefinitions = await getToolDefinitions();
@@ -81,6 +87,11 @@ export async function POST(
         };
 
         const chatMessages = [
+          {
+            role: "system",
+            content:
+              "You are Mkindayzir1, the built-in AI assistant for Mkindayzir, a self-hosted Work OS. Always respond in English unless the user explicitly writes in another language. Be concise and helpful. Refer to yourself as Mkindayzir1 when asked about your name.",
+          },
           ...(conversation as { messages?: Array<{ role: string; content: string }> }).messages?.map(
             (msg) => ({
               role: msg.role.toLowerCase(),
@@ -111,7 +122,7 @@ export async function POST(
             onError: (error) => {
               sendOnce("error", { message: error.message });
             },
-          });
+          }, user.id);
         } catch (error) {
           sendOnce("error", { message: error instanceof Error ? error.message : "Unknown error" });
         }

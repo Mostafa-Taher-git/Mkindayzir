@@ -1,5 +1,8 @@
 // src/lib/config.ts
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 const ModeSchema = z.enum(['personal', 'team', 'enterprise']);
 
@@ -10,7 +13,7 @@ const configSchema = z.object({
   databaseUrl: z.string().default('file:./data/mkindayzir.db'),
   dataDir: z.string().default('./data'),
   sessionSecret: z.string().min(64),
-  encryptionKey: z.string().min(32),
+  encryptionKey: z.string().min(64),
   sessionMaxAge: z.coerce.number().default(86400),
   bcryptRounds: z.coerce.number().default(12),
   maxUploadSize: z.coerce.number().default(26214400),
@@ -29,19 +32,107 @@ const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>;
 
+function generateSecretHex(bytes: number): string {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+/**
+ * Loads secrets from data/secrets.json, generating and persisting them on first
+ * boot when they are missing or too weak. This makes Personal mode zero-config.
+ */
+function loadOrGenerateSecrets(dataDir: string): { sessionSecret: string; encryptionKey: string } {
+  const secretsPath = path.resolve(process.cwd(), dataDir, 'secrets.json');
+  try {
+    if (fs.existsSync(secretsPath)) {
+      const parsed = JSON.parse(fs.readFileSync(secretsPath, 'utf-8'));
+      if (
+        typeof parsed.sessionSecret === 'string' && parsed.sessionSecret.length >= 64 &&
+        typeof parsed.encryptionKey === 'string' && parsed.encryptionKey.length >= 64
+      ) {
+        return { sessionSecret: parsed.sessionSecret, encryptionKey: parsed.encryptionKey };
+      }
+    }
+  } catch {
+    // ignore and regenerate
+  }
+
+  const secrets = {
+    sessionSecret: generateSecretHex(32),
+    encryptionKey: generateSecretHex(32),
+  };
+
+  try {
+    fs.mkdirSync(path.dirname(secretsPath), { recursive: true });
+    fs.writeFileSync(secretsPath, JSON.stringify(secrets, null, 2));
+  } catch (e) {
+    console.warn('[config] Could not persist generated secrets:', (e as Error).message);
+  }
+
+  return secrets;
+}
+
+function loadModeFromConfigJson(dataDir: string): string | undefined {
+  const configPath = path.resolve(process.cwd(), dataDir, 'config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (typeof parsed.mode === 'string') return parsed.mode;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+/**
+ * Persists the chosen mode to data/config.json so the setup wizard selection
+ * is honored on subsequent boots (env MKINDAYZIR_MODE takes precedence).
+ */
+export function persistMode(mode: string): void {
+  const dataDir = process.env.DATA_DIR ?? './data';
+  const configPath = path.resolve(process.cwd(), dataDir, 'config.json');
+  try {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ mode }, null, 2));
+  } catch (e) {
+    console.warn('[config] Could not persist mode:', (e as Error).message);
+  }
+}
+
+export function invalidateConfigCache(): void {
+  cachedConfig = null;
+}
+
 let cachedConfig: Config | null = null;
 
 export function getConfig(): Config {
   if (cachedConfig) return cachedConfig;
-  
+
+  const dataDir = process.env.DATA_DIR ?? './data';
+
+  const rawSessionSecret = process.env.SESSION_SECRET ?? '';
+  const rawEncryptionKey = process.env.ENCRYPTION_KEY ?? '';
+
+  // Only trust env secrets if they meet the strength requirement. Weak or
+  // placeholder values are ignored in favour of auto-generated secrets so a
+  // fresh clone boots without manual secret provisioning.
+  const envSessionSecret = rawSessionSecret.length >= 64 ? rawSessionSecret : '';
+  const envEncryptionKey = rawEncryptionKey.length >= 64 ? rawEncryptionKey : '';
+
+  const secrets = !envSessionSecret || !envEncryptionKey
+    ? loadOrGenerateSecrets(dataDir)
+    : { sessionSecret: envSessionSecret, encryptionKey: envEncryptionKey };
+
+  const resolvedMode = process.env.MKINDAYZIR_MODE ?? loadModeFromConfigJson(dataDir) ?? 'personal';
+
   const raw = {
-    mode: process.env.MKINDAYZIR_MODE ?? 'personal',
+    mode: resolvedMode,
     port: process.env.PORT ?? '3000',
     databaseProvider: process.env.DATABASE_PROVIDER ?? 'sqlite',
     databaseUrl: process.env.DATABASE_URL ?? 'file:./data/mkindayzir.db',
-    dataDir: process.env.DATA_DIR ?? './data',
-    sessionSecret: process.env.SESSION_SECRET ?? '',
-    encryptionKey: process.env.ENCRYPTION_KEY ?? '',
+    dataDir,
+    sessionSecret: secrets.sessionSecret,
+    encryptionKey: secrets.encryptionKey,
     sessionMaxAge: process.env.SESSION_MAX_AGE ?? '86400',
     bcryptRounds: process.env.BCRYPT_ROUNDS ?? '12',
     maxUploadSize: process.env.MAX_UPLOAD_SIZE ?? '26214400',

@@ -9,8 +9,10 @@ import { CommandPalette } from "@/components/layout/command-palette";
 
 export function DashboardLayout({
   children,
+  mode,
 }: {
   children: React.ReactNode;
+  mode: string;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -34,6 +36,7 @@ export function DashboardLayout({
         onToggle={() => setSidebarCollapsed((prev) => !prev)}
         open={sidebarOpen}
         onOpenChange={setSidebarOpen}
+        mode={mode}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header

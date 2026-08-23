@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/crypto";
+import { createSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { getConfig } from "@/lib/config";
+import { getConfig, isPersonalMode, persistMode, invalidateConfigCache } from "@/lib/config";
 import { z } from "zod";
 
 const SetupSchema = z.object({
@@ -9,6 +10,10 @@ const SetupSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1),
   password: z.string().min(8),
+  confirmPassword: z.string().min(1),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export async function POST(request: Request) {
@@ -55,7 +60,19 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ user }, { status: 201 });
+    // Persist the chosen mode so the wizard selection is honored on reboot.
+    persistMode(mode);
+    invalidateConfigCache();
+
+    // In Personal mode with auto-login enabled, establish the session
+    // immediately so the user lands directly on the dashboard.
+    let autoLoggedIn = false;
+    if (isPersonalMode() && getConfig().autoLogin) {
+      await createSession(user.id);
+      autoLoggedIn = true;
+    }
+
+    return NextResponse.json({ user, autoLoggedIn }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Setup failed";
     console.error("Setup error:", error);

@@ -10,11 +10,13 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState("");
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiModel, setAiModel] = useState("");
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
+    // Fetch user session
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
@@ -22,51 +24,62 @@ export default function SettingsPage() {
         if (u) {
           setUser(u);
           setDisplayName(u.displayName || "");
-          setAiProvider(u.aiProvider || "openrouter");
-          setAiModel(u.aiModel || "");
         }
+      })
+      .catch(() => {});
+
+    // Fetch AI settings from the correct endpoint
+    fetch("/api/assistant/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.provider) setAiProvider(data.provider);
+        if (data.model) setAiModel(data.model);
+        setApiKeyConfigured(Boolean(data.apiKeyConfigured));
       })
       .catch(() => {});
   }, []);
 
   const saveProfile = async () => {
     setSaving(true);
-    setMessage("");
+    setMessage(null);
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName }),
       });
-      if (res.ok) setMessage("Profile saved!");
-      else setMessage("Failed to save profile.");
+      if (res.ok) setMessage({ text: "Profile saved!", type: "success" });
+      else setMessage({ text: "Failed to save profile.", type: "error" });
     } catch {
-      setMessage("Error saving profile.");
+      setMessage({ text: "Error saving profile.", type: "error" });
     }
     setSaving(false);
   };
 
   const saveAiSettings = async () => {
     setSaving(true);
-    setMessage("");
+    setMessage(null);
     try {
-      const res = await fetch("/api/settings/ai", {
+      const res = await fetch("/api/assistant/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          aiProvider,
-          aiApiKey: aiApiKey || undefined,
-          aiModel,
+          provider: aiProvider || undefined,
+          apiKey: aiApiKey || undefined,
+          model: aiModel || undefined,
         }),
       });
       if (res.ok) {
-        setMessage("AI settings saved!");
+        const data = await res.json();
+        setApiKeyConfigured(Boolean(data.apiKeyConfigured));
         setAiApiKey("");
+        setMessage({ text: "AI settings saved! Your API key is encrypted and stored securely.", type: "success" });
       } else {
-        setMessage("Failed to save AI settings.");
+        const data = await res.json().catch(() => ({}));
+        setMessage({ text: data?.error?.message || "Failed to save AI settings.", type: "error" });
       }
     } catch {
-      setMessage("Error saving AI settings.");
+      setMessage({ text: "Error saving AI settings.", type: "error" });
     }
     setSaving(false);
   };
@@ -88,8 +101,12 @@ export default function SettingsPage() {
       </div>
 
       {message && (
-        <div className="px-4 py-2 bg-primary/10 border-2 border-primary/30 text-sm">
-          {message}
+        <div className={`px-4 py-2 border-2 text-sm ${
+          message.type === "success"
+            ? "bg-primary/10 border-primary/30 text-foreground"
+            : "bg-destructive/10 border-destructive/30 text-destructive-foreground"
+        }`}>
+          {message.text}
         </div>
       )}
 
@@ -165,17 +182,30 @@ export default function SettingsPage() {
               onChange={(e) => setAiApiKey(e.target.value)}
               placeholder="Enter your API key (leave empty to keep current)"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Your key is encrypted and stored securely on this server.
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              {apiKeyConfigured ? (
+                <span className="inline-flex items-center gap-1 text-xs text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  API key configured and encrypted
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                  No API key configured yet
+                </span>
+              )}
+            </div>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-1">Model</label>
+            <label className="text-sm font-medium block mb-1">Default Model</label>
             <Input
               value={aiModel}
               onChange={(e) => setAiModel(e.target.value)}
-              placeholder="e.g., anthropic/claude-sonnet-4-20250514"
+              placeholder={aiProvider === "openrouter" ? "e.g., anthropic/claude-sonnet-4-20250514" : aiProvider === "openai" ? "e.g., gpt-4o-mini" : "e.g., claude-3-haiku-20240307"}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              You can also choose a model per conversation in the Assistant.
+            </p>
           </div>
           <Button onClick={saveAiSettings} disabled={saving}>
             {saving ? "Saving..." : "Save AI Settings"}

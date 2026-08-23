@@ -24,6 +24,18 @@ export class BoardService {
     }
   }
 
+  async listAll(user: { id: string; role: string }) {
+    const auth = await requirePermission("view:boards");
+    if (!auth.authorized || !auth.session) return auth.error! as any;
+
+    try {
+      return await boardRepo.findAllForUser(user.id);
+    } catch (error) {
+      console.error("BoardService.listAll error:", error);
+      throw error;
+    }
+  }
+
   async get(id: string, user: { id: string; role: string }) {
     const auth = await requirePermission("view:boards");
     if (!auth.authorized || !auth.session) return auth.error! as any;

@@ -11,11 +11,16 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const providerConfig = await aiService.getProviderConfig(user);
-    const provider = providerConfig.name as ProviderType;
-    const models = await aiService.getAvailableModels(provider);
+    // Determine provider from user settings (don't need API key to list models)
+    const providerName = (user.aiProvider || "openrouter") as ProviderType;
 
-    return NextResponse.json({ models });
+    try {
+      const models = await aiService.getAvailableModels(providerName);
+      return NextResponse.json({ models });
+    } catch {
+      // If fetching model list fails, return empty but don't error
+      return NextResponse.json({ models: [] });
+    }
   } catch {
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to fetch models" } },
