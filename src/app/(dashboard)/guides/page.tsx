@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +20,7 @@ function GuidesPage() {
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
-      const res = await fetch(`/api/guides?${qs.toString()}`);
+      const res = await fetch(`/api/guides?${qs.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch guides");
       return res.json() as Promise<{ guides: Guide[] }>;
     },

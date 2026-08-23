@@ -1,4 +1,3 @@
-"use client";
 import { Link } from "react-router-dom";
 
 import * as React from "react";
@@ -103,7 +102,6 @@ function mapCardToWorkItem(card: BoardCard, columnNameMap: Record<string, string
 
 
 function BoardPresence({ boardId }: { boardId: string }) {
-  "use client";
   const { user } = useAuth();
   const { presentUsers } = usePresence("board", boardId);
   if (!user?.id) return null;
@@ -122,7 +120,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
   const { data: columnsData } = useQuery({
     queryKey: ["columns", board.id],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/boards/${board.id}/columns`, {
+      const res = await fetch(`${""}/api/boards/${board.id}/columns`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { columns: [] };
@@ -134,7 +132,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
   const { data: cardsData } = useQuery({
     queryKey: ["cards", board.id],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards?boardId=${board.id}`, {
+      const res = await fetch(`${""}/api/cards?boardId=${board.id}`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { cards: [] };
@@ -161,7 +159,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
 
   const moveMutation = useMutation({
     mutationFn: async ({ cardId, columnId }: { cardId: string; columnId: string }) => {
-      const res = await fetch(`/api/cards/${cardId}/move`, {
+      const res = await fetch(`/api/cards/${cardId}/move`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ columnId }),

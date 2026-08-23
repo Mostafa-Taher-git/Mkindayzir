@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +13,7 @@ function useReport<T>(type: string) {
   return useQuery({
     queryKey: ["reports", type],
     queryFn: async () => {
-      const res = await fetch(`/api/reports?type=${type}`);
+      const res = await fetch(`/api/reports?type=${type}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch report");
       const json = await res.json();
       return json.data as T;
@@ -32,7 +31,7 @@ function ReportsPage() {
 
   const handleExport = async () => {
     try {
-      const res = await fetch("/api/reports/export");
+      const res = await fetch("/api/reports/export", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to export CSV");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

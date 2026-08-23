@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.project import Project
 from app.models.work_item import WorkItem
+from datetime import datetime, timezone, timedelta
 
 
 class ReportService:
@@ -10,7 +11,7 @@ class ReportService:
         total_projects = await db.execute(select(func.count()).select_from(Project).where(Project.status == "ACTIVE", Project.deletedAt.is_(None)))
         open_work_items = await db.execute(select(func.count()).select_from(WorkItem).where(WorkItem.status != "done", WorkItem.deletedAt.is_(None)))
         assigned_to_me = await db.execute(select(func.count()).select_from(WorkItem).where(WorkItem.assigneeId == user_id, WorkItem.status != "done", WorkItem.deletedAt.is_(None)))
-        overdue_items = await db.execute(select(func.count()).select_from(WorkItem).where(WorkItem.status != "done", WorkItem.dueDate < __import__("datetime").datetime.utcnow(), WorkItem.deletedAt.is_(None)))
+        overdue_items = await db.execute(select(func.count()).select_from(WorkItem).where(WorkItem.status != "done", WorkItem.dueDate < datetime.now(timezone.utc), WorkItem.deletedAt.is_(None)))
         return {
             "totalProjects": total_projects.scalar_one(),
             "openWorkItems": open_work_items.scalar_one(),
@@ -62,8 +63,7 @@ class ReportService:
 
     @staticmethod
     async def get_trend_report(db: AsyncSession, user: dict) -> list[dict]:
-        from datetime import timedelta
-        thirty_days_ago = __import__("datetime").datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         created = await db.execute(
             select(WorkItem.createdAt).where(WorkItem.createdAt >= thirty_days_ago, WorkItem.deletedAt.is_(None))
         )
@@ -75,7 +75,7 @@ class ReportService:
 
         daily = {}
         for i in range(30):
-            d = (__import__("datetime").datetime.utcnow() - timedelta(days=i)).date().isoformat()
+            d = (datetime.now(timezone.utc) - timedelta(days=i)).date().isoformat()
             daily[d] = {"date": d, "created": 0, "resolved": 0}
         for d in created_dates:
             if d in daily:

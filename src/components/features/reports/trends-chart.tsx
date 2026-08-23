@@ -1,4 +1,3 @@
-"use client";
 
 import { TrendDay } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

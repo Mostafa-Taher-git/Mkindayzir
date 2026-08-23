@@ -1,4 +1,3 @@
-"use client";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import * as React from "react";
@@ -47,7 +46,7 @@ function Header({
     .slice(0, 2);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/session", { method: "DELETE" });
+    await fetch("/api/auth/session", {credentials: "include",  method: "DELETE" });
     window.location.href = ROUTES.LOGIN;
   };
 

@@ -1,4 +1,3 @@
-"use client";
 import { useNavigate } from "react-router-dom";
 
 import { useState, useEffect } from "react";
@@ -15,7 +14,7 @@ export default function SystemSettingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/system/migration/status")
+    fetch("/api/system/migration/status", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         setMode(data.mode);

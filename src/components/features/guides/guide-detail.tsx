@@ -1,4 +1,3 @@
-"use client";
 
 import { Guide } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

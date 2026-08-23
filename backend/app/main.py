@@ -47,9 +47,13 @@ app = FastAPI(title="mkindayzir API", lifespan=lifespan)
 app.add_exception_handler(RequestValidationError, custom_exception_handler)
 app.add_exception_handler(Exception, custom_exception_handler)
 
+_allowed_origins = os.environ.get(
+    "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,8 +100,9 @@ if _frontend_dir.exists() and _frontend_dir.is_dir():
 
     @app.get("/{path:path}")
     async def serve_spa(path: str):
-        # Any real file under dist (other than /assets which is mounted) is served.
-        candidate = _frontend_dir / path
-        if path and candidate.exists() and candidate.is_file():
+        # Resolve candidate and ensure it stays within the frontend directory
+        resolved_frontend = _frontend_dir.resolve()
+        candidate = (resolved_frontend / path).resolve()
+        if path and candidate.is_relative_to(resolved_frontend) and candidate.exists() and candidate.is_file():
             return FileResponse(str(candidate))
-        return FileResponse(str(_frontend_dir / "index.html"))
+        return FileResponse(str(resolved_frontend / "index.html"))

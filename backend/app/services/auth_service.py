@@ -1,3 +1,4 @@
+import uuid
 import bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert
@@ -6,7 +7,7 @@ from app.models.session import Session as DBSession
 from app.utils.helpers import generate_secure_token
 from app.utils.encryption import get_encryption_key
 from app.config import settings
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 
 class AuthService:
@@ -35,7 +36,7 @@ class AuthService:
             raise ValueError("Invalid email or password")
 
         token = generate_secure_token()
-        expires_at = datetime.utcnow() + timedelta(seconds=settings.SESSION_MAX_AGE)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.SESSION_MAX_AGE)
         db.add(DBSession(userId=user.id, token=token, expiresAt=expires_at))
         await db.commit()
         return {"user": AuthService._serialize_user(user), "token": token}
@@ -48,7 +49,7 @@ class AuthService:
 
         password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)).decode("utf-8")
         user = User(
-            id=__import__("uuid").uuid4().hex,
+            id=uuid.uuid4().hex,
             email=email.lower(),
             passwordHash=password_hash,
             displayName=display_name,
@@ -73,7 +74,7 @@ class AuthService:
 
         password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)).decode("utf-8")
         user = User(
-            id=__import__("uuid").uuid4().hex,
+            id=uuid.uuid4().hex,
             email=email.lower(),
             passwordHash=password_hash,
             displayName=display_name,
@@ -87,7 +88,7 @@ class AuthService:
         auto_logged_in = False
         if mode == "personal" and settings.AUTO_LOGIN:
             token = generate_secure_token()
-            expires_at = datetime.utcnow() + timedelta(seconds=settings.SESSION_MAX_AGE)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.SESSION_MAX_AGE)
             db.add(DBSession(userId=user.id, token=token, expiresAt=expires_at))
             await db.commit()
             auto_logged_in = True
@@ -97,7 +98,7 @@ class AuthService:
     @staticmethod
     async def create_session(db: AsyncSession, user_id: str) -> str:
         token = generate_secure_token()
-        expires_at = datetime.utcnow() + timedelta(seconds=settings.SESSION_MAX_AGE)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.SESSION_MAX_AGE)
         db.add(DBSession(userId=user_id, token=token, expiresAt=expires_at))
         await db.commit()
         return token

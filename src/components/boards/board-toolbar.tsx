@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -33,7 +32,7 @@ function BoardToolbar({
   const { data: labelsData } = useQuery({
     queryKey: ["labels", boardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {
+      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };

@@ -1,4 +1,3 @@
-"use client";
 
 import { VelocityGroup } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -16,6 +16,18 @@ test-results
 .env.local
 .env*.local
 
+# Secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
 # Database
 prisma/migrations/*.sql
 !prisma/migrations/migration_lock.toml

@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -34,7 +33,7 @@ function ConversationList({
   const { data } = useQuery({
     queryKey: ["assistant", "conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/conversations");
+      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json() as Promise<{ conversations: Conversation[] }>;
     },
@@ -43,7 +42,7 @@ function ConversationList({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/assistant/conversations/${id}`, {
+      const res = await fetch(`/api/assistant/conversations/${id}`, {credentials: "include", 
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete conversation");
@@ -55,7 +54,7 @@ function ConversationList({
   });
 
   const handleNewChat = async () => {
-    const res = await fetch("/api/assistant/conversations", {
+    const res = await fetch("/api/assistant/conversations", {credentials: "include", 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: selectedModel || undefined }),

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/projects/{project_id}/iterations", tags=["iterations"])
 
@@ -112,6 +113,6 @@ async def delete_iteration(iteration_id: str, user: dict = Depends(get_current_u
     iteration = result.scalar_one_or_none()
     if not iteration:
         raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Iteration not found"}})
-    iteration.deletedAt = __import__("datetime").datetime.utcnow()
+    iteration.deletedAt = datetime.now(timezone.utc)
     await db.commit()
     return {"ok": True}

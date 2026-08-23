@@ -1,4 +1,3 @@
-"use client";
 import { Link } from "react-router-dom";
 
 import * as React from "react";
@@ -40,7 +39,7 @@ export default function BoardsPage() {
   const { data: boardsData, isLoading: boardsLoading } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
-      const res = await fetch("/api/boards");
+      const res = await fetch("/api/boards", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch boards");
       return res.json() as Promise<{ boards: any[] }>;
     },
@@ -49,7 +48,7 @@ export default function BoardsPage() {
   const { data: spacesData } = useQuery({
     queryKey: ["spaces"],
     queryFn: async () => {
-      const res = await fetch("/api/spaces");
+      const res = await fetch("/api/spaces", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch spaces");
       return res.json() as Promise<{ spaces: any[] }>;
     },
@@ -77,7 +76,7 @@ export default function BoardsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (payload: { spaceId: string; name: string; background?: string }) => {
-      const res = await fetch("/api/boards", {
+      const res = await fetch("/api/boards", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

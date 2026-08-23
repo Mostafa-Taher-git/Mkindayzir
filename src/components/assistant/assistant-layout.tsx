@@ -1,4 +1,3 @@
-"use client";
 import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
@@ -19,7 +18,7 @@ function AssistantLayout({
 
   // Load default model from settings
   React.useEffect(() => {
-    fetch("/api/assistant/settings")
+    fetch("/api/assistant/settings", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         if (data.model) setSelectedModel(data.model);

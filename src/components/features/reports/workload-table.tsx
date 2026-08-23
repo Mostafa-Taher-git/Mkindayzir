@@ -1,4 +1,3 @@
-"use client";
 
 import { WorkloadGroup } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

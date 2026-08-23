@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
 from app.models.work_item import WorkItem
@@ -130,7 +130,7 @@ class WorkItemService:
         item = result.scalar_one_or_none()
         if not item:
             raise ValueError("Work item not found")
-        item.deletedAt = datetime.utcnow()
+        item.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 
@@ -142,7 +142,7 @@ class WorkItemService:
             raise ValueError("Work item not found")
         item.status = new_status
         if new_status == "done":
-            item.resolvedAt = datetime.utcnow()
+            item.resolvedAt = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(item)
         return WorkItemService._serialize(item)

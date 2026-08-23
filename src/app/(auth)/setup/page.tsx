@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 // src/app/(auth)/setup/page.tsx
-"use client";
 
 import { useState } from "react";
 import { SetupSchema } from "@/lib/validators";
@@ -70,7 +69,7 @@ export default function SetupPage() {
     }
 
     try {
-      const res = await fetch("/api/setup", {
+      const res = await fetch("/api/setup", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result.data),

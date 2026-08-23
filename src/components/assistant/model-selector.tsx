@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +16,7 @@ function ModelSelector({
   const { data, isLoading, isError } = useQuery({
     queryKey: ["assistant", "models"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/models");
+      const res = await fetch("/api/assistant/models", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch models");
       return res.json() as Promise<{ models: Array<{ id: string; name: string }> }>;
     },

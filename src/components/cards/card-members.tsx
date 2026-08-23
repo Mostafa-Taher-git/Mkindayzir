@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +16,7 @@ function CardMembers({ cardId }: CardMembersProps) {
   const { data } = useQuery({
     queryKey: ["card-members", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}/members`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/members`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { members: [] };
@@ -28,7 +27,7 @@ function CardMembers({ cardId }: CardMembersProps) {
   const { data: usersData } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/users`, {
+      const res = await fetch(`${""}/api/users`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { users: [] };
@@ -41,7 +40,7 @@ function CardMembers({ cardId }: CardMembersProps) {
 
   const addMutation = useMutation({
     mutationFn: async (uid: string) => {
-      const res = await fetch(`/api/cards/${cardId}/members`, {
+      const res = await fetch(`/api/cards/${cardId}/members`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: uid }),
@@ -59,7 +58,7 @@ function CardMembers({ cardId }: CardMembersProps) {
 
   const removeMutation = useMutation({
     mutationFn: async (uid: string) => {
-      const res = await fetch(`/api/cards/${cardId}/members/${uid}`, { method: "DELETE" });
+      const res = await fetch(`/api/cards/${cardId}/members/${uid}`, {credentials: "include",  method: "DELETE" });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to remove member" }));
         throw new Error(error.message);

@@ -1,4 +1,3 @@
-"use client";
 import { useLocation } from "react-router-dom";
 
 import * as React from "react";
@@ -54,7 +53,7 @@ function Sidebar({
     .slice(0, 2);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/session', { method: 'DELETE' });
+    await fetch('/api/auth/session', {credentials: "include",  method: 'DELETE' });
     window.location.href = ROUTES.LOGIN;
   };
 

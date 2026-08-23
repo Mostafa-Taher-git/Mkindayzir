@@ -1,4 +1,3 @@
-"use client";
 
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,13 +23,15 @@ export default function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard", "stats"],
     queryFn: async () => {
-      try {
-        return await (
-          await fetch("/api/dashboard/stats", { credentials: "include" })
-        ).json();
-      } catch {
+      const res = await fetch("/api/dashboard/stats", { credentials: "include" });
+      if (res.status === 401) {
+        window.location.href = "/login";
         return { projectCount: 0, workItemCount: 0, recentActivities: [] };
       }
+      if (!res.ok) {
+        return { projectCount: 0, workItemCount: 0, recentActivities: [] };
+      }
+      return res.json();
     },
   });
 

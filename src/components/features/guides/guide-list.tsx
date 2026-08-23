@@ -1,4 +1,3 @@
-"use client";
 
 import { Guide } from "@/types";
 import { Badge } from "@/components/ui/badge";

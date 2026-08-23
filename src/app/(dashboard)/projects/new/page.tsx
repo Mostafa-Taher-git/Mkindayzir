@@ -1,4 +1,3 @@
-"use client";
 import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
@@ -37,7 +36,7 @@ function NewProjectPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await fetch("/api/projects", {
+      const res = await fetch("/api/projects", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

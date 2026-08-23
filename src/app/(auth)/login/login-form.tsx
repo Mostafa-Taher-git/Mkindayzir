@@ -1,7 +1,6 @@
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
-// src/app/(auth)/login/login-form.tsx
 "use client";
 
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { LoginSchema } from "@/lib/validators";
 
@@ -38,7 +37,7 @@ export function LoginForm({
     }
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/login', {credentials: "include", 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: result.data.email, password: result.data.password }),

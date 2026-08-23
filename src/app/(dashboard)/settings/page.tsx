@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +18,7 @@ export default function SettingsPage() {
   const [dbSize, setDbSize] = useState<number>(0);
 
   useEffect(() => {
-    fetch("/api/auth/session")
+    fetch("/api/auth/session", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         const u = data.data || data.user;
@@ -30,7 +29,7 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    fetch("/api/assistant/settings")
+    fetch("/api/assistant/settings", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         if (data.provider) setAiProvider(data.provider);
@@ -39,7 +38,7 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    fetch("/api/system/migration/status")
+    fetch("/api/system/migration/status", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         setMode(data.mode);
@@ -52,7 +51,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/settings", {
+      const res = await fetch("/api/settings", {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName }),
@@ -69,7 +68,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/assistant/settings", {
+      const res = await fetch("/api/assistant/settings", {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

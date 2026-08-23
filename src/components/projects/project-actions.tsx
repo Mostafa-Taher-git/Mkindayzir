@@ -1,4 +1,3 @@
-"use client";
 import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
@@ -51,7 +50,7 @@ export function ProjectActions({ projectId, initialName, initialDescription }: P
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
+      const res = await fetch(`/api/projects/${projectId}`, {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), description }),
@@ -73,7 +72,7 @@ export function ProjectActions({ projectId, initialName, initialDescription }: P
     setDeleting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      const res = await fetch(`/api/projects/${projectId}`, {credentials: "include",  method: "DELETE" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? "Failed to delete project");

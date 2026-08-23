@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.card import Card
@@ -97,7 +97,7 @@ class CardService:
         card = result.scalar_one_or_none()
         if not card:
             raise ValueError("Card not found")
-        card.deletedAt = datetime.utcnow()
+        card.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 

@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.conversation import Conversation
@@ -103,7 +103,7 @@ class ConversationService:
             raise ValueError("Conversation not found")
         if conv.userId != user["id"]:
             raise ValueError("Forbidden")
-        conv.deletedAt = datetime.utcnow()
+        conv.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 
@@ -129,7 +129,7 @@ class ConversationService:
             tokens=extra.get("tokens") if extra else None,
         )
         db.add(message)
-        conv.updatedAt = datetime.utcnow()
+        conv.updatedAt = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(message)
         return {

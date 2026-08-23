@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,7 +17,7 @@ function ChecklistForm({ cardId, onSuccess }: ChecklistFormProps) {
 
   const mutation = useMutation({
     mutationFn: async (checklistTitle: string) => {
-      const res = await fetch(`/api/cards/${cardId}/checklists`, {
+      const res = await fetch(`/api/cards/${cardId}/checklists`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: checklistTitle }),

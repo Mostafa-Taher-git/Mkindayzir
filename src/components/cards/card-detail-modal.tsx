@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,7 +35,7 @@ function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }: CardDe
   const { data: cardData } = useQuery({
     queryKey: ["cards", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}`, {
+      const res = await fetch(`${""}/api/cards/${cardId}`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return null;
@@ -57,7 +56,7 @@ function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }: CardDe
 
   const updateMutation = useMutation({
     mutationFn: async (data: { title?: string; description?: string; dueDate?: string | null; columnId?: string }) => {
-      const res = await fetch(`/api/cards/${cardId}`, {
+      const res = await fetch(`/api/cards/${cardId}`, {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -77,7 +76,7 @@ function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }: CardDe
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/cards/${cardId}`, { method: "DELETE" });
+      const res = await fetch(`/api/cards/${cardId}`, {credentials: "include",  method: "DELETE" });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to delete card" }));
         throw new Error(error.message);
@@ -216,7 +215,7 @@ function ActivityLog({ cardId }: { cardId: string }) {
   const { data } = useQuery({
     queryKey: ["activity", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}/activity`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/activity`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { activities: [] };

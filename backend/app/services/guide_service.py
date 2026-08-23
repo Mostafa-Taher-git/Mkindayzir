@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from app.models.guide import Guide
@@ -68,7 +69,7 @@ class GuideService:
     @staticmethod
     async def create(db: AsyncSession, data: dict, user: dict) -> dict:
         guide = Guide(
-            id=__import__("uuid").uuid4().hex,
+            id=uuid.uuid4().hex,
             title=data["title"],
             slug=data["slug"],
             content=data["content"],

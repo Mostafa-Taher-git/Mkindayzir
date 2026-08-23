@@ -1,4 +1,3 @@
-"use client";
 
 import { useConfig } from "@/hooks/use-config";
 import { LoginForm } from "./login-form";

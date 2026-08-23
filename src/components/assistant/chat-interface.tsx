@@ -1,4 +1,3 @@
-"use client";
 import { useNavigate } from "react-router-dom";
 
 import * as React from "react";
@@ -40,7 +39,7 @@ function ChatInterface({
 
   // Load the user's default model from settings
   React.useEffect(() => {
-    fetch("/api/assistant/settings")
+    fetch("/api/assistant/settings", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         if (data.model && !selectedModel) {
@@ -62,7 +61,7 @@ function ChatInterface({
       setIsStreaming(true);
       setStreamingMessage("");
 
-      const response = await fetch(`/api/assistant/conversations/${conversationId}/messages`, {
+      const response = await fetch(`/api/assistant/conversations/${conversationId}/messages`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, model: selectedModel || undefined }),

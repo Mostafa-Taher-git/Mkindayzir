@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
 from app.models.vault_folder import VaultFolder
@@ -128,7 +128,7 @@ class VaultService:
         folder = result.scalar_one_or_none()
         if not folder:
             raise ValueError("Folder not found")
-        folder.deletedAt = datetime.utcnow()
+        folder.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 
@@ -221,7 +221,7 @@ class VaultService:
         note = result.scalar_one_or_none()
         if not note:
             raise ValueError("Note not found")
-        note.deletedAt = datetime.utcnow()
+        note.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 
@@ -232,7 +232,7 @@ class VaultService:
         if not note:
             raise ValueError("Note not found")
         note.status = "PUBLISHED"
-        note.publishedAt = datetime.utcnow()
+        note.publishedAt = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(note)
         return VaultService._serialize_note(note)

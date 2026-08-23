@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";

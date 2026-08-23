@@ -1,4 +1,3 @@
-"use client";
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -32,7 +31,7 @@ export function MigrationWizard({ onComplete }: MigrationWizardProps) {
   const testConnection = async () => {
     setError("");
     try {
-      const res = await fetch("/api/system/migration/test-connection", {
+      const res = await fetch("/api/system/migration/test-connection", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ database_url: pgUrl }),
@@ -51,7 +50,7 @@ export function MigrationWizard({ onComplete }: MigrationWizardProps) {
 
   const runPreCheck = async () => {
     try {
-      const res = await fetch("/api/system/migration/pre-check", {
+      const res = await fetch("/api/system/migration/pre-check", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ database_url: pgUrl }),
@@ -71,7 +70,7 @@ export function MigrationWizard({ onComplete }: MigrationWizardProps) {
 
   const startMigration = async () => {
     try {
-      const res = await fetch("/api/system/migration/start", {
+      const res = await fetch("/api/system/migration/start", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ database_url: pgUrl }),

@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useState } from "react";
@@ -36,7 +35,7 @@ function SettingsPanel({
   const { data: settings, isLoading } = useQuery<Settings>({
     queryKey: ["assistant", "settings"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/settings");
+      const res = await fetch("/api/assistant/settings", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch settings");
       return (await res.json()) as Settings;
     },
@@ -59,7 +58,7 @@ function SettingsPanel({
       if (provider === "custom" && customBaseUrl) {
         body.customBaseUrl = customBaseUrl;
       }
-      const res = await fetch("/api/assistant/settings", {
+      const res = await fetch("/api/assistant/settings", {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -89,7 +88,7 @@ function SettingsPanel({
       const body: Record<string, unknown> = { provider, model };
       if (apiKey) body.apiKey = apiKey;
       if (provider === "custom" && customBaseUrl) body.customBaseUrl = customBaseUrl;
-      const res = await fetch("/api/assistant/settings", {
+      const res = await fetch("/api/assistant/settings", {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

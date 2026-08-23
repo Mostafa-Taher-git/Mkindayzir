@@ -1,4 +1,3 @@
-"use client";
 
 import { useOfflineStore } from "@/stores/offline.store";
 

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,17 +9,6 @@ from app.middleware.auth import get_current_user
 from app.config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-@router.get("/config")
-async def public_config():
-    """Public, non-sensitive instance configuration used by the SPA auth
-    screen and dashboard layout (mode + registration availability)."""
-    return {
-        "mode": settings.MKINDAYZIR_MODE,
-        "registrationEnabled": settings.REGISTRATION_ENABLED,
-    }
-
 
 
 @router.post("/login")
@@ -93,5 +83,5 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         "email": result["user"]["email"],
         "displayName": result["user"]["displayName"],
         "role": result["user"]["role"],
-        "createdAt": __import__("datetime").datetime.utcnow().isoformat(),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
     }}

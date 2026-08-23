@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -74,7 +74,7 @@ class SpaceService:
         space = result.scalar_one_or_none()
         if not space:
             raise ValueError("Space not found")
-        space.deletedAt = datetime.utcnow()
+        space.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 

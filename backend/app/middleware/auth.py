@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import User, Session as DBSession
 from app.config import settings
+from datetime import datetime, timezone
 
 security = HTTPBearer(auto_error=False)
 
@@ -28,7 +29,7 @@ async def get_current_user(
     result = await db.execute(
         select(DBSession).where(
             DBSession.token == token,
-            DBSession.expiresAt > __import__("datetime").datetime.utcnow(),
+            DBSession.expiresAt > datetime.now(timezone.utc),
         )
     )
     session = result.scalar_one_or_none()

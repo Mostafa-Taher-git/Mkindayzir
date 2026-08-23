@@ -18,7 +18,7 @@ export function useConfig(): PublicConfig {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/config")
+    fetch("/api/config", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!cancelled && data && typeof data.mode === "string") {

@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useEffect } from "react";
 
@@ -28,7 +27,7 @@ export function useAuth(): UseAuthReturn {
   useEffect(() => {
     async function fetchSession() {
       try {
-        const res = await fetch("/api/auth/session");
+        const res = await fetch("/api/auth/session", { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           setUser(data.data);

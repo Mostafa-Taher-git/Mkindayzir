@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from app.models.project import Project
@@ -108,7 +108,7 @@ class ProjectService:
         project = result.scalar_one_or_none()
         if not project:
             raise ValueError("Project not found")
-        project.deletedAt = datetime.utcnow()
+        project.deletedAt = datetime.now(timezone.utc)
         await db.commit()
         return {"ok": True}
 

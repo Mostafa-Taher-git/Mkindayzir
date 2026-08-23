@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +15,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
   const { data } = useQuery({
     queryKey: ["card-labels", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}/labels`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/labels`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };
@@ -27,7 +26,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
   const { data: boardLabelsData } = useQuery({
     queryKey: ["labels", boardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {
+      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };
@@ -40,7 +39,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
 
   const addMutation = useMutation({
     mutationFn: async (lid: string) => {
-      const res = await fetch(`/api/cards/${cardId}/labels`, {
+      const res = await fetch(`/api/cards/${cardId}/labels`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ labelId: lid }),
@@ -58,7 +57,7 @@ function CardLabels({ cardId, boardId }: CardLabelsProps) {
 
   const removeMutation = useMutation({
     mutationFn: async (lid: string) => {
-      const res = await fetch(`/api/cards/${cardId}/labels/${lid}`, { method: "DELETE" });
+      const res = await fetch(`/api/cards/${cardId}/labels/${lid}`, {credentials: "include",  method: "DELETE" });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to remove label" }));
         throw new Error(error.message);

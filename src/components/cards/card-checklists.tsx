@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,7 +17,7 @@ function CardChecklists({ cardId }: CardChecklistsProps) {
   const { data } = useQuery({
     queryKey: ["checklists", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}/checklists`, {
+      const res = await fetch(`${""}/api/cards/${cardId}/checklists`, {credentials: "include", 
         cache: "no-store",
       });
       if (!res.ok) return { checklists: [] };
@@ -30,7 +29,7 @@ function CardChecklists({ cardId }: CardChecklistsProps) {
 
   const createMutation = useMutation({
     mutationFn: async (title: string) => {
-      const res = await fetch(`/api/cards/${cardId}/checklists`, {
+      const res = await fetch(`/api/cards/${cardId}/checklists`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
@@ -49,7 +48,7 @@ function CardChecklists({ cardId }: CardChecklistsProps) {
 
   const toggleItemMutation = useMutation({
     mutationFn: async ({ itemId, isComplete }: { itemId: string; isComplete: boolean }) => {
-      const res = await fetch(`/api/checklist-items/${itemId}`, {
+      const res = await fetch(`/api/checklist-items/${itemId}`, {credentials: "include", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isComplete: !isComplete }),
@@ -67,7 +66,7 @@ function CardChecklists({ cardId }: CardChecklistsProps) {
 
   const addItemMutation = useMutation({
     mutationFn: async ({ checklistId, title }: { checklistId: string; title: string }) => {
-      const res = await fetch(`/api/checklists/${checklistId}/items`, {
+      const res = await fetch(`/api/checklists/${checklistId}/items`, {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
