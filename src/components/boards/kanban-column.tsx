@@ -8,14 +8,17 @@ import { Card } from "@/components/ui/card";
 import type { WorkItem } from "@/types/work-item";
 import { KanbanCard } from "./kanban-card";
 
+import { AddCardComposer } from "./add-card-composer";
+
 interface KanbanColumnProps {
   id: string;
   title: string;
   items: WorkItem[];
   onItemClick: (id: string) => void;
+  boardId?: string; // when set, shows the add-card composer
 }
 
-function KanbanColumn({ id, title, items, onItemClick }: KanbanColumnProps) {
+function KanbanColumn({ id, title, items, onItemClick, boardId }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -38,9 +41,10 @@ function KanbanColumn({ id, title, items, onItemClick }: KanbanColumnProps) {
         ))}
         {items.length === 0 && (
           <div className="text-xs text-muted-foreground text-center py-4">
-            No items
+            No cards yet
           </div>
         )}
+        {boardId && <AddCardComposer boardId={boardId} columnId={id} />}
       </Card>
     </div>
   );

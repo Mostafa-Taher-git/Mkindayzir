@@ -56,3 +56,32 @@ async def delete_board(board_id: str, user: dict = Depends(get_current_user), db
         return await BoardService.delete(db, board_id, user)
     except ValueError:
         raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Board not found"}})
+
+
+@router.post("/{board_id}/star")
+async def star_board(board_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Star a board (per-user). Starred boards float to the top of lists."""
+    try:
+        return await BoardService.set_star(db, board_id, user["id"], True)
+    except ValueError:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Board not found"}})
+
+
+@router.delete("/{board_id}/star")
+async def unstar_board(board_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        return await BoardService.set_star(db, board_id, user["id"], False)
+    except ValueError:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Board not found"}})
+
+
+@router.post("/{board_id}/duplicate", status_code=201)
+async def duplicate_board(board_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Clone a board (columns + cards) — used for 'create from template'."""
+    from app.utils.rbac import has_permission
+    if not has_permission(user["role"], "manage:boards"):
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": "Forbidden"}})
+    try:
+        return {"board": await BoardService.duplicate(db, board_id, data or {}, user)}
+    except ValueError:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Board not found"}})

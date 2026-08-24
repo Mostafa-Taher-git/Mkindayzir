@@ -138,20 +138,28 @@ async def public_config():
 class ApiSlashRedirectMiddleware:
     def __init__(self, app):
         self.app = app
-        self._slashful_paths: set[str] | None = None
+        self._slashful_patterns: list | None = None
 
     def _build_path_set(self) -> None:
         # Newer FastAPI wraps include_router() in opaque _IncludedRouter
         # objects; the concrete APIRouter hangs off .original_router.
+        import re as _re
         from app.main import app as fastapi_app
 
-        paths: set[str] = set()
+        patterns: list[_re.Pattern] = []
+
+        def add(path: str) -> None:
+            if not path.startswith("/api") or not path.endswith("/"):
+                return
+            # Turn "/api/x/{item_id}/y/" into a full-match regex.
+            regex = _re.sub(r"\{[^}]+\}", "[^/]+", path)
+            patterns.append(_re.compile("^" + regex + "$"))
 
         def walk(routes) -> None:
             for route in routes:
                 path = getattr(route, "path", None)
                 if path:
-                    paths.add(path)
+                    add(path)
                 nested = getattr(route, "routes", None)
                 if nested and not path:
                     walk(nested)
@@ -160,7 +168,7 @@ class ApiSlashRedirectMiddleware:
                     walk(original.routes)
 
         walk(fastapi_app.routes)
-        self._slashful_paths = {p for p in paths if p.startswith("/api") and p.endswith("/")}
+        self._slashful_patterns = patterns
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
@@ -170,11 +178,12 @@ class ApiSlashRedirectMiddleware:
                 and len(path) > 4
                 and not path.endswith("/")
             ):
-                if self._slashful_paths is None:
+                if self._slashful_patterns is None:
                     self._build_path_set()
-                if (path + "/") in self._slashful_paths:
+                candidate = path + "/"
+                if any(pat.match(candidate) for pat in self._slashful_patterns):
                     scope = dict(scope)
-                    scope["path"] = path + "/"
+                    scope["path"] = candidate
         await self.app(scope, receive, send)
 
 

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: ROUTES.DASHBOARD, label: "Dashboard", icon: DashboardIcon },
   { href: ROUTES.PROJECTS, label: "Projects", icon: FolderIcon },
-  { href: ROUTES.BOARDS, label: "Boards", icon: KanbanIcon },
+  { href: "/workspace", label: "Workspace", icon: KanbanIcon },
   // Tickets: visible in every mode — the helpdesk is core, not team-only.
   { href: ROUTES.TICKETS, label: "Tickets", icon: TicketIcon },
   { href: ROUTES.VAULT, label: "Vault", icon: VaultIcon },

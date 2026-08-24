@@ -21,6 +21,9 @@ import type { WorkItem } from "@/types/work-item";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BoardToolbar } from "@/components/boards/board-toolbar";
+import { BoardHeader } from "@/components/boards/board-header";
+import { AddColumnButton } from "@/components/boards/add-column-button";
+import { AddCardComposer } from "@/components/boards/add-card-composer";
 import { BoardTableView } from "@/components/boards/board-table-view";
 import { KanbanBoard } from "@/components/boards/kanban-board";
 import { Board, BoardColumn, BoardCard, BoardLabel } from "@/types";
@@ -108,8 +111,20 @@ function BoardPresence({ boardId }: { boardId: string }) {
   return <PresenceIndicator users={presentUsers} currentUserId={user.id} />;
 }
 
-function BoardDetailClient({ board, columns: initialColumns, cards: initialCards }: BoardDetailClientProps) {
+function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: initialCards }: BoardDetailClientProps) {
   const queryClient = useQueryClient();
+
+  // Live board record (starred flag / visibility may change while viewing).
+  const boardQ = useQuery({
+    queryKey: ["board", boardProp.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/boards/${boardProp.id}`, { credentials: "include", cache: "no-store" });
+      if (!res.ok) return { board: boardProp };
+      return res.json();
+    },
+    initialData: { board: boardProp },
+  });
+  const board = (boardQ.data?.board ?? boardProp) as typeof boardProp;
   const [search, setSearch] = React.useState("");
   const [memberFilter, setMemberFilter] = React.useState("");
   const [labelFilter, setLabelFilter] = React.useState("");
@@ -223,22 +238,18 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{board.name}</h1>
-            <BoardPresence boardId={board.id} />
-          </div>
-          {board.description && (
-            <p className="text-muted-foreground mt-1">{board.description}</p>
-          )}
+    <div className="p-6 space-y-6" style={board.background ? { background: board.background } : undefined}>
+      <BoardHeader board={board} onBoardChanged={() => {
+        queryClient.invalidateQueries({ queryKey: ["board", board.id] });
+      }} />
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground flex items-center gap-3">
+          {board.description && <span>{board.description}</span>}
+          <BoardPresence boardId={board.id} />
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link to={`${ROUTES.SPACES}/${board.spaceId}`}>Back to Space</Link>
-          </Button>
-        </div>
+        <Button variant="outline" asChild>
+          <Link to="/workspace">Back to Workspace</Link>
+        </Button>
       </div>
 
       <BoardToolbar
@@ -265,6 +276,7 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
             items={mappedItems}
             onItemClick={(id) => setSelectedCardId(id)}
             onStatusChange={handleStatusChange}
+            boardId={board.id}
           />
           <DragOverlay>
             {activeCard ? (
@@ -283,6 +295,10 @@ function BoardDetailClient({ board, columns: initialColumns, cards: initialCards
           onCardClick={(id) => setSelectedCardId(id)}
         />
       )}
+
+      <div className="mt-2">
+        <AddColumnButton boardId={board.id} />
+      </div>
 
       {selectedCardId && (
         <CardDetailModal

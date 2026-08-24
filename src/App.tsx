@@ -18,6 +18,7 @@ import NewSpacePage from "@/app/(dashboard)/spaces/new/page";
 import SpaceDetailPage from "@/app/(dashboard)/spaces/[spaceId]/page";
 import NewBoardPage from "@/app/(dashboard)/spaces/[spaceId]/boards/new/page";
 import BoardsPage from "@/app/(dashboard)/boards/page";
+import WorkspacePage from "@/app/(dashboard)/workspace/page";
 import BoardDetailPage from "@/app/(dashboard)/boards/[boardId]/page";
 import CardDetailPage from "@/app/(dashboard)/cards/[cardId]/page";
 import VaultPage from "@/app/(dashboard)/vault/page";
@@ -144,6 +145,16 @@ export default function App() {
           <ProtectedRoute>
             <DashboardRoute>
               <NewBoardPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workspace"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <WorkspacePage />
             </DashboardRoute>
           </ProtectedRoute>
         }
