@@ -78,6 +78,10 @@ export interface BoardCard {
   description: string | null;
   dueDate: string | null;
   coverImage: string | null;
+  coverColor?: string | null;
+  isComplete?: boolean;
+  isTemplate?: boolean;
+  createdById?: string;
   position: number;
   metadata: CardMetadata;
   createdAt: string;

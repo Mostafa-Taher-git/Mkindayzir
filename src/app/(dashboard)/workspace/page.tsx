@@ -192,6 +192,18 @@ export default function WorkspacePage() {
         </Card>
       )}
 
+      {/* Starred boards — across ALL spaces, Trello-style */}
+      {boards.some((b) => b.starred) && (
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-3">☆ Starred boards</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {boards.filter((b) => b.starred).map((b) => (
+              <BoardTile key={b.id} board={b} onOpen={() => navigate(`${ROUTES.BOARDS}/${b.id}`)} onToggleStar={() => toggleStar.mutate({ id: b.id, starred: false })} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Boards of the selected space */}
       {selectedSpace && (
         <>
@@ -219,36 +231,12 @@ export default function WorkspacePage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {spaceBoards.map((b) => (
-                <Card key={b.id} className="overflow-hidden group relative">
-                  <button
-                    aria-label={b.starred ? "Unstar board" : "Star board"}
-                    title={b.starred ? "Unstar" : "Star"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleStar.mutate({ id: b.id, starred: !b.starred });
-                    }}
-                    className={`absolute top-2 right-2 z-10 text-lg leading-none transition-transform ${
-                      b.starred ? "text-amber-400 scale-110" : "text-white/60 opacity-0 group-hover:opacity-100 hover:text-amber-300"
-                    }`}
-                  >
-                    {b.starred ? "★" : "☆"}
-                  </button>
-                  <button
-                    className="block w-full text-left"
-                    onClick={() => navigate(`${ROUTES.BOARDS}/${b.id}`)}
-                  >
-                    <div
-                      className="h-20 w-full"
-                      style={{ backgroundColor: b.background || "#1f2937" }}
-                    />
-                    <CardContent className="p-3">
-                      <div className="font-semibold">{b.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {b.starred ? "★ " : ""}{b.spaceName || ""}
-                      </div>
-                    </CardContent>
-                  </button>
-                </Card>
+                <BoardTile
+                  key={b.id}
+                  board={b}
+                  onOpen={() => navigate(`${ROUTES.BOARDS}/${b.id}`)}
+                  onToggleStar={() => toggleStar.mutate({ id: b.id, starred: !b.starred })}
+                />
               ))}
 
               {/* create-board tile */}
@@ -358,4 +346,39 @@ export default function WorkspacePage() {
 function useStateSafe(initial: string): [string, (v: string) => void] {
   const [v, setV] = React.useState(initial);
   return [v, setV];
+}
+
+
+function BoardTile({
+  board,
+  onOpen,
+  onToggleStar,
+}: {
+  board: BoardItem;
+  onOpen: () => void;
+  onToggleStar: () => void;
+}) {
+  return (
+    <Card className="overflow-hidden group relative">
+      <button
+        aria-label={board.starred ? "Unstar board" : "Star board"}
+        title={board.starred ? "Unstar" : "Star"}
+        onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+        className={`absolute top-2 right-2 z-10 h-6 w-6 flex items-center justify-center rounded bg-black/25 text-base leading-none transition-transform ${
+          board.starred ? "text-amber-300 scale-110" : "text-white/70 opacity-0 group-hover:opacity-100 hover:text-amber-300"
+        }`}
+      >
+        {board.starred ? "★" : "☆"}
+      </button>
+      <button className="block w-full text-left" onClick={onOpen}>
+        <div className="h-20 w-full bg-cover bg-center" style={{ backgroundColor: board.background || "#1f2937" }} />
+        <CardContent className="p-3">
+          <div className="font-semibold truncate">{board.name}</div>
+          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+            {board.spaceName || ""}
+          </div>
+        </CardContent>
+      </button>
+    </Card>
+  );
 }

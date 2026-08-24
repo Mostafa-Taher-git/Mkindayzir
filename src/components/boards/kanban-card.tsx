@@ -1,47 +1,60 @@
-
+/**
+ * Trello-style kanban card face:
+ *   cover stripe · complete circle · title · badges (desc/checklist/members)
+ *   hover actions: edit (opens card) + archive · template banner
+ */
 import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { WorkItem } from "@/types/work-item";
-
-const TYPE_COLORS: Record<string, string> = {
-  TASK: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  BUG: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  FEATURE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  IMPROVEMENT: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: "border-l-red-500",
-  HIGH: "border-l-orange-500",
-  MEDIUM: "border-l-yellow-500",
-  LOW: "border-l-gray-400",
-};
-
-const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  TASK: WrenchIcon,
-  BUG: BugIcon,
-  FEATURE: LightbulbIcon,
-  IMPROVEMENT: FileTextIcon,
-};
 
 interface KanbanCardProps {
   item: WorkItem;
   onClick: () => void;
+  /** boardId enables quick actions (archive/complete) */
+  boardId?: string;
 }
 
-function KanbanCard({ item, onClick }: KanbanCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
+function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+
+  const queryClient = useQueryClient();
+  const meta = (item as any).metadata ?? {};
+  const isComplete = !!(item as any).isComplete;
+  const isTemplate = !!(item as any).isTemplate;
+  const coverColor = (item as any).coverColor as string | null | undefined;
+  const description = item.description ?? "";
+  const checklists = (item as any).checklists ?? [];
+  const checklistTotal = checklists.reduce(
+    (acc: number, cl: any) => acc + ((cl.items as any[]) ?? []).length, 0
+  );
+  const checklistDone = checklists.reduce(
+    (acc: number, cl: any) => acc + (((cl.items as any[]) ?? []).filter((i: any) => i.isCompleted).length), 0
+  );
+
+  const refresh = () => {
+    if (!boardId) return;
+    queryClient.invalidateQueries({ queryKey: ["cards", boardId] });
+  };
+
+  const toggleComplete = useMutation({
+    mutationFn: () =>
+      fetch(`/api/cards/${item.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isComplete: !isComplete }),
+      }),
+    onSuccess: refresh,
+  });
+
+  const archive = useMutation({
+    mutationFn: () =>
+      fetch(`/api/cards/${item.id}`, { method: "DELETE", credentials: "include" }),
+    onSuccess: refresh,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -49,86 +62,79 @@ function KanbanCard({ item, onClick }: KanbanCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const TypeIcon = TYPE_ICONS[item.type] || WrenchIcon;
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, ...(coverColor ? { borderTop: `4px solid ${coverColor}` } : {}) }}
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={cn(
-        "border-l-4 rounded-md border bg-card p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow",
-        PRIORITY_COLORS[item.priority] || PRIORITY_COLORS.MEDIUM,
-        isDragging && "opacity-50"
-      )}
+      className={`group relative rounded-md border bg-card p-2.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
+        isComplete ? "opacity-80" : ""
+      } ${isTemplate ? "border-primary/50" : "border-outline"}`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-            TYPE_COLORS[item.type] || TYPE_COLORS.TASK
-          )}
+      {/* template banner */}
+      {isTemplate && (
+        <div className="mb-1.5 text-[10px] font-mono bg-primary/15 text-primary-light border border-primary/40 px-1.5 py-0.5 inline-block">
+          📋 Template
+        </div>
+      )}
+
+      {/* title row: complete circle + title */}
+      <div className="flex items-start gap-2">
+        <button
+          aria-label={isComplete ? "Mark complete" : "Mark incomplete"}
+          title={isComplete ? "Mark complete" : "Mark complete"}
+          onClick={(e) => { e.stopPropagation(); toggleComplete.mutate(); }}
+          className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center text-[9px] leading-none transition-colors ${
+            isComplete ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/50 hover:border-emerald-400"
+          }`}
         >
-          <TypeIcon className="h-3 w-3" />
-          {item.type}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {item.project?.key}-{item.number}
-        </span>
+          {isComplete ? "✓" : ""}
+        </button>
+        <p className={`text-sm font-medium leading-snug break-words ${isComplete ? "line-through opacity-70" : ""}`}>
+          {item.title}
+        </p>
       </div>
-      <p className="text-sm font-medium line-clamp-2 mb-2">{item.title}</p>
-      <div className="flex items-center justify-between">
-        {item.assignee ? (
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={item.assignee.avatar ?? ""} alt={item.assignee.displayName} />
-            <AvatarFallback className="text-xs">
-              {item.assignee.displayName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
-        ) : (
-          <div />
+
+      {/* badges row */}
+      <div className="mt-1.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
+        {description && <span title="This card has a description">≡</span>}
+        {checklistTotal > 0 && (
+          <span className={checklistDone === checklistTotal ? "text-emerald-500" : ""}>
+            ☑ {checklistDone}/{checklistTotal}
+          </span>
         )}
-        <Badge variant="secondary" className="text-xs">
-          {item.priority}
-        </Badge>
+        {(item.assignee) && (
+          <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/80 text-[9px] font-bold text-primary-foreground">
+            {(item.assignee.displayName ?? "?").slice(0, 2).toUpperCase()}
+          </span>
+        )}
       </div>
+
+      {/* hover quick actions: edit / archive */}
+      {boardId && (
+        <div className="absolute right-1.5 top-1.5 hidden group-hover:flex items-center gap-1">
+          <button
+            aria-label="Edit card"
+            title="Edit card (opens details)"
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-primary"
+          >
+            ✎
+          </button>
+          <button
+            aria-label="Archive card"
+            title="Archive card"
+            onClick={(e) => { e.stopPropagation(); archive.mutate(); }}
+            className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-destructive hover:text-destructive"
+          >
+            🗑
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function cn(...classes: Array<string | false | undefined | null>) {
-  return classes.filter(Boolean).join(" ");
-}
-
 export { KanbanCard };
-
-function WrenchIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
-  );
-}
-
-function BugIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 20a4 4 0 0 0 4-4V8a4 4 0 0 0-4-4 4 4 0 0 0-4 4v8a4 4 0 0 0 4 4Z" /><path d="M12 4V1" /><path d="M12 23v-3" /><path d="M4 12H1" /><path d="M23 12h-3" /></svg>
-  );
-}
-
-function LightbulbIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" /><path d="M9 18h6" /><path d="M10 22h4" /></svg>
-  );
-}
-
-function FileTextIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" /></svg>
-  );
-}

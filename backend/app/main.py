@@ -17,7 +17,7 @@ from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
-    tickets, ws, board_backgrounds
+    tickets, ws, board_backgrounds, card_comments
 )
 
 
@@ -102,6 +102,7 @@ for router in [
     checklists.router, vault.router, assistant.router, settings.router,
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
     dashboard.router, tickets.router, ws.router, board_backgrounds.router,
+    card_comments.router,
 ]:
     app.include_router(router)
 

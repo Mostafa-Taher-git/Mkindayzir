@@ -54,8 +54,21 @@ async def delete_card(card_id: str, user: dict = Depends(get_current_user), db: 
 
 @router.post("/{card_id}/move")
 async def move_card(card_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # The SPA sends {"columnId"} (and position optional); older callers used
+    # {"targetColumnId"}. Accept both, defaulting position to end-of-list.
+    column_id = data.get("columnId") or data.get("targetColumnId")
+    if not column_id:
+        raise HTTPException(status_code=400, detail={"error": {"code": "VALIDATION_ERROR", "message": "columnId is required"}})
+    position = data.get("position")
     try:
-        return await CardService.move(db, card_id, data["targetColumnId"], data["position"], user)
+        if position is None:
+            from sqlalchemy import select, func
+            from app.models.card import Card
+            count = (await db.execute(
+                select(func.count()).where(Card.columnId == column_id, Card.deletedAt.is_(None))
+            )).scalar_one()
+            position = int(count)
+        return await CardService.move(db, card_id, column_id, int(position), user)
     except ValueError:
         raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Card not found"}})
 
@@ -90,3 +103,12 @@ async def remove_card_member(card_id: str, user_id: str, user: dict = Depends(ge
 async def create_card_checklist(card_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from app.services.checklist_service import ChecklistService
     return await ChecklistService.create(db, {"cardId": card_id, **data}, user)
+
+
+@router.post("/{card_id}/copy", status_code=201)
+async def copy_card(card_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Duplicate a card into the same list (Trello-style Copy)."""
+    try:
+        return {"card": await CardService.copy(db, card_id, user)}
+    except ValueError:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Card not found"}})

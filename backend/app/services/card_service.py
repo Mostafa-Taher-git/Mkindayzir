@@ -23,6 +23,8 @@ class CardService:
             "position": card.position,
             "dueDate": card.dueDate.isoformat() if card.dueDate else None,
             "coverColor": card.coverColor,
+            "isComplete": bool(getattr(card, "isComplete", False)),
+            "isTemplate": bool(getattr(card, "isTemplate", False)),
             "metadata": card.meta,
             "createdById": card.createdById,
             "createdAt": card.createdAt.isoformat() if card.createdAt else None,
@@ -84,6 +86,11 @@ class CardService:
         for field in ["title", "description", "position", "dueDate", "coverColor"]:
             if field in data and data[field] is not None:
                 setattr(card, field, data[field])
+        # boolean flags may be explicitly set false, so check membership only
+        if "isComplete" in data:
+            card.isComplete = bool(data["isComplete"])
+        if "isTemplate" in data:
+            card.isTemplate = bool(data["isTemplate"])
         if "metadata" in data and data["metadata"] is not None:
             card.meta = str(data["metadata"])
 
@@ -167,3 +174,33 @@ class CardService:
             "name": label.name,
             "color": label.color,
         }
+
+    @staticmethod
+    async def copy(db: AsyncSession, card_id: str, user: dict) -> dict:
+        """Duplicate a card into the same list (Trello 'Copy')."""
+        source = (await db.execute(select(Card).where(Card.id == card_id, Card.deletedAt.is_(None)))).scalar_one_or_none()
+        if not source:
+            raise ValueError("Card not found")
+
+        result = await db.execute(
+            select(func.count()).where(Card.columnId == source.columnId, Card.deletedAt.is_(None))
+        )
+        position = result.scalar_one()
+
+        clone = Card(
+            id=uuid.uuid4().hex,
+            columnId=source.columnId,
+            title=f"{source.title} (copy)",
+            description=source.description,
+            position=position,
+            dueDate=source.dueDate,
+            coverColor=source.coverColor,
+            isComplete=source.isComplete,
+            isTemplate=source.isTemplate,
+            meta=source.meta,
+            createdById=user["id"],
+        )
+        db.add(clone)
+        await db.commit()
+        await db.refresh(clone)
+        return CardService._serialize(clone)

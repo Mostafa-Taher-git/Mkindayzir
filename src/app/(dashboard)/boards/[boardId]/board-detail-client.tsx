@@ -60,8 +60,9 @@ function mapBoardLabelToWorkItemLabel(label: BoardLabel): WorkItemLabel {
   };
 }
 
-function mapCardToWorkItem(card: BoardCard, columnNameMap: Record<string, string>): WorkItemLike {
-  const status = columnNameMap[card.columnId] ?? card.columnId;
+function mapCardToWorkItem(card: BoardCard, _columnNameMap: Record<string, string>): WorkItemLike {
+  // status is the column ID — KanbanBoard keys lists by id now.
+  const status = card.columnId;
   const firstMember = card.members?.[0];
   const assignee = firstMember?.user
     ? {
@@ -202,7 +203,9 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
     id: board.id,
     projectId: board.spaceId,
     name: board.name,
-    statuses: columns.map((c: BoardColumn) => c.name),
+    // Key kanban columns by column ID (stable across renames). The card->WorkItem
+    // mapper below resolves the display name separately.
+    statuses: columns.map((c: BoardColumn) => c.id),
     transitions: {},
     isDefault: false,
     createdAt: board.createdAt,
