@@ -5,6 +5,7 @@ from .setup import setup_cli
 from .migrate import migrate_cli
 from .backup import backup_cli
 from .password import password_cli
+from .seed_demo import main as seed_demo_main
 
 
 @click.group()
@@ -17,6 +18,13 @@ cli.add_command(setup_cli)
 cli.add_command(migrate_cli)
 cli.add_command(backup_cli)
 cli.add_command(password_cli)
+
+
+@cli.command("seed-demo")
+@click.option("--force", is_flag=True, help="Re-run even if the flag file exists (still idempotent per user).")
+def seed_demo(force):
+    """Create the standard demo/test accounts (see docs/TEST_ACCOUNTS.md)."""
+    seed_demo_main()
 
 
 @cli.command()

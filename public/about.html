@@ -105,13 +105,17 @@
       </div>
 
       <h2>How it's made</h2>
-      <p>Mkindayzir is a TypeScript/Next.js application with a Prisma data layer that targets both SQLite (Personal mode) and PostgreSQL (Team/Enterprise). The AI layer is a small Python service that proxies your provider of choice — your API key is encrypted at rest and never logged.</p>
+      <p>Mkindayzir is a single self-hosted process: a Python <strong>FastAPI</strong> backend serving both the REST API and the built React/Vite console on one port. Data lives in SQLite (Personal mode) or PostgreSQL (Team/Enterprise), moved between them from inside the app. The AI layer is a small companion service that talks to your provider of choice — your API key is encrypted at rest with AES-256-GCM and never logged.</p>
       <ul>
-        <li>Next.js app + custom Node server</li>
-        <li>Prisma: SQLite &amp; PostgreSQL from one schema</li>
-        <li>Python FastAPI service for AI streaming &amp; tools</li>
+        <li>FastAPI (Python 3.11+) — async REST API, RBAC, session auth</li>
+        <li>React + Vite console — served by the same process in production</li>
+        <li>SQLAlchemy 2.0 async: SQLite &amp; PostgreSQL from one schema</li>
+        <li>Ticketing with SLA tracking, Kanban boards, knowledge vault</li>
         <li>One Docker Compose file for team deployments</li>
       </ul>
+
+      <h2>Honest roadmap</h2>
+      <p>Email verification codes and an in-app safe updater are designed and scheduled — see the Roadmap page for exactly how updates will protect your data.</p>
 
       <h2>Who it's for</h2>
       <p>Individuals who want a calm, private workspace. Teams who need shared boards and a vault without surrendering data. Companies with compliance needs who must keep operations on-premises. If you value control over convenience, Mkindayzir is built for you.</p>

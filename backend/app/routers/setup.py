@@ -19,7 +19,7 @@ async def complete_setup(req: SetupRequest, db: AsyncSession = Depends(get_db)):
     if req.password != req.confirmPassword:
         raise HTTPException(status_code=400, detail={"error": {"code": "VALIDATION_ERROR", "message": "Passwords do not match"}})
     try:
-        result = await AuthService.complete_setup(db, req.mode, req.email, req.displayName, req.password)
+        result = await AuthService.complete_setup(db, req.mode, req.email, req.displayName, req.password, req.initialRole)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": {"code": "ALREADY_SETUP", "message": str(e)}})

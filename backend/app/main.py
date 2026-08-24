@@ -8,6 +8,11 @@ from pathlib import Path
 import os
 
 from app.config import settings as config_settings
+
+# Single source of truth for the running app version. Bump on every release;
+# surfaced via /api/config and shown on the roadmap page ("Your Installation").
+APP_VERSION = "1.0.0"
+
 from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
@@ -107,9 +112,11 @@ async def health():
 
 @app.get("/api/config")
 async def public_config():
+    # Public, unauthenticated. Only non-sensitive launch info lives here.
     return {
         "mode": config_settings.MKINDAYZIR_MODE,
         "registrationEnabled": config_settings.REGISTRATION_ENABLED,
+        "version": APP_VERSION,
     }
 
 
@@ -136,4 +143,8 @@ if _frontend_dir.exists() and _frontend_dir.is_dir():
         candidate = (resolved_frontend / path).resolve()
         if path and candidate.is_relative_to(resolved_frontend) and candidate.exists() and candidate.is_file():
             return FileResponse(str(candidate))
+        # The marketing landing page is the front door: "/" serves it instead
+        # of dropping the visitor straight into the console login.
+        if not path or path == "/":
+            return FileResponse(str(resolved_frontend / "landing.html"))
         return FileResponse(str(resolved_frontend / "index.html"))

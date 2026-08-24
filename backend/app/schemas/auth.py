@@ -35,6 +35,9 @@ class SetupRequest(BaseModel):
     displayName: str
     password: str
     confirmPassword: str
+    # Optional role for team/enterprise setups. Validated against the fixed
+    # role set; personal mode always forces ADMIN regardless of this value.
+    initialRole: Optional[str] = None
 
 
 class SetupResponse(BaseModel):

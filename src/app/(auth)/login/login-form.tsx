@@ -15,6 +15,8 @@ export function LoginForm({
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Reveal what is being typed (item #4).
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -118,6 +120,18 @@ export function LoginForm({
               Authenticate to enter
             </p>
           </div>
+          {/* Item #6: back to the landing page. NB: full page load, not
+              navigate("/") — the SPA router redirects "/" to /dashboard,
+              which bounces unauthenticated visitors right back here. */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/"; }}
+              className="border-2 border-outline bg-surface px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:border-primary hover:text-foreground"
+            >
+              ← Back
+            </button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground">
@@ -147,14 +161,25 @@ export function LoginForm({
               >
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border-2 border-outline bg-surface px-3 py-2 pr-20 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 border border-outline bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

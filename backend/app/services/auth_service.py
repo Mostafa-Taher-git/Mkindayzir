@@ -63,14 +63,27 @@ class AuthService:
 
     @staticmethod
     async def check_setup_complete(db: AsyncSession) -> bool:
-        result = await db.execute(select(User).where(User.role == "ADMIN"))
+        # Setup is complete once ANY account exists — not "once an ADMIN
+        # exists". The original ADMIN-only check left the setup wizard open
+        # whenever the first user chose a non-admin role in team mode,
+        # letting a later visitor register themselves as ADMIN.
+        result = await db.execute(select(User.id).limit(1))
         return result.scalar_one_or_none() is not None
 
     @staticmethod
-    async def complete_setup(db: AsyncSession, mode: str, email: str, display_name: str, password: str) -> dict:
-        existing = await db.execute(select(User).where(User.role == "ADMIN"))
-        if existing.scalar_one_or_none():
+    async def complete_setup(db: AsyncSession, mode: str, email: str, display_name: str, password: str, initial_role: str | None = None) -> dict:
+        # Same any-account semantics as check_setup_complete (see above).
+        existing = await db.execute(select(User.id).limit(1))
+        if existing.scalar_one_or_none() is not None:
             raise ValueError("Setup has already been completed")
+
+        # Server-side role validation (never trust the client): personal mode
+        # is always ADMIN; team/enterprise may pick any of the four roles.
+        VALID_ROLES = {"ADMIN", "MANAGER", "MEMBER", "VIEWER"}
+        if mode == "personal":
+            role = "ADMIN"
+        else:
+            role = initial_role if initial_role in VALID_ROLES else "ADMIN"
 
         password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)).decode("utf-8")
         user = User(
@@ -78,7 +91,7 @@ class AuthService:
             email=email.lower(),
             passwordHash=password_hash,
             displayName=display_name,
-            role="ADMIN",
+            role=role,
             status="ACTIVE",
         )
         db.add(user)

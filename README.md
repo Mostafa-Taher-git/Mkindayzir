@@ -52,6 +52,7 @@ The app is then available on **http://localhost:3000** (put it behind your rever
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — personal / team deployment via `pip`, `easy-install.py`, or Docker.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design, routing, services, persistence, security.
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — environment variables reference.
+- [docs/TEST_ACCOUNTS.md](docs/TEST_ACCOUNTS.md) — ready-made demo accounts for testers (`mkindayzir seed-demo`).
 - [RUNNING.md](RUNNING.md) — quick-run cheat-sheet.
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — how to contribute.
 

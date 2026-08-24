@@ -215,11 +215,27 @@
         </p>
       </div>
 
+      <!-- Your Installation (item #2): current app version + update channel -->
+      <div class="arch-band chamfer-lg" id="versionBand" style="margin-top:0; margin-bottom:56px; padding:28px 36px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;">
+          <div>
+            <div class="label">Your Installation</div>
+            <h2 style="margin-top:6px;">Version <span class="mono" id="mkVersion">1.0.0</span> <span style="color:var(--emerald-lt); font-size:14px;" id="mkChannel">· STABLE</span></h2>
+            <p style="margin:8px 0 0;">
+              Check <span class="mono">Settings → System</span> inside the console for update availability.
+              The planned in-app safe updater (see Stage 2 · Lifecycle below) will let you update fully or partially
+              from this screen — with automatic backups and rollback so your data is never at risk.
+            </p>
+          </div>
+          <a class="btn btn-ghost chamfer" href="/login">Open Console →</a>
+        </div>
+      </div>
+
       <!-- Filter Controls -->
       <div class="filter-bar chamfer">
-        <button class="filter-btn active" onclick="filterStage('all')">All Horizons (10)</button>
+        <button class="filter-btn active" onclick="filterStage('all')">All Horizons (12)</button>
         <button class="filter-btn" onclick="filterStage('portal')">Stage 1 · Customer Portal &amp; Helpdesk</button>
-        <button class="filter-btn" onclick="filterStage('enterprise')">Stage 2 · Enterprise &amp; Compliance</button>
+        <button class="filter-btn" onclick="filterStage('enterprise')">Stage 2 · Enterprise &amp; Lifecycle</button>
         <button class="filter-btn" onclick="filterStage('ai')">Stage 3 · Autonomous AI &amp; ChatOps</button>
         <button class="filter-btn" onclick="filterStage('edge')">Stage 4 · Edge &amp; Mobile Ops</button>
       </div>
@@ -415,6 +431,44 @@
             <span>Push API notifications for assigned tasks and tickets</span>
           </div>
         </div>
+
+        <!-- 11. Email Validation & Verification Codes (item #1) -->
+        <div class="roadmap-card chamfer" data-stage="enterprise">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="stage-tag stage-2">Stage 2 · Identity</span>
+              <span class="status-badge planned">Planned</span>
+            </div>
+            <h3>Email Verification Codes</h3>
+            <p>
+              New accounts receive a one-time numeric code by email and paste it into an in-app pop-up to prove ownership of the address. Unverified accounts keep working with limited rights until verified.
+            </p>
+          </div>
+          <div class="tech-specs">
+            <span>6-digit single-use codes, 10-minute expiry, rate-limited resend</span>
+            <span>Uses the existing SMTP settings — no third-party email service</span>
+            <span>Verification badge on user profiles &amp; admin user list</span>
+          </div>
+        </div>
+
+        <!-- 12. In-App Updater (item #1) -->
+        <div class="roadmap-card chamfer" data-stage="enterprise">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="stage-tag stage-2">Stage 2 · Lifecycle</span>
+              <span class="status-badge in-design">In Design</span>
+            </div>
+            <h3>In-App Safe Updater</h3>
+            <p>
+              Update the whole app or individual parts from Settings → System without losing any data. Automatic pre-update snapshot (database + uploads), staged migrations that are reversible, and a health check before committing.
+            </p>
+          </div>
+          <div class="tech-specs">
+            <span>Full or component-level updates (backend / frontend / AI service)</span>
+            <span>Automatic backup + rollback on failed health check</span>
+            <span>Zero data loss: migrations are additive &amp; reversible</span>
+          </div>
+        </div>
       </div>
 
       <!-- Architecture Blueprint Section -->
@@ -469,6 +523,19 @@
 
   <script>
     document.getElementById('yr').textContent = new Date().getFullYear();
+
+    // Item #2: show the running app version (public, unauthenticated endpoint).
+    fetch('/api/config')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (cfg) {
+        if (!cfg) return;
+        var v = document.getElementById('mkVersion');
+        var c = document.getElementById('mkChannel');
+        if (v && cfg.version) v.textContent = cfg.version;
+        if (c && cfg.mode) c.textContent = '· ' + String(cfg.mode).toUpperCase();
+      })
+      .catch(function () { /* static fallback values remain */ });
+
     var btn = document.getElementById('themeBtn');
     var saved = localStorage.getItem('mkindayzir-theme');
     if (saved) document.documentElement.setAttribute('data-theme', saved);

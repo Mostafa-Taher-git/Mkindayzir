@@ -27,6 +27,15 @@ const MODES: { value: Mode; label: string; spec: string; description: string }[]
   },
 ];
 
+// Role options shown when Team/Enterprise is selected (item #5).
+type Role = "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER";
+const ROLES: { value: Role; label: string; blurb: string }[] = [
+  { value: "ADMIN",   label: "Admin",   blurb: "Full control — users, settings, everything." },
+  { value: "MANAGER", label: "Manager", blurb: "Runs projects, boards, tickets. No user management." },
+  { value: "MEMBER",  label: "Member",  blurb: "Does the work — create/edit items, reply to tickets." },
+  { value: "VIEWER",  label: "Viewer",  blurb: "Read-only access for stakeholders." },
+];
+
 export default function SetupPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode | null>(null);
@@ -34,8 +43,13 @@ export default function SetupPage() {
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<Role>("ADMIN");
+  // Item #4: reveal what is being typed in the password fields.
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const needsRole = mode === "team" || mode === "enterprise";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,10 +83,10 @@ export default function SetupPage() {
     }
 
     try {
-      const res = await fetch("/api/setup", {credentials: "include", 
+      const res = await fetch("/api/setup", {credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.data),
+        body: JSON.stringify({ ...result.data, initialRole: role }),
       });
 
       const data = await res.json();
@@ -93,6 +107,19 @@ export default function SetupPage() {
   const fieldClass =
     "w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background";
 
+  // Shared show/hide button markup for both password fields.
+  const toggleBtn = (
+    <button
+      type="button"
+      onClick={() => setShowPassword((v) => !v)}
+      className="absolute right-2 top-1/2 -translate-y-1/2 border border-outline bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      aria-label={showPassword ? "Hide password" : "Show password"}
+      title={showPassword ? "Hide password" : "Show password"}
+    >
+      {showPassword ? "Hide" : "Show"}
+    </button>
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="panel w-full max-w-2xl p-8 shadow-panel">
@@ -102,6 +129,17 @@ export default function SetupPage() {
             <div className="font-display text-xl font-extrabold uppercase tracking-tight">System Setup</div>
             <div className="uppercase-label text-muted-foreground mt-1">Initialize your operations console</div>
           </div>
+        </div>
+
+        {/* Item #6: back navigation */}
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            className="border-2 border-outline bg-surface px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:border-primary hover:text-foreground"
+          >
+            ← Back
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -143,6 +181,40 @@ export default function SetupPage() {
             </div>
           </div>
 
+          {/* Step 1b: Role selection — only for Team / Enterprise (item #5) */}
+          {needsRole && (
+            <div>
+              <h2 className="mb-4 font-mono text-sm font-semibold uppercase tracking-wider">
+                01b · Choose your role
+              </h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {ROLES.map((r) => {
+                  const active = role === r.value;
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setRole(r.value)}
+                      className={`border-2 p-3 text-left transition-all ${
+                        active
+                          ? "border-primary bg-primary/10"
+                          : "border-outline hover:border-primary"
+                      }`}
+                    >
+                      <div className={`font-display text-sm font-bold uppercase ${active ? "text-primary-light" : ""}`}>
+                        {r.label}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{r.blurb}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+                You can promote other members later from Settings → Users.
+              </p>
+            </div>
+          )}
+
           {/* Step 2: Admin Account */}
           <div>
             <h2 className="mb-4 font-mono text-sm font-semibold uppercase tracking-wider">
@@ -165,13 +237,19 @@ export default function SetupPage() {
                 <label htmlFor="password" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Password
                 </label>
-                <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={fieldClass} required />
+                <div className="relative">
+                  <input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className={`${fieldClass} pr-20`} required />
+                  {toggleBtn}
+                </div>
               </div>
               <div>
                 <label htmlFor="confirmPassword" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">
                   Confirm Password
                 </label>
-                <input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={fieldClass} required />
+                <div className="relative">
+                  <input id="confirmPassword" type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={`${fieldClass} pr-20`} required />
+                  {toggleBtn}
+                </div>
               </div>
             </div>
           </div>
