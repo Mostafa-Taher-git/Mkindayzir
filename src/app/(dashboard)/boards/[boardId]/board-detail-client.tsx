@@ -24,6 +24,7 @@ import { BoardToolbar } from "@/components/boards/board-toolbar";
 import { BoardHeader } from "@/components/boards/board-header";
 import { AddColumnButton } from "@/components/boards/add-column-button";
 import { AddCardComposer } from "@/components/boards/add-card-composer";
+import { BackgroundPicker } from "@/components/boards/background-picker";
 import { BoardTableView } from "@/components/boards/board-table-view";
 import { KanbanBoard } from "@/components/boards/kanban-board";
 import { Board, BoardColumn, BoardCard, BoardLabel } from "@/types";
@@ -139,7 +140,9 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
         cache: "no-store",
       });
       if (!res.ok) return { columns: [] };
-      return res.json();
+      const data = await res.json();
+      // tolerate both {columns:[...]} (current) and bare [...] (legacy)
+      return { columns: Array.isArray(data) ? data : data.columns ?? [] };
     },
     initialData: { columns: initialColumns },
   });
@@ -237,17 +240,53 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
     }
   };
 
+  // ---- background (color or image + fine overlay) ----
+  const settings = (typeof board.settings === "string"
+    ? safeParse(board.settings)
+    : board.settings) as { bgImageUrl?: string | null; bgOverlay?: number; bgColor?: string | null } | undefined;
+  const bgImage = settings?.bgImageUrl || null;
+  const bgOverlay = typeof settings?.bgOverlay === "number" ? settings.bgOverlay : 0.45;
+  const bgColor = settings?.bgColor || board.background || "#0b1622";
+
   return (
-    <div className="p-6 space-y-6" style={board.background ? { background: board.background } : undefined}>
-      <BoardHeader board={board} onBoardChanged={() => {
-        queryClient.invalidateQueries({ queryKey: ["board", board.id] });
-      }} />
-      <div className="flex items-center justify-between">
+    <div className="relative min-h-screen">
+      {/* Layer 1 — photo */}
+      {bgImage && (
+        <div
+          className="fixed inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: `url(${bgImage})` }}
+        />
+      )}
+      {/* Layer 2 — fine dark overlay so text/cards stay legible */}
+      {bgImage && (
+        <div className="fixed inset-0 -z-10" style={{ backgroundColor: `rgba(4,10,18,${bgOverlay})` }} />
+      )}
+      {/* Fallback tint when no photo */}
+      {!bgImage && (
+        <div className="fixed inset-0 -z-30" style={{ backgroundColor: bgColor }} />
+      )}
+
+      {/* Content column on translucent panels */}
+      <div className="p-6 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <BoardHeader board={board} onBoardChanged={() => {
+          queryClient.invalidateQueries({ queryKey: ["board", board.id] });
+        }} />
+        <BackgroundPicker
+          boardId={board.id}
+          value={{
+            color: bgColor,
+            imageUrl: bgImage,
+            overlay: bgOverlay,
+          }}
+        />
+      </div>
+      <div className="flex items-center justify-between rounded-md bg-background/70 backdrop-blur-sm px-3 py-1.5 border border-outline/40">
         <div className="text-sm text-muted-foreground flex items-center gap-3">
           {board.description && <span>{board.description}</span>}
           <BoardPresence boardId={board.id} />
         </div>
-        <Button variant="outline" asChild>
+        <Button variant="outline" size="sm" asChild>
           <Link to="/workspace">Back to Workspace</Link>
         </Button>
       </div>
@@ -311,8 +350,13 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
           }}
         />
       )}
+      </div>
     </div>
   );
+}
+
+function safeParse(raw: string): any {
+  try { const v = JSON.parse(raw); return v && typeof v === "object" ? v : {}; } catch { return {}; }
 }
 
 export { BoardDetailClient };

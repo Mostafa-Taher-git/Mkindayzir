@@ -32,8 +32,9 @@ function KanbanColumn({ id, title, items, onItemClick, boardId }: KanbanColumnPr
       <Card
         ref={setNodeRef}
         className={cn(
-          "flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-200px)]",
-          isOver && "ring-2 ring-primary/50 bg-accent/20"
+          // solid surface so lists stay readable over photo backgrounds
+          "flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-260px)] bg-surface border-outline",
+          isOver && "ring-2 ring-primary/50"
         )}
       >
         {items.map((item) => (

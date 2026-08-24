@@ -14,6 +14,17 @@ from app.models.card import Card
 
 class BoardService:
     @staticmethod
+    def _parse_settings(raw) -> dict:
+        import json as _json
+        if isinstance(raw, dict):
+            return raw
+        try:
+            parsed = _json.loads(raw or "{}")
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    @staticmethod
     def _serialize(board: Board, starred: bool = False, space_name: str | None = None) -> dict:
         return {
             "id": board.id,
@@ -23,7 +34,7 @@ class BoardService:
             "background": board.background,
             "visibility": getattr(board, "visibility", "WORKSPACE") or "WORKSPACE",
             "projectId": getattr(board, "projectId", None),
-            "settings": board.settings,
+            "settings": BoardService._parse_settings(board.settings),
             "position": board.position,
             "starred": starred,
             "spaceName": space_name,
@@ -100,7 +111,9 @@ class BoardService:
             if field in data and data[field] is not None:
                 setattr(board, field, data[field])
         if "settings" in data and data["settings"] is not None:
-            board.settings = str(data["settings"])
+            # store real JSON (str(dict) yields single quotes -> unparseable)
+            import json as _json
+            board.settings = _json.dumps(data["settings"]) if isinstance(data["settings"], (dict, list)) else str(data["settings"])
 
         await db.commit()
         await db.refresh(board)

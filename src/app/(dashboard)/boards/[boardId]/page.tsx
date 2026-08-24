@@ -25,7 +25,8 @@ export default function BoardDetailPage() {
     queryFn: async () => {
       const res = await fetch(`/api/boards/${boardId}/columns`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch columns");
-      return res.json();
+      const data = await res.json();
+      return { columns: Array.isArray(data) ? data : data.columns ?? [] };
     },
   });
 

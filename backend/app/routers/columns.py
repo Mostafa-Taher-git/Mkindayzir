@@ -9,7 +9,10 @@ router = APIRouter(prefix="/api/boards/{board_id}/columns", tags=["columns"])
 
 @router.get("/")
 async def list_columns(board_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await ColumnService.list(db, board_id, user)
+    # Wrapped in {"columns": [...]} for a consistent envelope — the SPA's
+    # react-query layer reads `data.columns`; a bare list broke the board page
+    # (new lists never appeared until reload).
+    return {"columns": await ColumnService.list(db, board_id, user)}
 
 
 @router.post("/", status_code=201)

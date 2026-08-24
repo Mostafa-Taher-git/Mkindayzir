@@ -66,7 +66,10 @@ export default function BoardsPage() {
   const grouped = React.useMemo(() => {
     const map = new Map<string, { spaceId: string; boards: any[] }>();
     for (const b of boards) {
-      const spaceName = b.space?.name ?? "Unknown Space";
+      // Board list API returns flat records with `spaceName`; older builds
+      // expected a nested `space` object which never existed -> everything
+      // grouped under "Unknown Space".
+      const spaceName = b.spaceName ?? b.space?.name ?? "Unknown Space";
       const spaceId = b.space?.id ?? "";
       if (!map.has(spaceName)) map.set(spaceName, { spaceId, boards: [] });
       map.get(spaceName)!.boards.push(b);
