@@ -13,7 +13,7 @@ class Workflow(Base):
     statuses: Mapped[str] = mapped_column(String, nullable=False)
     transitions: Mapped[str] = mapped_column(String, nullable=False)
     isDefault: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     project: Mapped["Project"] = relationship(back_populates="workflows")

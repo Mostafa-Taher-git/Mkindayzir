@@ -12,9 +12,9 @@ class Session(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: uuid.uuid4().hex)
     userId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    expiresAt: Mapped[datetime] = mapped_column("expiresAt", DateTime, nullable=False)
+    expiresAt: Mapped[datetime] = mapped_column("expiresAt", DateTime(timezone=True), nullable=False)
     ipAddress: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     userAgent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="sessions")

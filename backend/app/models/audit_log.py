@@ -16,7 +16,7 @@ class AuditLog(Base):
     details: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     ipAddress: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     userAgent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         Index("ix_audit_logs_user_id", "userId"),

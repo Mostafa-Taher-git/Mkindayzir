@@ -14,7 +14,7 @@ class Activity(Base):
     userId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     changes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         Index("ix_activities_entity", "entityType", "entityId"),

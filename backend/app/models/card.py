@@ -12,17 +12,17 @@ class Card(Base):
     columnId: Mapped[str] = mapped_column(String(36), ForeignKey("columns.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    position: Mapped[int] = mapped_column(Integer, server_default=text("0"), nullable=False)
-    dueDate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    position: Mapped[int] = mapped_column(Integer, server_default=text("'0'"), nullable=False)
+    dueDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     coverColor: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     # Trello-style card states
     isComplete: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     isTemplate: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     meta: Mapped[str] = mapped_column("metadata", String, server_default=text("'{}'"), nullable=False)
     createdById: Mapped[str] = mapped_column(String(36), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_cards_column_id", "columnId", "position"),

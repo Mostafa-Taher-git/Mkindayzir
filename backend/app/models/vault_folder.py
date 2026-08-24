@@ -12,10 +12,10 @@ class VaultFolder(Base):
     parentId: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("vault_folders.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
-    position: Mapped[int] = mapped_column(Integer, server_default=text("0"), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    position: Mapped[int] = mapped_column(Integer, server_default=text("'0'"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("parentId", "name", name="uq_vault_folders_parent_name"),

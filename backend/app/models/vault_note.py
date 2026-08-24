@@ -14,14 +14,14 @@ class VaultNote(Base):
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     content: Mapped[str] = mapped_column(String, nullable=False)
     excerpt: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    status: Mapped[str] = mapped_column(String(50), server_default=text("DRAFT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), server_default=text("'DRAFT'"), nullable=False)
     authorId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     meta: Mapped[str] = mapped_column("metadata", String, server_default=text("'{}'"), nullable=False)
-    version: Mapped[int] = mapped_column(Integer, server_default=text("1"), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    publishedAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, server_default=text("'1'"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    publishedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_vault_notes_folder_id", "folderId"),

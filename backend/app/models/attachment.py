@@ -15,7 +15,7 @@ class Attachment(Base):
     mimeType: Mapped[str] = mapped_column(String(255), nullable=False)
     storagePath: Mapped[str] = mapped_column(String, nullable=False)
     uploadedBy: Mapped[str] = mapped_column(String(36), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
 
     __table_args__ = (
         Index("ix_attachments_entity", "entityType", "entityId"),

@@ -14,9 +14,9 @@ class Comment(Base):
     authorId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     content: Mapped[str] = mapped_column(String, nullable=False)
     parentId: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("comments.id"), nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_comments_entity", "entityType", "entityId"),

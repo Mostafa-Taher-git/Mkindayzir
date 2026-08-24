@@ -13,7 +13,7 @@ class NoteVersion(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(String, nullable=False)
     editedBy: Mapped[str] = mapped_column(String(36), nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("noteId", "version", name="uq_note_versions_note_version"),

@@ -16,8 +16,8 @@ class Notification(Base):
     entityType: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     entityId: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     isRead: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
-    readAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    readAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         Index("ix_notifications_user_id", "userId", "isRead"),

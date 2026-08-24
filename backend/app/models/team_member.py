@@ -10,8 +10,8 @@ class TeamMember(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     userId: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     teamId: Mapped[str] = mapped_column(String(36), ForeignKey("teams.id"), nullable=False)
-    role: Mapped[str] = mapped_column(String(50), server_default=text("MEMBER"), nullable=False)
-    joinedAt: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), server_default=text("'MEMBER'"), nullable=False)
+    joinedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("userId", "teamId", name="uq_team_members_user_team"),

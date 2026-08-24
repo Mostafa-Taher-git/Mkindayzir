@@ -16,7 +16,7 @@ class Message(Base):
     toolResults: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
 
     __table_args__ = (
         Index("ix_messages_conversation_id", "conversationId"),

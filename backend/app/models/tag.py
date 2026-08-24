@@ -11,6 +11,6 @@ class Tag(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     color: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     notes: Mapped[list["NoteTag"]] = relationship(back_populates="tag", cascade="all, delete-orphan")
