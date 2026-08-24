@@ -10,6 +10,7 @@ import type { WorkItem } from "@/types/work-item";
 import { KanbanCard } from "./kanban-card";
 
 import { AddCardComposer } from "./add-card-composer";
+import { IconMore, IconEdit, IconTrash } from "@/components/icons/grendizer";
 
 interface KanbanColumnProps {
   id: string;
@@ -98,7 +99,7 @@ function KanbanColumn({ id, title, items, onItemClick, boardId, onRenamed }: Kan
             {title}
           </h3>
         )}
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full" title="Total cards">
+        <span className="text-[11px] font-mono text-muted-foreground border border-outline px-1.5 py-0.5" title="Total cards">
           {items.length}
         </span>
 
@@ -109,9 +110,9 @@ function KanbanColumn({ id, title, items, onItemClick, boardId, onRenamed }: Kan
               aria-label="List actions"
               title="List actions"
               onClick={() => setMenuOpen((v) => !v)}
-              className="h-6 w-6 rounded hover:bg-accent text-muted-foreground hover:text-foreground text-xs tracking-widest"
+              className="h-6 w-6 hover:bg-accent text-muted-foreground hover:text-foreground"
             >
-              ⋯
+              <IconMore className="h-4 w-4" />
             </button>
             {menuOpen && (
               <>
@@ -121,7 +122,7 @@ function KanbanColumn({ id, title, items, onItemClick, boardId, onRenamed }: Kan
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     onClick={() => { setMenuOpen(false); setRenaming(true); }}
                   >
-                    ✎ Rename list
+                    <IconEdit className="h-4 w-4 inline-block mr-1.5 -mt-0.5" /> Rename list
                   </button>
                   <button
                     className="block w-full px-3 py-2 text-left text-sm text-destructive hover:bg-accent"
@@ -131,7 +132,7 @@ function KanbanColumn({ id, title, items, onItemClick, boardId, onRenamed }: Kan
                       }
                     }}
                   >
-                    🗑 Delete list
+                    <IconTrash className="h-4 w-4 inline-block mr-1.5 -mt-0.5" /> Delete list
                   </button>
                 </div>
               </>

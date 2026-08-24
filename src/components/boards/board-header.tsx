@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { IconStar, IconShare, IconDuplicate, IconSwitch, IconVisibility } from "@/components/icons/grendizer";
 import {
   Dialog,
   DialogContent,
@@ -106,7 +107,7 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
       {/* Switch board */}
       <div className="relative">
         <Button variant="outline" size="sm" onClick={() => setSwitcherOpen((v) => !v)}>
-          ⇄ Switch board
+          <IconSwitch className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Switch board
         </Button>
         {switcherOpen && (
           <>
@@ -147,7 +148,7 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
           const el = e.currentTarget.nextElementSibling as HTMLElement | null;
           if (el) el.style.display = el.style.display === "block" ? "none" : "block";
         }}>
-          ◉ {visibilityMeta.label}
+          <IconVisibility className="h-4 w-4 inline-block mr-1 -mt-0.5" /> {visibilityMeta.label}
         </Button>
         <div className="hidden absolute left-0 top-full z-50 mt-1 w-64 border-2 border-outline bg-surface shadow-lg">
           <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-outline">
@@ -174,7 +175,7 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
 
       {/* Share */}
       <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
-        ⤴ Share
+        <IconShare className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Share
       </Button>
 
       {/* Duplicate (template) */}
@@ -196,7 +197,7 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
           } catch { /* surfaced by query devtools; keep simple */ }
         }}
       >
-        ⧉ Duplicate
+        <IconDuplicate className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Duplicate
       </Button>
 
       <div className="ml-auto flex items-center gap-2">
@@ -205,11 +206,11 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
           aria-label={board.starred ? "Unstar board" : "Star board"}
           title={board.starred ? "Unstar board" : "Star board"}
           onClick={() => toggleStar.mutate(!board.starred)}
-          className={`text-2xl leading-none transition-transform hover:scale-110 ${
-            board.starred ? "text-amber-400" : "text-muted-foreground/50 hover:text-amber-300"
+          className={`transition-transform hover:scale-110 ${
+            board.starred ? "text-amber-500" : "text-muted-foreground/50 hover:text-amber-500"
           }`}
         >
-          {board.starred ? "★" : "☆"}
+          <IconStar filled={board.starred} className="h-5 w-5" />
         </button>
 
         {/* Rename (inline click-to-edit on the title) */}
@@ -237,14 +238,14 @@ export function BoardHeader({ board, onBoardChanged }: BoardHeaderProps) {
           />
         ) : (
           <h1
-            className="text-xl font-bold cursor-text hover:bg-accent px-2 rounded"
+            className="text-xl font-bold cursor-text hover:bg-accent px-2"
             title="Click to rename"
             onClick={() => {
               setRenameValue(board.name);
               setRenaming(true);
             }}
           >
-            {board.starred ? "★ " : ""}{board.name}
+            {board.name}
           </h1>
         )}
       </div>

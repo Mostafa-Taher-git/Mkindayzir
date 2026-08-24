@@ -12,6 +12,7 @@ import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { BOARD_BACKGROUNDS } from "@/lib/constants";
+import { IconPalette, IconUpload } from "@/components/icons/grendizer";
 
 export type BoardBg = {
   color?: string | null;      // solid color or null when image is set
@@ -100,7 +101,7 @@ export function BackgroundPicker({ boardId, value, onChanged }: Props) {
   return (
     <div className="relative">
       <Button variant="outline" size="sm" onClick={() => setOpen((v) => !v)}>
-        🎨 Background
+        <IconPalette className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Background
       </Button>
 
       {open && (
@@ -146,7 +147,7 @@ export function BackgroundPicker({ boardId, value, onChanged }: Props) {
               disabled={busy}
               onClick={() => fileRef.current?.click()}
             >
-              {busy ? "Uploading…" : "⬆ Upload image"}
+              {busy ? "Uploading…" : (<><IconUpload className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Upload image</>)}
             </Button>
             {current.imageUrl && (
               <Button

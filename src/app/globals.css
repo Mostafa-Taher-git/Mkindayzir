@@ -61,19 +61,20 @@
 }
 
 [data-theme="light"] {
-  --color-bg-primary: #e9eef3;
-  --color-bg-secondary: #dce5ec;
-  --color-bg-tertiary: #cfdbe6;
-  --color-bg-highest: #c2d2e0;
-  --color-bg-lowest: #f3f6f9;
+  /* Grendizer day-ops: bright hangar white-blue, steel lines, power red */
+  --color-bg-primary: #f2f5f8;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #e7edf3;
+  --color-bg-highest: #dbe4ec;
+  --color-bg-lowest: #fafcfd;
 
-  --color-text-primary: #0c2233;
-  --color-text-secondary: #33526e;
-  --color-text-muted: #5f7a93;
+  --color-text-primary: #10293d;   /* AA on white */
+  --color-text-secondary: #3d5a75;
+  --color-text-muted: #64809a;
 
-  --color-border: #9fb2c4;
-  --color-border-strong: #7d93a8;
-  --color-border-subtle: #c2cedb;
+  --color-border: #b9c8d6;
+  --color-border-strong: #8fa5b8;
+  --color-border-subtle: #dde6ee;
 
   --color-accent: #bb152c;
   --color-accent-hover: #d61f33;
@@ -81,15 +82,15 @@
   --color-accent-light: #8a0014;
   --color-accent-strong: #ffffff;
 
-  --color-success: #1f8f63;
-  --color-warning: #9a6b00;
-  --color-error: #c0392b;
+  --color-success: #147a52;
+  --color-warning: #8a5a00;
+  --color-error: #b3261e;
   --color-info: #2c4a78;
 
-  --metal-sheen: linear-gradient(180deg, #ffffff 0%, #dce5ec 60%, #cdd9e5 100%);
-  --metal-sheen-raised: linear-gradient(180deg, #ffffff 0%, #d4dfe9 100%);
+  --metal-sheen: linear-gradient(180deg, #ffffff 0%, #f2f5f8 55%, #e7edf3 100%);
+  --metal-sheen-raised: linear-gradient(180deg, #ffffff 0%, #eef3f8 100%);
   --red-sheen: linear-gradient(180deg, #d61f33 0%, #bb152c 100%);
-  --panel-line: rgba(12, 34, 51, 0.06);
+  --panel-line: rgba(16, 41, 61, 0.07);
 
   color-scheme: light;
 }
@@ -126,23 +127,20 @@
   main h1 {
     font-family: var(--font-display);
     font-weight: 800;
-    text-transform: uppercase;
     letter-spacing: -0.01em;
-    font-size: 1.875rem;
+    font-size: 1.75rem;
     line-height: 1.1;
   }
   main h1 + p {
     margin-top: 6px;
     color: var(--color-text-muted);
     font-family: var(--font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
     font-size: 12px;
   }
   main h2 {
     font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0;
+    letter-spacing: -0.01em;
   }
 
   /* Caret & selection belong to the design system */

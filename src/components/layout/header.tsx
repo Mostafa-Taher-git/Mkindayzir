@@ -222,7 +222,8 @@ function ThemeToggle() {
 
   React.useEffect(() => {
     const stored = localStorage.getItem("mkindayzir-theme");
-    const initial = stored === "light" ? "light" : "dark";
+    // Light is the default theme (user decision); dark stays available.
+    const initial = stored === "dark" ? "dark" : "light";
     setTheme(initial);
     document.documentElement.setAttribute("data-theme", initial);
     document.documentElement.classList.remove("light", "dark");

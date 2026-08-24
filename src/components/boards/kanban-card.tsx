@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CSS } from "@dnd-kit/utilities";
 
 import type { WorkItem } from "@/types/work-item";
+import { IconEdit, IconArchive, IconCheck, IconTemplate } from "@/components/icons/grendizer";
 
 interface KanbanCardProps {
   item: WorkItem;
@@ -69,14 +70,14 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={`group relative rounded-md border bg-card p-2.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
+      className={`group relative border-2 bg-card p-2.5 cursor-pointer transition-shadow hover:shadow-[0_2px_0_0_var(--color-border-strong)] ${
         isComplete ? "opacity-80" : ""
-      } ${isTemplate ? "border-primary/50" : "border-outline"}`}
+      } ${isTemplate ? "border-primary/60" : "border-outline"}`}
     >
       {/* template banner */}
       {isTemplate && (
         <div className="mb-1.5 text-[10px] font-mono bg-primary/15 text-primary-light border border-primary/40 px-1.5 py-0.5 inline-block">
-          📋 Template
+          <IconTemplate className="h-3 w-3 inline-block mr-1 -mt-0.5" /> Template
         </div>
       )}
 
@@ -86,7 +87,7 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
           aria-label={isComplete ? "Mark complete" : "Mark incomplete"}
           title={isComplete ? "Mark complete" : "Mark complete"}
           onClick={(e) => { e.stopPropagation(); toggleComplete.mutate(); }}
-          className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center text-[9px] leading-none transition-colors ${
+          className={`mt-0.5 h-4 w-4 shrink-0 rounded-[3px] border-2 flex items-center justify-center text-[9px] leading-none transition-colors ${
             isComplete ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/50 hover:border-emerald-400"
           }`}
         >
@@ -98,7 +99,7 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
       </div>
 
       {/* badges row */}
-      <div className="mt-1.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
+      <div className="mt-1.5 flex items-center gap-2.5 text-[11px] font-mono text-muted-foreground">
         {description && <span title="This card has a description">≡</span>}
         {checklistTotal > 0 && (
           <span className={checklistDone === checklistTotal ? "text-emerald-500" : ""}>
@@ -121,7 +122,7 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
             onClick={(e) => { e.stopPropagation(); onClick(); }}
             className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-primary"
           >
-            ✎
+            <IconEdit className="h-3.5 w-3.5" />
           </button>
           <button
             aria-label="Archive card"
@@ -129,7 +130,7 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
             onClick={(e) => { e.stopPropagation(); archive.mutate(); }}
             className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-destructive hover:text-destructive"
           >
-            🗑
+            <IconArchive className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

@@ -1,9 +1,10 @@
 /**
- * AddColumnButton — "+ Add another list" inline composer (Trello-style).
+ * AddColumnButton — "<IconPlus className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Add another list" inline composer (Trello-style).
  */
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { IconPlus, IconClose } from "@/components/icons/grendizer";
 
 export function AddColumnButton({ boardId }: { boardId: string }) {
   const [open, setOpen] = React.useState(false);
@@ -32,9 +33,9 @@ export function AddColumnButton({ boardId }: { boardId: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-72 shrink-0 border-2 border-dashed border-outline bg-surface/60 p-3 text-left text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+        className="w-72 shrink-0 border-2 border-outline bg-surface/70 p-3 text-left text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
       >
-        + Add another list
+        <IconPlus className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Add another list
       </button>
     );
   }
@@ -57,7 +58,7 @@ export function AddColumnButton({ boardId }: { boardId: string }) {
           Add list
         </Button>
         <Button size="sm" variant="ghost" onClick={() => { setOpen(false); setName(""); }}>
-          ✕
+          <IconClose className="h-4 w-4" />
         </Button>
       </div>
     </div>

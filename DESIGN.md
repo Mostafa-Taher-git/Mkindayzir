@@ -1,5 +1,8 @@
 ---
 name: Grendizer Heroic Industrial
+version: 2.0
+mode: Operate
+theme-default: light
 colors:
   surface: '#001522'
   surface-dim: '#001522'
@@ -48,6 +51,27 @@ colors:
   background: '#001522'
   on-background: '#c7e7ff'
   surface-variant: '#003952'
+colors-light:
+  background: '#f2f5f8'
+  surface: '#ffffff'
+  surface-container-lowest: '#fafcfd'
+  surface-container-low: '#f2f5f8'
+  surface-container: '#ffffff'
+  surface-container-high: '#e7edf3'
+  surface-container-highest: '#dbe4ec'
+  on-surface: '#10293d'
+  on-surface-variant: '#3d5a75'
+  outline: '#b9c8d6'
+  outline-strong: '#8fa5b8'
+  outline-variant: '#dde6ee'
+  primary: '#bb152c'
+  on-primary: '#ffffff'
+  primary-hover: '#d61f33'
+  primary-bright: '#ff535b'
+  success: '#147a52'
+  warning: '#8a5a00'
+  error: '#b3261e'
+  info: '#2c4a78'
 typography:
   display-lg:
     fontFamily: Sora
@@ -86,56 +110,81 @@ spacing:
 ---
 
 ## Brand & Style
-This design system embodies a heroic, industrial aesthetic inspired by 1970s super-robot aesthetics. The brand personality is powerful, protective, and technologically advanced. It blends **Retro-Futurism** with **Modern Industrial** design, focusing on structural integrity and mechanical precision.
+Grendizer Heroic Industrial — a heroic-industrial design language inspired by
+1970s super-robot aesthetics, tuned for **professional helpdesk and project
+management use**. The brand personality is powerful, protective, and precise:
+a cockpit that operators trust all day, not a theme park.
 
-The UI should evoke a sense of "cockpit utility"—highly functional but emotionally resonant. It utilizes sharp geometry, heavy linework reminiscent of anime cel-shading, and metallic surface treatments to create a tactical, high-stakes professional environment.
+**v2 tone shift (user decision):** the cockpit stays, the cosplay goes.
+Headlines are no longer forced to ALL CAPS; sentence case with Sora's
+geometric weight carries the authority. Emoji are banned from UI chrome —
+all icons are 2px-stroke angular SVGs (`src/components/icons/grendizer.tsx`).
+
+## Themes — LIGHT IS THE DEFAULT
+- **Light ("Day Ops") is the primary theme.** Bright hangar white-blue
+  surfaces (`#f2f5f8` app background, `#ffffff` cards), steel borders
+  (`#b9c8d6`), ink `#10293d` (AA on white), Power Red accents unchanged.
+- **Dark ("Deep Space") remains fully supported** for night shifts.
+- Default is set pre-paint in `index.html`; the user's explicit choice is
+  stored in `localStorage("mkindayzir-theme")`.
+- Every component must read from the CSS custom properties — never hardcode
+  hex values in components. Both themes are first-class.
 
 ## Colors
-The palette is dominated by deep space and mechanical tones, punctuated by high-energy "Power Red."
-
-- **Primary (Grendizer Red):** Used for critical actions, key alerts, and brand accents. It represents energy and urgency.
-- **Secondary (Space Blue):** The primary background and structural color. It provides a deep, stable foundation for the interface.
-- **Tertiary (Titanium White/Gold):** Primarily used for high-contrast text and "glowing" UI elements. 
-- **Neutral (Mechanical Grey):** Used for secondary surfaces, borders, and inactive states, mimicking the look of brushed steel or alloy plating.
-
-State-based variations should use increased luminosity for hover states and reduced saturation for disabled states.
+- **Primary (Grendizer Red `#bb152c`):** critical actions, active states,
+  powered-on indicators. One red action per view region.
+- **Structure (Space Blue / Hangar White):** backgrounds, panels, cards.
+- **Steel (borders):** 2px solid borders on all containers; `outline-strong`
+  for emphasis, `outline-variant` for hairlines.
+- **Status:** success `#147a52`, warning `#8a5a00`, error `#b3261e`,
+  info `#2c4a78` (light) — always paired with an icon, never color alone.
 
 ## Typography
-The typography strategy balances aggressive, wide-set headers with technical, high-legibility body text.
-
-- **Headlines:** Set in **Sora**. Its geometric construction and slightly wide stance feel futuristic and assertive. Use "All Caps" for primary section headers to reinforce the heroic tone.
-- **Body:** Set in **Hanken Grotesk**. This provides a professional, clean contrast to the bold headers, ensuring long-form content is readable within a technical interface.
-- **Labels/Data:** Set in **JetBrains Mono**. This monospaced font is used for status indicators, coordinates, and technical metadata, emphasizing the "mechanical" nature of the system.
+- **Headlines: Sora** — geometric, assertive. Sentence case. Page titles 28px/800.
+- **Body: Hanken Grotesk** — clean, high legibility.
+- **Labels/data: JetBrains Mono** — counts, statuses, metadata, timestamps.
+  Uppercase + letterspaced ONLY for tiny section labels (`.uppercase-label`).
 
 ## Layout & Spacing
-The layout follows a **Fixed Grid** philosophy to simulate physical panels and dashboard consoles.
-
-- **Grid:** A 12-column grid for desktop with wide 24px gutters. Elements should feel "locked" into place, avoiding excessive fluidity that might feel flimsy.
-- **Rhythm:** Uses a 4px baseline shift. Most vertical stacks should use 16px or 32px increments to maintain a rigid, structural feel.
-- **Breakpoints:**
-  - **Mobile:** 4 columns, 16px margins. Content stacks vertically.
-  - **Tablet:** 8 columns, 24px margins. Sidebar navigation collapses to icons.
-  - **Desktop:** 12 columns, 32px margins. Max-width of 1440px to ensure the interface feels contained and "engineered."
+- 12-column desktop grid, 24px gutters, max-width 1440px.
+- 4px baseline; vertical rhythm in 16px/32px steps.
+- Breakpoints: mobile 4-col/16px margins; tablet 8-col/24px (sidebar collapses
+  to icons); desktop 12-col/32px.
 
 ## Elevation & Depth
-This design system rejects soft, ambient shadows in favor of **Tonal Layers** and **Hard Bevels**.
-
-- **Z-Axis Hierarchy:** Depth is created by stacking lighter shades of Mechanical Grey or Space Blue on top of darker backgrounds. 
-- **Hard Outlines:** Every container and card must have a 1px or 2px solid border. Use `Mechanical Grey` for standard containers and `Primary Red` for active or "powered-on" elements.
-- **Metallic Gradients:** Use subtle linear gradients (top-to-bottom) on primary surfaces to simulate the sheen of painted metal armor.
-- **Inner Glows:** Instead of drop shadows, use a 1px inner stroke of a lighter color on the top and left edges of buttons to create a "raised" tactile effect.
+- **Tonal layers + hard bevels, no soft ambient shadows.**
+- Hover affordance: `0 2px 0 0 var(--color-border-strong)` (a physical press edge).
+- Active/primary elements: `.glow-red` (1px ring + tight red bloom).
+- Panels: `.panel` (metal sheen gradient + 2px steel border).
 
 ## Shapes
-The shape language is strictly **Sharp and Angular**. 
+- **Sharp and angular.** `--radius: 0px` globally.
+- Complete/check indicators use 3px-rounded squares (not circles).
+- 45° chamfers (`.chamfer`) reserved for primary hero actions only.
 
-Rounded corners are avoided to maintain an industrial, aggressive silhouette. To further the robotic aesthetic, use "clipped corners" (45-degree chamfers) on primary action buttons and main navigation tabs. This geometric motif mimics the joint plating and armor panels of a giant robot.
+## Components (board/workspace specifics)
+- **Cards (kanban):** 2px steel border, solid `bg-card`, sharp corners.
+  Complete = red-free green square-check + strikethrough title.
+  Badges row in mono 11px. Hover reveals Edit/Archive icon buttons top-right.
+- **Lists:** solid `bg-surface` body (must stay readable over board photo
+  backgrounds), header with mono count chip in a boxed border, `⋯` actions menu.
+- **Board backgrounds:** photo → fine dark overlay (0–85%, user-adjusted) →
+  translucent header strip → hard cards. Colors from `BOARD_BACKGROUNDS`.
+- **Buttons:** sharp; primary uses red sheen; secondary 2px steel border.
+- **Inputs:** surface background, 2px steel border, red focus ring (never default blue).
+- **Icons:** exclusively from `src/components/icons/grendizer.tsx`
+  (2px stroke, square caps). No emoji in chrome, buttons, or menus.
+- **Dialogs:** 2px steel border, header row with mono context chip
+  (e.g. list name), sharp corners, `max-h-[92vh]` scroll.
 
-## Components
-Consistent styling for core elements:
+## Motion
+- `--transition: 160ms cubic-bezier(0.2,0.8,0.2,1)` for hovers/focus.
+- Entrance: `.animate-power-on` (280ms, exponential ease-out) — once per view,
+  never on data updates.
+- No bounce, no parallax, no decorative loops. `prefers-reduced-motion` honored.
 
-- **Buttons:** Sharp edges only. Primary buttons use a Grendizer Red background with Tertiary White text. Use a 2px "Mechanical Grey" bottom border to give a physical, pressable appearance.
-- **Input Fields:** Dark Space Blue backgrounds with a 1px Mechanical Grey border. On focus, the border transitions to Grendizer Red with a subtle outer "glow" (0px blur, 2px spread).
-- **Cards:** Defined by a heavy 2px border and a header bar with a slightly lighter tint than the body. Use the "Label" font for metadata in the card footer.
-- **Chips:** Monospaced text inside a boxed border. For status (e.g., "ACTIVE"), use Grendizer Red text on a transparent background with a red border.
-- **Progress Bars:** Segmented bars (resembling battery cells or power levels) instead of a continuous smooth fill.
-- **Additional Component: "Status Panels":** Large, non-interactive displays that show high-level system data with oversized monospaced numerals.
+## Accessibility floor
+- Text contrast ≥ 4.5:1 in both themes (verified for ink/border tokens).
+- Focus-visible: 2px `--color-accent-bright` outline, 2px offset, everywhere.
+- Icon-only buttons require `aria-label` + `title` (tooltips).
+- Status never conveyed by color alone (icon or text accompanies it).

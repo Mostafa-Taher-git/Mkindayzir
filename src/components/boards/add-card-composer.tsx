@@ -1,10 +1,11 @@
 /**
- * AddCardComposer — "+ Add a card" inline composer at the bottom of each
+ * AddCardComposer — "<IconPlus className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Add a card" inline composer at the bottom of each
  * list, plus a "from template" picker that pre-fills the title/description.
  */
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { IconPlus, IconClose, IconTemplate } from "@/components/icons/grendizer";
 
 export type CardTemplate = {
   id: string;
@@ -92,7 +93,7 @@ export function AddCardComposer({ boardId, columnId }: AddCardComposerProps) {
         onClick={() => setOpen(true)}
         className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
-        + Add a card
+        <IconPlus className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Add a card
       </button>
     );
   }
@@ -133,10 +134,10 @@ export function AddCardComposer({ boardId, columnId }: AddCardComposerProps) {
           onClick={() => setTemplateMenu((v) => !v)}
           title="Create card from template"
         >
-          📋 Template ▾
+          <IconTemplate className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Template ▾
         </Button>
         <Button size="sm" variant="ghost" onClick={() => { setOpen(false); reset(); }}>
-          ✕
+          <IconClose className="h-4 w-4" />
         </Button>
 
         {templateMenu && (

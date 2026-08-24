@@ -162,7 +162,7 @@ export default function WorkspacePage() {
           <button
             key={s.id}
             onClick={() => setSelectedSpaceId(s.id)}
-            className={`px-4 py-2 border-2 text-sm font-medium transition-colors ${
+            className={`px-4 py-2 border-2 font-mono text-xs uppercase tracking-wide transition-colors ${
               s.id === selectedSpaceId
                 ? "border-primary bg-primary/10 text-primary-light"
                 : "border-outline hover:border-primary"
@@ -242,7 +242,7 @@ export default function WorkspacePage() {
               {/* create-board tile */}
               <button
                 onClick={() => setShowNewBoard(true)}
-                className="border-2 border-dashed border-outline min-h-[132px] flex items-center justify-center text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+                className="border-2 border-outline min-h-[132px] flex items-center justify-center text-sm font-mono uppercase tracking-wide text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
               >
                 + Create new board
               </button>

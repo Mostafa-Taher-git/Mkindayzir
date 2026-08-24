@@ -18,6 +18,7 @@ import { CardMembers } from "@/components/cards/card-members";
 import { CardLabels } from "@/components/cards/card-labels";
 import { CardChecklists } from "@/components/cards/card-checklists";
 import { BoardCard, BoardColumn } from "@/types";
+import { IconMore, IconClose, IconCheck, IconLabel, IconClock, IconChecklist, IconMember, IconComment, IconTemplate, IconTrash } from "@/components/icons/grendizer";
 
 interface CardDetailModalProps {
   cardId: string;
@@ -197,7 +198,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
 
             {/* "..." menu */}
             <div className="relative">
-              <Button variant="ghost" size="icon" onClick={() => setMenuOpen((v) => !v)}>⋯</Button>
+              <Button variant="ghost" size="icon" onClick={() => setMenuOpen((v) => !v)}><IconMore className="h-4 w-4" /></Button>
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
@@ -228,7 +229,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
               )}
             </div>
 
-            <Button variant="ghost" size="icon" onClick={onClose}>✕</Button>
+            <Button variant="ghost" size="icon" onClick={onClose}><IconClose className="h-4 w-4" /></Button>
           </div>
         </div>
 
@@ -244,12 +245,12 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
                 : "border-muted-foreground/60 hover:border-primary"
             }`}
           >
-            {card.isComplete ? "✓" : ""}
+            {card.isComplete && <IconCheck className="h-3.5 w-3.5" />}
           </button>
           <div className="flex-1">
             {card.isTemplate && (
               <div className="mb-2 text-xs font-mono bg-primary/15 text-primary-light border border-primary/40 px-2 py-1 inline-block">
-                📋 This card is a template.
+                <IconTemplate className="h-3.5 w-3.5 inline-block mr-1 -mt-0.5" /> This card is a template.
               </div>
             )}
             <input
@@ -270,10 +271,10 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
 
         {/* ---- action buttons row ---- */}
         <div className="flex flex-wrap gap-2 mt-4 relative">
-          <Button size="sm" variant="outline" onClick={() => setSection(section === "labels" ? null : "labels")}>🏷 Labels</Button>
-          <Button size="sm" variant="outline" onClick={() => setSection(section === "dates" ? null : "dates")}>🕐 Dates</Button>
-          <Button size="sm" variant="outline" onClick={() => setSection(section === "checklist" ? null : "checklist")}>☑ Checklist</Button>
-          <Button size="sm" variant="outline" onClick={() => setSection(section === "members" ? null : "members")}>👤 Members</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "labels" ? null : "labels")}><IconLabel className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Labels</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "dates" ? null : "dates")}><IconClock className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Dates</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "checklist" ? null : "checklist")}><IconChecklist className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Checklist</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "members" ? null : "members")}><IconMember className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Members</Button>
 
           {section === "labels" && (
             <div className="absolute top-full left-0 z-30 mt-1 w-80 border-2 border-outline bg-surface shadow-lg p-2">
@@ -313,7 +314,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
           {/* left: description + inline editors */}
           <div className="lg:col-span-3 space-y-4">
             <div>
-              <div className="text-sm font-semibold mb-1 flex items-center gap-2">≡ Description</div>
+              <div className="text-sm font-semibold mb-1 flex items-center gap-2">Description</div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -333,7 +334,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
 
           {/* right: comments & activity */}
           <div className="lg:col-span-2 border-l-2 border-outline lg:pl-4">
-            <div className="text-sm font-semibold mb-2 flex items-center gap-2">💬 Comments and activity</div>
+            <div className="text-sm font-semibold mb-2 flex items-center gap-2"><IconComment className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Comments and activity</div>
             <textarea
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
@@ -368,7 +369,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
                       title="Delete comment"
                       onClick={() => deleteComment.mutate(cm.id)}
                     >
-                      🗑
+                      <IconTrash className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
