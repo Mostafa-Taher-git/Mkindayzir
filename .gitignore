@@ -33,8 +33,8 @@ prisma/migrations/*.sql
 !prisma/migrations/migration_lock.toml
 
 # Uploads
-data/uploads
-data/backups
+data/
+backend/data/
 
 # IDE
 .idea
