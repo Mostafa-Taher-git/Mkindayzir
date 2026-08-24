@@ -74,8 +74,11 @@ class Settings(BaseSettings):
 
     # AI
     DEFAULT_AI_PROVIDER: str = "openrouter"
-    DEFAULT_AI_MODEL: str = "anthropic/claude-sonnet-4-20250514"
+    DEFAULT_AI_MODEL: str = "nvidia/nemotron-3-super-120b-a12b:free"
     PYTHON_AI_URL: str = "http://localhost:8000"
+    # Optional server-level fallback key so the assistant works out of the box
+    # (personal user keys, stored encrypted, always take precedence).
+    OPENROUTER_API_KEY: str = ""
 
     # Email
     SMTP_HOST: str = ""

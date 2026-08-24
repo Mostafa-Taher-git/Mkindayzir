@@ -86,7 +86,8 @@ export function RoleDemotionSection({ currentRole }: RoleDemotionSectionProps) {
             onChange={(e) => setSelectedRole(e.target.value)}
             className="w-full px-3 py-2 border-2 border-outline bg-surface font-mono text-foreground focus:border-primary focus:outline-none"
           >
-            <option value="MANAGER">MANAGER — Team & Project Oversight</option>
+            <option value="MANAGER">MANAGER — Team &amp; Project Oversight</option>
+            <option value="AGENT">AGENT — Helpdesk &amp; Tickets</option>
             <option value="MEMBER">MEMBER — Standard Contributor</option>
             <option value="VIEWER">VIEWER — Read-only Observer</option>
           </select>

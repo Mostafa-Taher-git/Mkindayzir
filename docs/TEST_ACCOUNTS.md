@@ -9,6 +9,7 @@ All of them are created by one command and are safe to share with testers.
 |---------|---------------------------|-----------------|------------------|
 | ADMIN   | `admin@mkindayzir.demo`   | `Admin@2026!`   | Everything: users, settings, all modules, migrations |
 | MANAGER | `manager@mkindayzir.demo` | `Manager@2026!` | Projects, boards, work items, tickets, reports — no user management |
+| AGENT   | `agent@mkindayzir.demo`   | `Agent@2026!`   | Helpdesk: full ticket handling (assign/close/reopen), customers; read-only elsewhere |
 | MEMBER  | `member@mkindayzir.demo`  | `Member@2026!`  | Create/edit own work items, view + create + reply to tickets |
 | VIEWER  | `viewer@mkindayzir.demo`  | `Viewer@2026!`  | Read-only across projects, boards, vault, tickets |
 

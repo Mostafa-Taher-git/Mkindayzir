@@ -78,8 +78,8 @@ class AuthService:
             raise ValueError("Setup has already been completed")
 
         # Server-side role validation (never trust the client): personal mode
-        # is always ADMIN; team/enterprise may pick any of the four roles.
-        VALID_ROLES = {"ADMIN", "MANAGER", "MEMBER", "VIEWER"}
+        # is always ADMIN; team/enterprise may pick any of the valid roles.
+        VALID_ROLES = {"ADMIN", "MANAGER", "AGENT", "MEMBER", "VIEWER"}
         if mode == "personal":
             role = "ADMIN"
         else:

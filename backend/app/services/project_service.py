@@ -59,6 +59,13 @@ class ProjectService:
     async def create(db: AsyncSession, data: dict, user: dict) -> dict:
         project_id = uuid.uuid4().hex
         key = data.get("key") or project_id[:8].upper()
+
+        # Duplicate keys must be a friendly 400, not an unhandled
+        # IntegrityError -> 500 (found during live testing).
+        existing = await db.execute(select(Project).where(Project.key == key, Project.deletedAt.is_(None)))
+        if existing.scalar_one_or_none():
+            raise ValueError(f"Project key '{key}' is already in use")
+
         project = Project(
             id=project_id,
             key=key,

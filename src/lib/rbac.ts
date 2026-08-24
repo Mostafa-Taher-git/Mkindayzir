@@ -3,6 +3,8 @@ export const ROLES = {
   MANAGER: "MANAGER",
   MEMBER: "MEMBER",
   VIEWER: "VIEWER",
+  /** Helpdesk-focused role: full ticket handling, read-only elsewhere. */
+  AGENT: "AGENT",
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -67,6 +69,20 @@ const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.VIEW_TICKETS,
     PERMISSIONS.CREATE_TICKETS,
     PERMISSIONS.REPLY_TICKETS,
+    PERMISSIONS.VIEW_CUSTOMERS,
+  ],
+  // AGENT: helpdesk-focused — full ticket handling + customers, read-only elsewhere.
+  [ROLES.AGENT]: [
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_PROJECTS,
+    PERMISSIONS.VIEW_BOARDS,
+    PERMISSIONS.VIEW_VAULT,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.MANAGE_TICKETS,
+    PERMISSIONS.VIEW_TICKETS,
+    PERMISSIONS.CREATE_TICKETS,
+    PERMISSIONS.REPLY_TICKETS,
+    PERMISSIONS.MANAGE_CUSTOMERS,
     PERMISSIONS.VIEW_CUSTOMERS,
   ],
   [ROLES.VIEWER]: [

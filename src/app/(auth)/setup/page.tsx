@@ -28,10 +28,11 @@ const MODES: { value: Mode; label: string; spec: string; description: string }[]
 ];
 
 // Role options shown when Team/Enterprise is selected (item #5).
-type Role = "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER";
+type Role = "ADMIN" | "MANAGER" | "AGENT" | "MEMBER" | "VIEWER";
 const ROLES: { value: Role; label: string; blurb: string }[] = [
   { value: "ADMIN",   label: "Admin",   blurb: "Full control — users, settings, everything." },
   { value: "MANAGER", label: "Manager", blurb: "Runs projects, boards, tickets. No user management." },
+  { value: "AGENT",   label: "Agent",   blurb: "Helpdesk focus — handles tickets & customers, read-only elsewhere." },
   { value: "MEMBER",  label: "Member",  blurb: "Does the work — create/edit items, reply to tickets." },
   { value: "VIEWER",  label: "Viewer",  blurb: "Read-only access for stakeholders." },
 ];

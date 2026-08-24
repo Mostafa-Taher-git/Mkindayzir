@@ -24,6 +24,8 @@ from app.models import User
 DEMO_USERS = [
     ("admin@mkindayzir.demo",       "Admin@2026!",   "Demo Admin",    "ADMIN"),
     ("manager@mkindayzir.demo",     "Manager@2026!", "Demo Manager",  "MANAGER"),
+    # AGENT: helpdesk-focused role (tickets + customers, read-only elsewhere)
+    ("agent@mkindayzir.demo",       "Agent@2026!",   "Demo Agent",    "AGENT"),
     ("member@mkindayzir.demo",      "Member@2026!",  "Demo Member",   "MEMBER"),
     ("viewer@mkindayzir.demo",      "Viewer@2026!",  "Demo Viewer",   "VIEWER"),
 ]

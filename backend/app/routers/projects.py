@@ -28,7 +28,10 @@ async def create_project(data: ProjectCreate, user: dict = Depends(get_current_u
     from app.utils.rbac import has_permission
     if not has_permission(user["role"], "manage:projects"):
         raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": "Forbidden"}})
-    result = await ProjectService.create(db, data.model_dump(exclude_none=True), user)
+    try:
+        result = await ProjectService.create(db, data.model_dump(exclude_none=True), user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": {"code": "DUPLICATE_KEY", "message": str(e)}})
     return {"project": result}
 
 

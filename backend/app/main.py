@@ -17,7 +17,7 @@ from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
-    tickets
+    tickets, ws
 )
 
 
@@ -101,7 +101,7 @@ for router in [
     spaces.router, boards.router, columns.router, cards.router,
     checklists.router, vault.router, assistant.router, settings.router,
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
-    dashboard.router, tickets.router,
+    dashboard.router, tickets.router, ws.router,
 ]:
     app.include_router(router)
 
@@ -121,6 +121,64 @@ async def public_config():
 
 
 
+
+# --------------------------------------------------------------------------- #
+# API slash-tolerance middleware.
+#
+# Routers declare collections WITH a trailing slash ("/api/projects/") while
+# the SPA calls them WITHOUT ("/api/projects"). Starlette would normally 307-
+# redirect the slashless form, but the SPA catch-all route below intercepts
+# the request first, so POST/PATCH to "/api/projects" died with 405.
+#
+# A blanket rewrite is wrong too ("/api/auth/login" has no slash-ful twin),
+# so this middleware builds the concrete set of API paths once at startup and
+# only rewrites when the slash-ful variant actually exists. Both spellings
+# then work for every current and future route with zero client changes.
+# --------------------------------------------------------------------------- #
+class ApiSlashRedirectMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self._slashful_paths: set[str] | None = None
+
+    def _build_path_set(self) -> None:
+        # Newer FastAPI wraps include_router() in opaque _IncludedRouter
+        # objects; the concrete APIRouter hangs off .original_router.
+        from app.main import app as fastapi_app
+
+        paths: set[str] = set()
+
+        def walk(routes) -> None:
+            for route in routes:
+                path = getattr(route, "path", None)
+                if path:
+                    paths.add(path)
+                nested = getattr(route, "routes", None)
+                if nested and not path:
+                    walk(nested)
+                original = getattr(route, "original_router", None)
+                if original is not None:
+                    walk(original.routes)
+
+        walk(fastapi_app.routes)
+        self._slashful_paths = {p for p in paths if p.startswith("/api") and p.endswith("/")}
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if (
+                path.startswith("/api")
+                and len(path) > 4
+                and not path.endswith("/")
+            ):
+                if self._slashful_paths is None:
+                    self._build_path_set()
+                if (path + "/") in self._slashful_paths:
+                    scope = dict(scope)
+                    scope["path"] = path + "/"
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(ApiSlashRedirectMiddleware)
 
 # --------------------------------------------------------------------------- #
 # Static serving of the built frontend (production single-process mode).

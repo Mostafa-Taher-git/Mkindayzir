@@ -1,10 +1,12 @@
+import os
+
 import httpx
 from app.config import settings
 from app.utils.encryption import decrypt, get_encryption_key
 
 
 DEFAULT_PROVIDERS = {
-    "openrouter": {"baseUrl": "https://openrouter.ai/api/v1", "defaultModel": "meta-llama/llama-3.1-8b-instruct:free"},
+    "openrouter": {"baseUrl": "https://openrouter.ai/api/v1", "defaultModel": "nvidia/nemotron-3-super-120b-a12b:free"},
     "openai": {"baseUrl": "https://api.openai.com/v1", "defaultModel": "gpt-4o-mini"},
     "anthropic": {"baseUrl": "https://api.anthropic.com/v1", "defaultModel": "claude-3-haiku-20240307"},
     "custom": {"baseUrl": "", "defaultModel": ""},
@@ -18,11 +20,20 @@ class AIService:
         provider_defaults = DEFAULT_PROVIDERS.get(provider_name, DEFAULT_PROVIDERS["openrouter"])
 
         encrypted_api_key = user.get("aiApiKey")
-        if not encrypted_api_key:
-            raise ValueError("No API key configured. Please add your API key in Settings.")
-
-        key = get_encryption_key()
-        api_key = decrypt(encrypted_api_key, key)
+        if encrypted_api_key:
+            key = get_encryption_key()
+            api_key = decrypt(encrypted_api_key, key)
+        else:
+            # Fallback: server-level OpenRouter key (OPENROUTER_API_KEY in the
+            # backend .env). Lets a fresh instance use the assistant without
+            # every user pasting their own key. Personal keys always win.
+            api_key = os.environ.get("OPENROUTER_API_KEY", "")
+            if not api_key:
+                # pydantic-settings reads the .env file but doesn't export it;
+                # read the setting off the Settings model if declared there.
+                api_key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
+            if not api_key or provider_name != "openrouter":
+                raise ValueError("No API key configured. Please add your API key in Settings.")
 
         return {
             "name": provider_name,
@@ -56,7 +67,15 @@ class AIService:
                 "stream": True,
             }
             if tools and len(tools) > 0:
-                request_body["tools"] = tools
+                # TOOL_DEFINITIONS are stored as bare {name, description,
+                # parameters}; the OpenAI/OpenRouter wire format wraps each in
+                # {"type": "function", "function": {...}}. Sending them raw
+                # made every provider reject the request with 400 "missing
+                # field `type`" — so the assistant could NEVER stream.
+                request_body["tools"] = [
+                    t if t.get("type") == "function" else {"type": "function", "function": t}
+                    for t in tools
+                ]
             if is_anthropic:
                 request_body["max_tokens"] = 4096
 

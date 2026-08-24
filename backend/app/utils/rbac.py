@@ -5,6 +5,9 @@ ROLES = {
     "MANAGER": "MANAGER",
     "MEMBER": "MEMBER",
     "VIEWER": "VIEWER",
+    # AGENT: helpdesk-focused role — full ticket handling + customer
+    # visibility, read-only everywhere else. Sits between MEMBER and MANAGER.
+    "AGENT": "AGENT",
 }
 
 PERMISSIONS = {
@@ -65,6 +68,20 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
         PERMISSIONS["VIEW_TICKETS"],
         PERMISSIONS["CREATE_TICKETS"],
         PERMISSIONS["REPLY_TICKETS"],
+        PERMISSIONS["VIEW_CUSTOMERS"],
+    ],
+    "AGENT": [
+        # Helpdesk agent: everything tickets + read-only workspace access.
+        PERMISSIONS["VIEW_DASHBOARD"],
+        PERMISSIONS["VIEW_PROJECTS"],
+        PERMISSIONS["VIEW_BOARDS"],
+        PERMISSIONS["VIEW_VAULT"],
+        PERMISSIONS["VIEW_REPORTS"],
+        PERMISSIONS["MANAGE_TICKETS"],
+        PERMISSIONS["VIEW_TICKETS"],
+        PERMISSIONS["CREATE_TICKETS"],
+        PERMISSIONS["REPLY_TICKETS"],
+        PERMISSIONS["MANAGE_CUSTOMERS"],
         PERMISSIONS["VIEW_CUSTOMERS"],
     ],
     "VIEWER": [
