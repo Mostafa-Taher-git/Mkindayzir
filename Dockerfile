@@ -1,7 +1,7 @@
 # =============================================================================
 # Mkindayzir — single-process production image
 #
-# Stage 1 builds the Vite React SPA (project root) -> dist/
+# Stage 1 builds the Vite React SPA (frontend/) -> frontend/dist/
 # Stage 2 runs FastAPI which serves /api/* AND the static dist/ on :3000
 # (via the `mkindayzir` console script + FRONTEND_DIR).
 # =============================================================================
@@ -14,11 +14,11 @@ WORKDIR /app
 
 # Install deps first (better layer caching) — copy lockfile + manifest first.
 RUN corepack enable && corepack prepare pnpm@9 --activate
-COPY package.json pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Copy the rest of the repo (frontend sources at root) and build.
-COPY . .
+# Copy the frontend sources and build.
+COPY frontend .
 RUN pnpm build
 
 # ---------------------------------------------------------------------------

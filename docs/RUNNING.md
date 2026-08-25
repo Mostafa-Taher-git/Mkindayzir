@@ -55,8 +55,8 @@ uvicorn app.main:app --reload --port 8000
 **Terminal 2 — Vite frontend:**
 
 ```bash
-pnpm install
-pnpm dev                         # http://localhost:3000, proxies /api -> :8000
+pnpm install                        # repo root (workspace)
+pnpm --dir frontend dev            # http://localhost:3000, proxies /api -> :8000
 ```
 
 - App: http://localhost:3000

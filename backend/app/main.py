@@ -189,7 +189,7 @@ app.add_middleware(ApiSlashRedirectMiddleware)
 # absent (dev mode) the API still works and SPA routes simply 404.
 # --------------------------------------------------------------------------- #
 _frontend_dir = Path(os.environ.get("FRONTEND_DIR", "")) if os.environ.get("FRONTEND_DIR") else (
-    Path(__file__).resolve().parent.parent.parent / "dist"
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 )
 
 if _frontend_dir.exists() and _frontend_dir.is_dir():

@@ -32,7 +32,7 @@ bash docker/init.sh         # runs migrations + creates the admin user
 
 The app is then available on **http://localhost:3000** (put it behind your reverse proxy / TLS terminator).
 
-> To build the SPA yourself before `mkindayzir start` (or for local dev), see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+> Local development (Vite dev server + API): see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Features
 

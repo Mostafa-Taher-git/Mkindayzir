@@ -6,6 +6,7 @@ node_modules
 .next
 out
 dist
+frontend/dist
 
 # Testing
 coverage
@@ -29,8 +30,9 @@ __pycache__/
 *.egg-info/
 
 # Database
-prisma/migrations/*.sql
-!prisma/migrations/migration_lock.toml
+*.db
+*.db-wal
+*.db-shm
 
 # Uploads
 data/
