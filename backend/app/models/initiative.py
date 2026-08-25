@@ -16,6 +16,7 @@ class Initiative(Base):
     progress: Mapped[float] = mapped_column(Float, server_default=text("'0'"), nullable=False)
     startDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     targetDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

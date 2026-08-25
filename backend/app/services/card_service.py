@@ -3,6 +3,7 @@ from typing import List
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 from app.models.card import Card
 from app.models.column import Column
 from app.models.card_member import CardMember
@@ -140,6 +141,28 @@ class CardService:
             await db.delete(cl)
             await db.commit()
         return {"ok": True}
+
+    @staticmethod
+    async def list_members(db: AsyncSession, card_id: str) -> dict:
+        result = await db.execute(
+            select(CardMember)
+            .where(CardMember.cardId == card_id)
+            .options(joinedload(CardMember.user))
+        )
+        members = result.unique().scalars().all()
+        return {
+            "members": [
+                {
+                    "id": m.userId,
+                    "userId": m.userId,
+                    "user": {
+                        "displayName": m.user.displayName if m.user else None,
+                        "avatar": m.user.avatar if m.user else None,
+                    },
+                }
+                for m in members
+            ]
+        }
 
     @staticmethod
     async def add_member(db: AsyncSession, card_id: str, user_id: str, user: dict) -> dict:

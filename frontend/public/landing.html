@@ -185,7 +185,6 @@
         <a href="/login">Console</a>
       </nav>
       <div class="nav-cta">
-        <button class="btn btn-ghost chamfer" id="themeBtn" title="Toggle theme">◐</button>
         <a class="btn btn-primary chamfer" href="/login">Enter Console</a>
       </div>
     </div>
@@ -204,7 +203,7 @@
         <div class="hero-stats">
           <div class="stat"><div class="n nums">100%</div><div class="l label">On your hardware</div></div>
           <div class="stat"><div class="n nums">0</div><div class="l label">Cloud dependencies</div></div>
-          <div class="stat"><div class="n nums">4</div><div class="l label">Ready-made test accounts</div></div>
+          <div class="stat"><div class="n nums">5</div><div class="l label">Ready-made test accounts</div></div>
         </div>
       </div>
       <div class="console chamfer-lg">
@@ -251,9 +250,9 @@
           <p>Data stays on disk. API keys are encrypted at rest with AES-256-GCM. Nothing leaves your network unless you choose.</p>
         </div>
         <div class="card">
-          <div class="ico">⟳</div>
-          <h3>Offline-Capable</h3>
-          <p>A service worker keeps the console usable without a connection. Changes sync when you reconnect.</p>
+          <div class="ico">⇄</div>
+          <h3>Real-Time Sync</h3>
+          <p>A live WebSocket connection keeps every board and ticket in step across open sessions — presence, updates, and changes arrive instantly.</p>
         </div>
         <div class="card">
           <div class="ico">⚙</div>
@@ -337,15 +336,6 @@
 
   <script>
     document.getElementById('yr').textContent = new Date().getFullYear();
-    var btn = document.getElementById('themeBtn');
-    var saved = localStorage.getItem('mkindayzir-theme');
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
-    btn.addEventListener('click', function () {
-      var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-      var next = cur === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('mkindayzir-theme', next);
-    });
   </script>
 </body>
 </html>

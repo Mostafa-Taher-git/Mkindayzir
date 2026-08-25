@@ -127,7 +127,7 @@ const ROADMAP_ITEMS: RoadmapItem[] = [
     stageLabel: "Stage 2 · Storage",
     status: "Planned",
     description:
-      "Automate full and incremental backups of SQLite databases, PostgreSQL clusters, and media attachments to S3-compatible storage (MinIO, Wasabi, AWS, Cloudflare R2) and SFTP.",
+      "Automate full and incremental backups of PostgreSQL clusters and media attachments to S3-compatible storage (MinIO, Wasabi, AWS, Cloudflare R2) and SFTP.",
     specs: [
       "Client-side GPG encryption before upload",
       "Point-in-time recovery (PITR) support",
@@ -365,7 +365,7 @@ export default function RoadmapPage() {
               <div className="text-primary font-bold mb-1">04 · STORAGE</div>
               <div className="font-semibold text-sm">Sovereign Data</div>
               <p className="text-muted-foreground text-[11px] mt-1">
-                Local-first SQLite or clustered PostgreSQL with encrypted multi-cloud backup automation.
+                Self-hosted PostgreSQL with encrypted multi-cloud backup automation.
               </p>
             </div>
           </div>

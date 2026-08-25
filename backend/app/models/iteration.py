@@ -15,6 +15,7 @@ class Iteration(Base):
     status: Mapped[str] = mapped_column(String(50), server_default=text("'PLANNING'"), nullable=False)
     startDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     endDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

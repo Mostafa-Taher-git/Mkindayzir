@@ -86,6 +86,11 @@ async def remove_card_label(card_id: str, label_id: str, user: dict = Depends(ge
     return await CardService.remove_label(db, card_id, label_id, user)
 
 
+@router.get("/{card_id}/members")
+async def list_card_members(card_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await CardService.list_members(db, card_id)
+
+
 @router.post("/{card_id}/members", status_code=201)
 async def add_card_member(card_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:

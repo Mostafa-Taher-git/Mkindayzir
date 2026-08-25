@@ -8,7 +8,7 @@ import { MigrationWizard } from "@/components/settings/migration-wizard";
 export default function SystemSettingsPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<string>("personal");
-  const [dbProvider, setDbProvider] = useState<string>("sqlite");
+  const [dbProvider, setDbProvider] = useState<string>("postgres");
   const [dbUrl, setDbUrl] = useState<string>("");
   const [dbSize, setDbSize] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,7 @@ export default function SystemSettingsPage() {
         <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Database</span>
-            <span className="font-mono">{dbProvider === "sqlite" ? "PostgreSQL" : "PostgreSQL"}</span>
+            <span className="font-mono">{dbProvider === "postgres" ? "PostgreSQL 16" : dbProvider}</span>
           </div>
           {isPersonal && (
             <div className="flex justify-between text-sm">
@@ -83,25 +83,6 @@ export default function SystemSettingsPage() {
         </Card>
       )}
 
-      {/* Downgrade to Personal Mode */}
-      {!isPersonal && (
-        <Card className="border-2 border-destructive/30">
-          <CardHeader>
-            <CardTitle className="text-destructive">Downgrade to Personal Mode</CardTitle>
-            <CardDescription>
-              This will export your data to SQLite and disable multi-user features.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Warning: This will remove all team members and disable real-time collaboration.
-            </p>
-            <Button variant="destructive" disabled>
-              Downgrade to Personal Mode (Coming Soon)
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

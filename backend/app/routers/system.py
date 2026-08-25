@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
@@ -25,7 +27,8 @@ async def get_migration_status(user: dict = Depends(get_current_user)):
     return {
         "mode": settings.MKINDAYZIR_MODE,
         "database_provider": settings.DATABASE_PROVIDER,
-        "database_url": settings.DATABASE_URL,
+        # Redact credentials before exposing the URL to any authenticated user.
+        "database_url": re.sub(r"(://[^:@/]+:)[^@/]+@", r"\1***@", settings.DATABASE_URL),
         "database_size_mb": round(db_size / (1024 * 1024), 2),
         "can_migrate": False,  # legacy SQLite import handled via CLI only
     }

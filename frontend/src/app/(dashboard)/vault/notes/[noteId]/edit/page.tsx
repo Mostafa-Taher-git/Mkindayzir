@@ -1,6 +1,6 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder, Tag } from "@/types";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
@@ -9,6 +9,37 @@ import { api } from "@/lib/api";
 
 export default function EditNotePage() {
   const { noteId } = useParams<{ noteId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Save wires the editor's onSave to the notes PATCH endpoint. Without it the
+  // editor's Save/Publish buttons were silent no-ops.
+  const saveMutation = useMutation({
+    mutationFn: async (data: {
+      title: string;
+      content: string;
+      folderId: string | null;
+      tagIds: string[];
+      status: string;
+    }) => {
+      const res = await fetch(`/api/vault/notes/${noteId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || "Failed to save note");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vault", "note", noteId] });
+      queryClient.invalidateQueries({ queryKey: ["vault", "note", noteId, "versions"] });
+      navigate(`/vault/notes/${noteId}`);
+    },
+  });
 
   const { data: noteData } = useQuery<{ note: any }>({
     queryKey: ["vault", "note", noteId],
@@ -48,7 +79,13 @@ export default function EditNotePage() {
             <span className="text-muted-foreground">/</span>
             <span className="text-sm">Edit Note</span>
           </div>
-          <NoteEditor note={note} folders={folders} availableTags={tags} />
+          <NoteEditor
+          note={note}
+          folders={folders}
+          availableTags={tags}
+          saving={saveMutation.isPending}
+          onSave={async (data) => { await saveMutation.mutateAsync(data); }}
+        />
         </div>
       </div>
     </div>

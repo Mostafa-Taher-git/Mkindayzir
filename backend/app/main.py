@@ -17,7 +17,7 @@ from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
-    tickets, ws, board_backgrounds, card_comments
+    tickets, ws, board_backgrounds, card_comments, users
 )
 
 
@@ -95,7 +95,7 @@ for router in [
     checklists.router, vault.router, assistant.router, settings.router,
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
     dashboard.router, tickets.router, ws.router, board_backgrounds.router,
-    card_comments.router,
+    card_comments.router, users.router,
 ]:
     app.include_router(router)
 
@@ -197,15 +197,36 @@ if _frontend_dir.exists() and _frontend_dir.is_dir():
     if _assets_dir.exists() and _assets_dir.is_dir():
         app.mount("/assets", StaticFiles(directory=str(_assets_dir), html=False), name="frontend-assets")
 
+    @app.get("/api/{path:path}")
+    async def api_fallback(path: str):
+        # Unmatched /api/* must never fall through to the SPA shell: the SPA
+        # catch-all below would otherwise answer real API typos/missing
+        # endpoints with index.html + 200, which silently renders as an
+        # "empty page" instead of a visible failure.
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "NOT_FOUND", "message": f"Unknown API endpoint: /api/{path}"}},
+        )
+
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         # Resolve candidate and ensure it stays within the frontend directory
         resolved_frontend = _frontend_dir.resolve()
+        # Marketing pages are edited directly in frontend/public/ — serve them
+        # from there so content fixes don't require a frontend rebuild.
+        if path.endswith(".html"):
+            public_candidate = (resolved_frontend.parent / "public" / path).resolve()
+            if public_candidate.is_relative_to((resolved_frontend.parent / "public").resolve()) and public_candidate.is_file():
+                return FileResponse(str(public_candidate))
         candidate = (resolved_frontend / path).resolve()
         if path and candidate.is_relative_to(resolved_frontend) and candidate.exists() and candidate.is_file():
             return FileResponse(str(candidate))
         # The marketing landing page is the front door: "/" serves it instead
-        # of dropping the visitor straight into the console login.
+        # of dropping the visitor straight into the console login. Prefer the
+        # live public/ copy so content edits never need a rebuild.
         if not path or path == "/":
+            public_landing = (resolved_frontend.parent / "public" / "landing.html").resolve()
+            if public_landing.is_file():
+                return FileResponse(str(public_landing))
             return FileResponse(str(resolved_frontend / "landing.html"))
         return FileResponse(str(resolved_frontend / "index.html"))
