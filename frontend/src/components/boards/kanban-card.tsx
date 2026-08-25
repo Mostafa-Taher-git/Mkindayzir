@@ -1,5 +1,5 @@
 /**
- * Trello-style kanban card face:
+ * Kanban card face:
  *   cover stripe · complete circle · title · badges (desc/checklist/members)
  *   hover actions: edit (opens card) + archive · template banner
  */

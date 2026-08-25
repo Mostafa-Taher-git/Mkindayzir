@@ -104,7 +104,7 @@ class PresenceHub:
             for ws in list(sockets):
                 try:
                     await ws.send_text(data)
-                except Exception:
+                except (RuntimeError, WebSocketDisconnect):
                     # dead socket; its disconnect handler will clean it up
                     pass
 
@@ -152,8 +152,8 @@ async def websocket_endpoint(ws: WebSocket, token: str | None = Query(None)):
             raw = await ws.receive_text()
             try:
                 message = json.loads(raw)
-            except Exception:
-                continue
+            except ValueError:
+                continue  # malformed frame from a client; ignore
 
             mtype = message.get("type")
             if mtype == "ping":

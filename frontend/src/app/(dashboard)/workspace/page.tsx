@@ -1,7 +1,7 @@
 /**
  * Workspace — the boards home.
  *
- * Flow (Trello-style):
+ * Flow:
  *   1. Pick a space (or create one inline).
  *   2. See that space's boards — starred boards float to the top.
  *   3. Create a board, open one, or link the space to a project.
@@ -192,7 +192,7 @@ export default function WorkspacePage() {
         </Card>
       )}
 
-      {/* Starred boards — across ALL spaces, Trello-style */}
+      {/* Starred boards — across ALL spaces */}
       {boards.some((b) => b.starred) && (
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2 mb-3">☆ Starred boards</h2>

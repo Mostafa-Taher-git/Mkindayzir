@@ -20,9 +20,9 @@ class BoardService:
             return raw
         try:
             parsed = _json.loads(raw or "{}")
-            return parsed if isinstance(parsed, dict) else {}
-        except Exception:
+        except (ValueError, TypeError):
             return {}
+        return parsed if isinstance(parsed, dict) else {}
 
     @staticmethod
     def _serialize(board: Board, starred: bool = False, space_name: str | None = None) -> dict:

@@ -1,5 +1,5 @@
 /**
- * AddColumnButton — "<IconPlus className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Add another list" inline composer (Trello-style).
+ * AddColumnButton — "+ Add another list" inline composer.
  */
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ export function AddColumnButton({ boardId }: { boardId: string }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["columns", boardId] });
       setName("");
-      // keep the composer open for rapid entry, like Trello
+      // keep the composer open for rapid entry
     },
   });
 

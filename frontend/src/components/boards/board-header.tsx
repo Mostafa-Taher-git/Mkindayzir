@@ -1,5 +1,5 @@
 /**
- * BoardHeader — Trello-style board chrome.
+ * BoardHeader — board chrome.
  *
  * Star/unstar · rename · visibility switcher · share (copy link + members) ·
  * switch-between-boards dropdown · background picker.

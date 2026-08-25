@@ -15,7 +15,7 @@ class Card(Base):
     position: Mapped[int] = mapped_column(Integer, server_default=text("'0'"), nullable=False)
     dueDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     coverColor: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    # Trello-style card states
+    # Card states
     isComplete: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     isTemplate: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     meta: Mapped[str] = mapped_column("metadata", String, server_default=text("'{}'"), nullable=False)

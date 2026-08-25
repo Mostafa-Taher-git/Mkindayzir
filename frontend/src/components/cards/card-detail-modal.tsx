@@ -1,5 +1,5 @@
 /**
- * CardDetailModal — Trello-style card view.
+ * CardDetailModal — card view.
  *
  * Layout: full-width dialog, left = title + complete toggle + action buttons +
  * description; right = Comments & activity feed.

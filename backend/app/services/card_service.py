@@ -177,7 +177,7 @@ class CardService:
 
     @staticmethod
     async def copy(db: AsyncSession, card_id: str, user: dict) -> dict:
-        """Duplicate a card into the same list (Trello 'Copy')."""
+        """Duplicate a card into the same list."""
         source = (await db.execute(select(Card).where(Card.id == card_id, Card.deletedAt.is_(None)))).scalar_one_or_none()
         if not source:
             raise ValueError("Card not found")

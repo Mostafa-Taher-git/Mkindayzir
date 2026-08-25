@@ -107,7 +107,7 @@ async def create_card_checklist(card_id: str, data: dict, user: dict = Depends(g
 
 @router.post("/{card_id}/copy", status_code=201)
 async def copy_card(card_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Duplicate a card into the same list (Trello-style Copy)."""
+    """Duplicate a card into the same list."""
     try:
         return {"card": await CardService.copy(db, card_id, user)}
     except ValueError:

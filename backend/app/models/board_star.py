@@ -1,7 +1,7 @@
 """
 Per-user board stars.
 
-Trello-style: starring is a per-user flag (a board starred by one user must
+Starring is a per-user flag (a board starred by one user must
 not appear starred for another), so it lives in its own table keyed by
 (user, board) rather than on the board row.
 """

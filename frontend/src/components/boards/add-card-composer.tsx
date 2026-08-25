@@ -73,7 +73,7 @@ export function AddCardComposer({ boardId, columnId }: AddCardComposerProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cards", boardId] });
-      // Trello behaviour: composer stays open, title resets, focus returns.
+      // Composer stays open, title resets, focus returns.
       setTitle("");
       setDescription("");
       setCoverColor(undefined);

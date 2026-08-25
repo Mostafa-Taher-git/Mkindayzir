@@ -13,7 +13,7 @@ class Board(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     background: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    # Trello-style board visibility: PRIVATE (space members) / WORKSPACE
+    # Board visibility: PRIVATE (space members) / WORKSPACE
     # (anyone in the instance) / PUBLIC (anyone with the link).
     visibility: Mapped[str] = mapped_column(String(20), server_default=text("'WORKSPACE'"), nullable=False)
     settings: Mapped[str] = mapped_column(String, server_default=text("'{}'"), nullable=False)
