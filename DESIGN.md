@@ -108,8 +108,8 @@ The visual style blends **Modern Corporate** reliability with **Glassmorphism** 
 The palette is rooted in the "Deep Space" environment.
 - **Primary (Deep Space Navy):** Used for base surfaces and background voids.
 - **Secondary (Titanium Grey):** Used for structural borders, inactive states, and metallic accents.
-- **Tertiary (Steel Blue):** Used for interactive elements, links, and progress indicators.
-- **Crimson Red:** Reserved exclusively for high-urgency alerts, critical tickets, and primary Call-to-Action (CTA) buttons.
+- **Tertiary (Steel Blue):** The action color — interactive elements, links, progress indicators, and primary action buttons.
+- **Crimson Red:** Reserved exclusively for danger and urgency — destructive buttons (Log out, Delete), critical tickets, SLA breaches, and the marketing CTA hover. Never for ordinary primary actions.
 - **Radiant Gold:** Used for "VIP" status, priority highlights, and system-level achievements.
 - **White:** Provides high-contrast legibility for primary text and iconography.
 
@@ -143,10 +143,12 @@ The shape language is **Strictly Geometric**.
 - **Beveled Accents:** For secondary decorative elements or status chips, use "clipped corners" (45-degree angles) via CSS `clip-path` to reinforce the Mecha design motif.
 
 ## Components
-- **Buttons:** 
-  - *Primary:* Solid Crimson Red with White text. Sharp corners.
-  - *Secondary:* Ghost style with Steel Blue borders and "Holographic" hover glow.
-- **Input Fields:** Dark background, 1px Titanium border. On focus, the border turns Gold and a faint Gold glow appears.
+- **Buttons — one structure, two colors.** Every button shares the same armored anatomy: chamfered corners (`clip-path`, 45°), 2px Titanium border, JetBrains Mono uppercase text, inset bevel (`inset 0 1px 0` highlight + `inset 0 -2px 0` shadow), and a 1px translate-down press. Only the color semantics differ:
+  - *Primary (default variant):* **Steel Blue fill at rest** (`#96ccff`) with deep-navy text (`#003353`) → brighter blue on hover (`#b8dcff`), blue border, and a blue ring+bloom (`0 0 0 1px` + soft glow). Used for every ordinary action: New Project, Save, Sign in, Add Card.
+  - *Destructive:* **Crimson fill at rest** (`#ff5449`) with white text → brighter crimson on hover (`#ff6c63`) with a crimson ring+bloom. Used only for danger actions: Log out, Delete, role demotion confirmations.
+  - *Outline / Secondary / Ghost:* Steel panel or transparent with Titanium borders; hover shifts border/text to Steel Blue. No fill change.
+  - *Marketing CTA exception:* The landing "Enter Console" button rests as a steel panel and fills crimson on hover — the one sanctioned place crimson acts as a CTA hover.
+- **Input Fields:** Dark background, 1px Titanium border. On focus, the border turns Steel Blue with a faint blue glow.
 - **Status Chips:** Rectangular with JetBrains Mono text. Use Crimson for "Critical," Gold for "Priority," and Steel Blue for "In Progress."
 - **Cards/Panels:** Semi-transparent background with a visible 1px Titanium frame. Top-left corners of cards may feature a small "Tech ID" tag in monospaced font.
 - **Progress Bars:** Segmented bars (reminiscent of power levels) rather than smooth continuous fills.

@@ -106,6 +106,8 @@ const config: Config = {
         panel: "0 0 0 1px var(--color-border)",
         // Primary-button hover: 1px crimson ring + soft bloom (marketing .btn-primary:hover)
         "critical-ring": "0 0 0 1px var(--color-critical), 0 0 14px -2px var(--color-critical)",
+        // Blue twin of critical-ring for primary actions (blue stays blue)
+        "accent-ring": "0 0 0 1px var(--color-accent), 0 0 14px -2px var(--color-accent)",
       },
       spacing: {
         "1": "4px",
