@@ -59,17 +59,10 @@ def http_exception_handler(request: Request, exc):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Bootstrap storage directories BEFORE the engine opens a connection.
-    # SQLite (and Postgres file paths) refuse to create intermediate
-    # directories, so a missing DATA_DIR crashed first startup with
-    # "unable to open database file".
+    # Uploads/backups still live on the filesystem — ensure their dirs exist.
     for _dir in (config_settings.data_dir, config_settings.UPLOAD_DIR, config_settings.BACKUP_DIR):
         Path(_dir).mkdir(parents=True, exist_ok=True)
 
-    if config_settings.database_provider == "sqlite":
-        from app.database import engine
-        from app.models import Base
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
     yield
 
 

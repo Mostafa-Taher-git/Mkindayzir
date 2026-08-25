@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     AUTO_LOGIN: bool = False
 
     # Database
-    DATABASE_PROVIDER: str = "sqlite"
+    # PostgreSQL is the only supported engine (user decision). "sqlite" is
+    # accepted solely as a legacy migration SOURCE via app.cli.migrate.
+    DATABASE_PROVIDER: str = "postgres"
     DATABASE_URL: str = "file:./data/mkindayzir.db"
     DATA_DIR: str = "./data"
 
@@ -107,8 +109,7 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        if self.database_provider == "sqlite":
-            return f"sqlite+aiosqlite:///{self.data_dir}/mkindayzir.db"
+        # PostgreSQL only. DATABASE_URL must be set in .env.
         return self.DATABASE_URL
 
     @property

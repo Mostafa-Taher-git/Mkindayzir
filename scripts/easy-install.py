@@ -5,7 +5,7 @@ Easy-install / deployment script for mkindayzir.
 Single-process architecture (target):
 - Backend: FastAPI served by the `mkindayzir` CLI; `mkindayzir start` runs uvicorn
   on port 3000 serving the API + the built Vite frontend.
-- DB: personal = SQLite (default); team/enterprise = PostgreSQL (asyncpg).
+- DB: PostgreSQL (asyncpg) for every mode. SQLite is legacy import-only.
 - Migrations: Alembic. First run: `alembic upgrade head`, then `mkindayzir setup admin`.
 - Docker: a SINGLE root Dockerfile builds the frontend and runs FastAPI on :3000.
   docker/docker-compose.yml defines one `app` service plus an optional `postgres`
@@ -124,8 +124,8 @@ def build_env_content(mode, domain, db_password):
     encryption_key = generate_secret()
 
     if mode == "personal":
-        provider = "sqlite"
-        database_url = "sqlite+aiosqlite:///./data/mkindayzir.db"
+        provider = "postgres"
+        database_url = "postgresql+asyncpg://mkindayzir:CHANGE_ME@127.0.0.1:5432/mkindayzir"
         postgres_block = ""
     else:
         provider = "postgres"
@@ -248,7 +248,7 @@ def cmd_local(args):
     print(f"  {Colors.BOLD}URL:{Colors.RESET}       http://localhost:3000")
     print(f"  {Colors.BOLD}Email:{Colors.RESET}     {email}")
     print(f"  {Colors.BOLD}Password:{Colors.RESET}  {password}")
-    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      Personal (SQLite, single process on :3000)")
+    print(f"  {Colors.BOLD}Mode:{Colors.RESET}      Personal (PostgreSQL, single process on :3000)")
     print()
     print(Colors.info("Start the server with:"))
     print(f"     {Colors.CYAN}source .venv/bin/activate && mkindayzir start{Colors.RESET}")
@@ -364,7 +364,7 @@ def build_parser():
 
     local = sub.add_parser("local", help="Install personal mode locally (venv + pip, no Docker).")
     local.add_argument("--mode", default="personal", const="personal", nargs="?",
-                       choices=["personal"], help="Local install is personal (SQLite) mode.")
+                       choices=["personal"], help="Local install is personal mode.")
     local.add_argument("--email", required=True, help="Admin email address.")
     local.add_argument("--password", default=None,
                        help="Admin password (auto-generated and printed if omitted).")
@@ -372,7 +372,7 @@ def build_parser():
 
     deploy = sub.add_parser("deploy", help="Deploy via Docker Compose (personal/team/enterprise).")
     deploy.add_argument("--mode", required=True, choices=["personal", "team", "enterprise"],
-                        help="personal=SQLite (no postgres), team/enterprise=PostgreSQL.")
+                        help="Mode selection (database is PostgreSQL in all modes).")
     deploy.add_argument("--email", required=True, help="Admin email address.")
     deploy.add_argument("--domain", default="", help="Public domain (team/enterprise).")
     deploy.add_argument("--db-password", default=None,

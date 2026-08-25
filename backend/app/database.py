@@ -21,10 +21,7 @@ def coerce_async_url(url: str) -> str:
     return url
 
 
-if settings.database_provider == "sqlite":
-    DATABASE_URL = f"sqlite+aiosqlite:///{settings.data_dir}/mkindayzir.db"
-else:
-    DATABASE_URL = coerce_async_url(settings.database_url)
+DATABASE_URL = coerce_async_url(settings.database_url)
 
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

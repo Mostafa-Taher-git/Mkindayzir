@@ -10,7 +10,7 @@ const MODES: { value: Mode; label: string; spec: string; description: string }[]
   {
     value: "personal",
     label: "Personal",
-    spec: "1 USER · SQLITE",
+    spec: "1 USER · POSTGRES",
     description: "Single user on a personal laptop. No Docker, no network, no team features.",
   },
   {

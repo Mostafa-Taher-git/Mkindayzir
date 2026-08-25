@@ -6,16 +6,12 @@ TC-SETUP-02  invalid initialRole falls back to ADMIN (never crashes)
 TC-SETUP-03  personal setup ALWAYS forces ADMIN regardless of requested role
 TC-SETUP-04  setup replay still rejected after role-based setup
 """
-import sqlite3
-import os
-
-from conftest import ADMIN, login
+from conftest import ADMIN, login, pg_query
 
 
 def _role_of(email):
-    con = sqlite3.connect(os.path.join(os.environ["DATA_DIR"], "mkindayzir.db"))
-    row = con.execute("SELECT role FROM users WHERE email=?", (email,)).fetchone()
-    con.close()
+    rows = pg_query('SELECT role FROM users WHERE "email"=$1', (email,))
+    return rows[0][0] if rows else None
     return row[0]
 
 

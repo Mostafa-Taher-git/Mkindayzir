@@ -13,18 +13,11 @@ TC-SEC-09  register endpoint honours REGISTRATION_ENABLED=false -> 403
 TC-SEC-10  password change flows hash with bcrypt (setup wizard)
 """
 import base64
-import os
 import re
-import sqlite3
 
 import pytest
 
-from conftest import ADMIN, MEMBER, setup_users, login
-
-
-def _db():
-    p = os.path.join(os.environ["DATA_DIR"], "mkindayzir.db")
-    return sqlite3.connect(p)
+from conftest import ADMIN, MEMBER, setup_users, login, pg_execute, pg_query
 
 
 def test_tc_sec_01_encryption_roundtrip():
@@ -41,9 +34,8 @@ def test_tc_sec_02_api_key_stored_encrypted(client):
     setup_users(client); login(client, ADMIN)
     r = client.patch("/api/settings/ai", json={"aiApiKey": "sk-or-v1-super-secret"})
     assert r.status_code == 200
-    con = _db()
-    row = con.execute("SELECT aiApiKey FROM users WHERE email=?", (ADMIN["email"],)).fetchone()
-    con.close()
+    rows = pg_query('SELECT "aiApiKey" FROM users WHERE "email"=$1', (ADMIN["email"],))
+    row = rows[0] if rows else None
     stored = row[0]
     assert stored and "sk-or-v1-super-secret" not in stored
     assert stored.count(".") == 3          # encrypted blob format
@@ -75,18 +67,14 @@ def test_tc_sec_05_role_change_requires_confirmation(client):
 
 def test_tc_sec_06_session_token_entropy(client):
     setup_users(client); login(client, ADMIN)
-    con = _db()
-    token = con.execute("SELECT token FROM sessions LIMIT 1").fetchone()[0]
-    con.close()
+    token = pg_query("SELECT token FROM sessions LIMIT 1")[0][0]
     assert len(token) == 128               # secrets.token_hex(64)
     assert re.fullmatch(r"[0-9a-f]{128}", token)
 
 
 def test_tc_sec_07_bcrypt_hash_strength(client):
     setup_users(client)
-    con = _db()
-    h = con.execute("SELECT passwordHash FROM users WHERE email=?", (ADMIN["email"],)).fetchone()[0]
-    con.close()
+    h = pg_query('SELECT "passwordHash" FROM users WHERE "email"=$1', (ADMIN["email"],))[0][0]
     assert h.startswith("$2")
     cost = int(h.split("$")[2])
     assert cost >= 10
@@ -115,8 +103,6 @@ def test_tc_sec_09_registration_toggle_off(client, monkeypatch):
 
 def test_tc_sec_10_setup_password_is_bcrypt_not_plaintext(client):
     client.post("/api/setup/", json={"mode": "team", **ADMIN, "confirmPassword": ADMIN["password"]})
-    con = _db()
-    h = con.execute("SELECT passwordHash FROM users WHERE email=?", (ADMIN["email"],)).fetchone()[0]
-    con.close()
+    h = pg_query('SELECT "passwordHash" FROM users WHERE "email"=$1', (ADMIN["email"],))[0][0]
     assert ADMIN["password"] not in h
     assert h.startswith("$2")

@@ -6,7 +6,7 @@ Mkindayzir is a single FastAPI process that serves the API (`/api/*`) and the bu
 
 - Python 3.11+ and pip
 - Node.js 18+ and pnpm 9+
-- PostgreSQL 16+ (Team mode only; Personal mode uses SQLite)
+- PostgreSQL 16+ (required in all modes)
 
 ## Quick start — Personal (no Docker)
 
@@ -76,9 +76,9 @@ mkindayzir version
 
 ## Database
 
-- **SQLite (Personal):** auto-created on startup; file at `data/mkindayzir.db`.
+- **PostgreSQL:** set `DATABASE_URL` in `backend/.env`; schema via `alembic upgrade head` (or the reset script).
 - **PostgreSQL (Team):** run `alembic upgrade head` (or `mkindayzir migrate upgrade`).
-- **SQLite -> PostgreSQL:** use the in-app wizard (Settings → System → "Upgrade to Team Mode"), or `mkindayzir migrate migrate-db` (reads `DATABASE_URL`).
+- **Legacy SQLite import:** `mkindayzir migrate-db <sqlite-file>` copies an old SQLite install into PostgreSQL.
 
 ## First run
 
@@ -90,7 +90,7 @@ mkindayzir version
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Essentials:
 
-- `DATABASE_PROVIDER`: `sqlite` (Personal) or `postgres` (Team)
+- `DATABASE_PROVIDER`: `postgres` (only value)
 - `DATABASE_URL`: database connection string
 - `SESSION_SECRET`: 64-char hex string for the session cookie
 - `ENCRYPTION_KEY`: 64-char hex string for AES-256-GCM encryption

@@ -3,10 +3,10 @@ Shared pytest fixtures: a fully isolated FastAPI app per test.
 
 Strategy
 --------
-- Point DATA_DIR / UPLOAD_DIR / BACKUP_DIR at a throwaway temp directory and
-  force DATABASE_PROVIDER=sqlite BEFORE importing app modules (config is a
-  singleton created at import time).
-- create_all() builds the schema on the temp SQLite DB; no Alembic needed.
+- Point DATA_DIR / UPLOAD_DIR / BACKUP_DIR at a throwaway temp directory.
+- Tests run against the dedicated PostgreSQL database mkindayzir_test (the
+  app is Postgres-only); the schema is dropped and recreated per test for
+  full isolation. No Alembic needed.
 - Requests go through httpx.AsyncClient + ASGITransport (the supported
   in-process pattern for httpx>=0.28), wrapped in a thin SYNC adapter so test
   bodies stay simple. Every request runs on ONE persistent event loop, which
@@ -18,7 +18,23 @@ import hashlib
 
 # --- env must be set before app.config is imported anywhere ---------------
 _TMP = tempfile.mkdtemp(prefix="mkindayzir-test-")
-os.environ["DATABASE_PROVIDER"] = "sqlite"
+
+# Reuse the dev DATABASE_URL but swap the database name to mkindayzir_test.
+import re as _re
+from pathlib import Path as _Path
+
+def _test_database_url() -> str:
+    env_path = _Path(__file__).resolve().parents[1] / ".env"
+    url = os.environ.get("DATABASE_URL", "")
+    if not url and env_path.is_file():
+        m = _re.search(r"^DATABASE_URL=(.+)$", env_path.read_text(), _re.M)
+        url = m.group(1).strip() if m else ""
+    if not url:
+        raise RuntimeError("DATABASE_URL not set for tests")
+    return _re.sub(r"/([^/@]+)(\?|$)", r"/mkindayzir_test\2", url)
+
+os.environ["DATABASE_URL"] = _test_database_url()
+os.environ["DATABASE_PROVIDER"] = "postgres"
 os.environ["DATA_DIR"] = os.path.join(_TMP, "data")
 os.environ["UPLOAD_DIR"] = os.path.join(_TMP, "uploads")
 os.environ["BACKUP_DIR"] = os.path.join(_TMP, "backups")
@@ -91,6 +107,8 @@ def client():
 
     async def _create():
         async with engine.begin() as conn:
+            # full isolation: wipe whatever the previous test left behind
+            await conn.run_sync(ModelsBase.metadata.drop_all)
             await conn.run_sync(ModelsBase.metadata.create_all)
 
     loop.run_until_complete(_create())
@@ -127,14 +145,42 @@ def setup_users(client):
     for u in (MEMBER, VIEWER):
         r = client.post("/api/auth/register", json=u)
         assert r.status_code == 201, r.text
-    import sqlite3
-    con = sqlite3.connect(os.path.join(os.environ["DATA_DIR"], "mkindayzir.db"))
-    con.execute("UPDATE users SET role='VIEWER' WHERE email=?", (VIEWER["email"],))
-    con.commit()
-    con.close()
+    pg_execute('UPDATE users SET role=\'VIEWER\' WHERE "email"=$1', (VIEWER["email"],))
 
 
 def login(client, who):
     r = client.post("/api/auth/login", json={"email": who["email"], "password": who["password"]})
     assert r.status_code == 200, r.text
     return r
+
+def pg_query(sql: str, params: tuple = ()) -> list[tuple]:
+    """Run a statement against the PG TEST database (sync). For test asserts."""
+    import asyncio
+    import asyncpg
+
+    async def _run():
+        url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+        conn = await asyncpg.connect(url)
+        try:
+            rows = await conn.fetch(sql, *params)
+            return [tuple(r.values()) for r in rows]
+        finally:
+            await conn.close()
+
+    return asyncio.get_event_loop().run_until_complete(_run())
+
+
+def pg_execute(sql: str, params: tuple = ()) -> None:
+    """Run a mutation against the PG TEST database (sync)."""
+    import asyncio
+    import asyncpg
+
+    async def _run():
+        url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+        conn = await asyncpg.connect(url)
+        try:
+            await conn.execute(sql, *params)
+        finally:
+            await conn.close()
+
+    asyncio.get_event_loop().run_until_complete(_run())

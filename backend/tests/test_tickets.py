@@ -108,11 +108,9 @@ def test_tc_tkt_09_assigned_member_can_close(client):
     setup_users(client)
 
     # fetch member id via direct DB read (no user-list API by design)
-    import sqlite3, os
-    db_path = os.path.join(os.environ["DATA_DIR"], "mkindayzir.db")
-    con = sqlite3.connect(db_path)
-    row = con.execute("SELECT id FROM users WHERE email=?", (MEMBER["email"],)).fetchone()
-    con.close()
+    from conftest import pg_query
+    rows = pg_query('SELECT "id" FROM users WHERE "email"=$1', (MEMBER["email"],))
+    row = rows[0] if rows else None
     member_id = row[0]
 
     login(client, ADMIN)
@@ -146,11 +144,8 @@ def test_tc_tkt_10_reply_permissions(client):
 
 def test_tc_tkt_11_assign_sets_in_progress(client):
     setup_users(client); login(client, ADMIN)
-    import sqlite3, os
-    db_path = os.path.join(os.environ["DATA_DIR"], "mkindayzir.db")
-    con = sqlite3.connect(db_path)
-    member_id = con.execute("SELECT id FROM users WHERE email=?", (MEMBER["email"],)).fetchone()[0]
-    con.close()
+    from conftest import pg_query
+    member_id = pg_query('SELECT "id" FROM users WHERE "email"=$1', (MEMBER["email"],))[0][0]
     t = _mk_ticket(client)
     out = client.post(f"/api/tickets/{t['id']}/assign", json={"assigneeId": member_id}).json()
     assert out["status"] == "IN_PROGRESS" and out["assigneeId"] == member_id

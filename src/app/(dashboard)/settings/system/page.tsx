@@ -44,13 +44,13 @@ export default function SystemSettingsPage() {
         <CardHeader>
           <CardTitle>Current Mode</CardTitle>
           <CardDescription>
-            {isPersonal ? "Personal (SQLite)" : "Team (PostgreSQL)"}
+            {isPersonal ? "Personal (PostgreSQL)" : "Team (PostgreSQL)"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Database</span>
-            <span className="font-mono">{dbProvider === "sqlite" ? "SQLite (local file)" : "PostgreSQL"}</span>
+            <span className="font-mono">{dbProvider === "sqlite" ? "PostgreSQL" : "PostgreSQL"}</span>
           </div>
           {isPersonal && (
             <div className="flex justify-between text-sm">

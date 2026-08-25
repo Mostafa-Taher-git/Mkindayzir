@@ -2,12 +2,15 @@
 # Mkindayzir — canonical single-process compose
 #
 # One `app` service builds the root Dockerfile (FastAPI + built Vite SPA) and
-# publishes a single port 3000. SQLite (personal) is the default; PostgreSQL
-# (team/enterprise) is opt-in via `docker compose --profile team up`.
+# publishes a single port 3000. PostgreSQL 16 is the database for every mode
+# and runs as a companion service on the `db` network alias.
 #
 # Usage:
-#   Personal : docker compose -f docker/docker-compose.yml up -d
-#   Team     : docker compose -f docker/docker-compose.yml --profile team up -d
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# The app connects with:
+#   DATABASE_PROVIDER=postgres
+#   DATABASE_URL=postgresql+asyncpg://mkindayzir:mkindayzir@db:5432/mkindayzir
 # =============================================================================
 services:
   app:
@@ -18,13 +21,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Override the relative default so SQLite lives on the named volume.
       - DATA_DIR=/app/data
       - FRONTEND_DIR=/app/dist
+      - DATABASE_PROVIDER=postgres
+      - DATABASE_URL=postgresql+asyncpg://mkindayzir:${POSTGRES_PASSWORD:-mkindayzir}@db:5432/mkindayzir
     volumes:
       - mkindayzir_data:/app/data
-    env_file:
-      - .env
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -32,27 +37,20 @@ services:
       timeout: 10s
       retries: 3
 
-  # Only for Team/Enterprise mode (opt-in via --profile team):
-  postgres:
+  db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-mkindayzir}
       - POSTGRES_USER=${POSTGRES_USER:-mkindayzir}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-mkindayzir}}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mkindayzir}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    env_file:
-      - .env
-    profiles:
-      - team
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mkindayzir} -d ${POSTGRES_DB:-mkindayzir}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U mkindayzir"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
   mkindayzir_data:

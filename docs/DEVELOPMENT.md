@@ -7,7 +7,7 @@ Mkindayzir is a single FastAPI backend (`backend/`) plus a Vite + React SPA at t
 - Python 3.11+
 - Node.js 18+
 - pnpm 9.x
-- PostgreSQL 16+ (only required for Team mode; Personal mode uses SQLite)
+- PostgreSQL 16+ running locally (`sudo systemctl status postgresql`)
 
 ## Backend setup
 
@@ -57,14 +57,15 @@ mkindayzir version
 
 ## Database
 
-### Personal mode (SQLite)
+### Database setup
 
 ```env
-DATABASE_PROVIDER=sqlite
+DATABASE_PROVIDER=postgres
+DATABASE_URL=postgresql+asyncpg://mkindayzir:<password>@127.0.0.1:5432/mkindayzir
 DATABASE_URL=file:./data/mkindayzir.db
 ```
 
-Tables are auto-created on backend startup for SQLite; run `alembic upgrade head` for a clean migration history.
+Create the role/database once, then `alembic upgrade head` (dev shortcut: `PYTHONPATH=. python scripts/reset_pg.py`). Tests use the dedicated `mkindayzir_test` database automatically.
 
 ### Team mode (PostgreSQL)
 

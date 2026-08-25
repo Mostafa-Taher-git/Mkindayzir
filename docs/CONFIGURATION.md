@@ -11,13 +11,13 @@ All configuration is via environment variables. The backend reads these from the
 | `MKINDAYZIR_MODE` | `personal` | Deployment mode: `personal` or `team`. |
 | `AUTO_LOGIN` | `false` | Auto-login for Personal Mode (single user). |
 | `FRONTEND_DIR` | `<project root>/dist` | Optional override of the directory serving the built SPA. |
-| `DATA_DIR` | `./data` | Data directory for the SQLite DB, uploads, and backups. |
+| `DATA_DIR` | `./data` | Uploads and backups directory. |
 
 ## Database
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_PROVIDER` | `sqlite` | Database provider: `sqlite` or `postgres`. |
+| `DATABASE_PROVIDER` | `postgres` | Only `postgres` is supported. |
 | `DATABASE_URL` | `file:./data/mkindayzir.db` | Connection string. `postgresql://user:pass@host:5432/dbname` for Team mode. |
 | `DB_PASSWORD` | `change-me-in-production` | Fallback PostgreSQL password used by Docker Compose when `POSTGRES_PASSWORD` is not explicitly set. |
 
@@ -83,11 +83,11 @@ All configuration is via environment variables. The backend reads these from the
 
 ## Examples
 
-### Personal mode (SQLite, no Docker)
+### Personal mode (no Docker)
 
 ```env
 MKINDAYZIR_MODE=personal
-DATABASE_PROVIDER=sqlite
+DATABASE_PROVIDER=postgres
 DATABASE_URL=file:./data/mkindayzir.db
 DATA_DIR=./data
 AUTO_LOGIN=false

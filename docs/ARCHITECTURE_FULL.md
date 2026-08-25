@@ -60,12 +60,12 @@ Mkindayzir is a full-stack application with a **Vite + React SPA** frontend and 
 |  |                          |                                     |
 |  |  +-----------------------v-----------------------------------+ |
 |  |  |  Data Access Layer (SQLAlchemy 2.0 ORM)                   | |
-|  |  |  Supports: SQLite (personal) OR PostgreSQL (team/enterprise)|
+|  |  |  PostgreSQL 16 + asyncpg (all modes) |
 |  |  +-----------------------------------------------------------+ |
 |  +---------------------------------------------------------------+
 |                               |                                    |
 |  +----------------------------v------+  +------------------------+ |
-|  |  SQLite file OR PostgreSQL 16     |  | File System            | |
+|  |  PostgreSQL 16 cluster            |  | File System            | |
 |  |  (based on DATABASE_PROVIDER)     |  | /data/uploads/         | |
 |  +-----------------------------------+  +------------------------+ |
 +-------------------------------------------------------------------+
@@ -263,9 +263,9 @@ Guarded by `require_permission(permission)` in `backend/app/utils/rbac.py`.
 | `alembic/` | Database migration version control. |
 
 ### Data Source
-- `DATABASE_PROVIDER` -> `sqlite` (Personal) or `postgresql` (Team/Enterprise)
+- `DATABASE_PROVIDER` -> `postgres` (only value)
 - `DATABASE_URL` -> connection string
-- SQLite: auto-creates tables on startup (no Alembic needed for Personal mode)
+- Schema via Alembic migrations; scripts/reset_pg.py for dev resets
 - PostgreSQL: uses Alembic migrations
 
 ### Prisma Schema (Reference Only)
@@ -338,7 +338,7 @@ All files under `backend/app/services/`. Each service encapsulates business logi
 | `backend/app/services/iteration.py` | Iteration lifecycle. |
 | `backend/app/services/initiative.py` | Initiative CRUD. |
 | `backend/app/services/ticket_service.py` | Ticket CRUD, replies, stats, SLA tracking, customer management. |
-| `backend/app/services/migration_service.py` | SQLite -> PostgreSQL live migration with SSE progress. |
+| `backend/app/services/migration_service.py` | Legacy SQLite import service (CLI-driven). |
 
 ---
 
@@ -362,7 +362,7 @@ The repository pattern is simplified into service methods with direct SQLAlchemy
 | `src/components/spaces/` | Space management, space form |
 | `src/components/work-items/` | Work item table, form, filters |
 | `src/components/assistant/` | AI assistant chat (layout, interface, input, message bubble, conversation list, settings, model selector) |
-| `src/components/settings/` | Migration wizard for SQLite -> PostgreSQL upgrade |
+| `src/components/settings/` | System settings panels |
 | `src/components/tickets/` | Ticket list, form, sidebar, reply form, status badges |
 
 ---
@@ -445,7 +445,7 @@ The offline layer stores mutations in IndexedDB and replays them via the API cli
 
 | Mode | Database | WebSocket | Teams | Admin Panel | Audit Log | Auto-login | Default Env |
 |------|----------|-----------|-------|-------------|-----------|------------|-------------|
-| **Personal** | SQLite | Disabled | Disabled | Disabled | Disabled | Optional | MKINDAYZIR_MODE=personal |
+| **Personal** | PostgreSQL | Disabled | Disabled | Disabled | Disabled | Optional | MKINDAYZIR_MODE=personal |
 | **Team** | PostgreSQL | Deferred | Enabled | Enabled | Disabled | Disabled | MKINDAYZIR_MODE=team |
 | **Enterprise** | PostgreSQL | Deferred | Enabled | Enabled | Enabled | Disabled | MKINDAYZIR_MODE=enterprise |
 
@@ -472,7 +472,7 @@ Frontend: Vitest + Playwright. Backend: pytest in `backend/pyproject.toml` optio
 
 | File | Responsibility |
 |------|----------------|
-| `.github/workflows/ci.yml` | Lint, typecheck, test-sqlite, test-postgres, build. |
+| `.github/workflows/ci.yml` | Lint, typecheck, backend tests (Postgres), build. |
 | `.github/workflows/release.yml` | Docker image push to ghcr.io on tags. |
 
 ---
@@ -491,7 +491,7 @@ Frontend: Vitest + Playwright. Backend: pytest in `backend/pyproject.toml` optio
 10. **SQLAlchemy 2.0 + Alembic**: Replaces Prisma for the backend. Async-first ORM with migration version control.
 11. **Local-First Offline**: Dexie-based IndexedDB with sync engine (unchanged from previous architecture).
 12. **Security**: httpOnly cookies, bcrypt password hashing (cost 12), AES-256-GCM encryption for AI keys, security headers.
-13. **Multi-Database**: SQLite (Personal) and PostgreSQL (Team/Enterprise) supported via DATABASE_PROVIDER env var.
+13. **PostgreSQL-only**: single supported engine via DATABASE_PROVIDER env var.
 14. **No External Auth**: Custom bcrypt + DB sessions for full control.
 15. **SSE Streaming**: FastAPI handles AI assistant streaming via `text/event-stream`.
 16. **WebSocket Deferred**: Real-time features deferred to future FastAPI implementation.

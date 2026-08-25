@@ -16,7 +16,7 @@ On first start, `mkindayzir start` runs `alembic upgrade head` automatically and
 ```bash
 mkindayzir backup create
 mkindayzir backup restore <file.tar.gz> --force
-mkindayzir migrate migrate-db      # SQLite -> PostgreSQL (reads DATABASE_URL)
+mkindayzir migrate-db <old.db>     # legacy SQLite import (optional)
 ```
 
 This method is recommended for a single-user, local-first install on a laptop or small server.

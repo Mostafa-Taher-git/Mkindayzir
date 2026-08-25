@@ -34,7 +34,7 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 |                              |                                     |
 |  +---------------------------v--------------------------------+   |
 |  |  Persistence: SQLAlchemy 2.0 (async) + Alembic             |   |
-|  |  SQLite (personal)  OR  PostgreSQL/asyncpg (team)          |   |
+|  |  PostgreSQL 16 + asyncpg (all modes)                        |   |
 |  +------------------------------------------------------------+   |
 |                                                                   |
 |  Static serving (production): mounted dist/ + SPA catch-all     |
@@ -45,8 +45,8 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 
 1. **Single process (API + SPA).** `app/main.py` mounts the API routers, then (when `dist/` exists) serves the built SPA and a catch-all that returns `index.html`. This keeps deployment to one container/process.
 2. **Thin routers, fat services.** API routers under `backend/app/routers/` only parse requests/responses; all business logic lives in the services layer.
-3. **Async everywhere.** FastAPI + SQLAlchemy async engines; SQLite uses `aiosqlite`, PostgreSQL uses `asyncpg`.
-4. **One ORM, two backends.** SQLAlchemy models are backend-agnostic. The migration service copies data between SQLite and PostgreSQL without code changes.
+3. **Async everywhere.** FastAPI + SQLAlchemy async on `asyncpg`.
+4. **PostgreSQL-only.** SQLAlchemy models target Postgres types (timestamptz, quoted defaults). Legacy SQLite installs are imported via the CLI.
 5. **SPA-friendly routing.** The frontend talks to the API via relative `/api` paths; in dev Vite proxies `/api` to `:8000`, and in prod the same FastAPI process answers both.
 
 ## API routing
@@ -64,7 +64,7 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 
 - **Models:** SQLAlchemy 2.0 declarative models in `backend/app/models/`.
 - **Migrations:** Alembic in `backend/app/alembic/`; run with `alembic upgrade head` or `mkindayzir migrate upgrade`.
-- **SQLite (Personal):** tables are also auto-created on startup via `Base.metadata.create_all` when `DATABASE_PROVIDER=sqlite`.
+- Schema is managed with **Alembic** migrations (`alembic upgrade head`); `scripts/reset_pg.py` drops/recreates for development.
 - **PostgreSQL (Team):** `DATABASE_PROVIDER=postgres`, `DATABASE_URL=postgresql://...` (asyncpg).
 
 ### SQLite -> PostgreSQL migration

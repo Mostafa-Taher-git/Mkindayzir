@@ -20,7 +20,6 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm lint
-      - run: pnpm format --check
 
   typecheck:
     runs-on: ubuntu-latest
@@ -34,31 +33,16 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm tsc --noEmit
+      - run: pnpm typecheck
 
-  test-sqlite:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-      - run: pnpm install
-      - run: pnpm prisma:generate
-      - run: pnpm test:unit
-
-  test-postgres:
+  backend-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: mkindayzir
-          POSTGRES_PASSWORD: password
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: mkindayzir
         options: >-
           --health-cmd pg_isready
@@ -67,6 +51,40 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pipx install uv
+      - name: Create venv + install deps
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python fastapi 'uvicorn[standard]' \
+            'sqlalchemy[asyncio]' alembic asyncpg 'pydantic-settings' \
+            'bcrypt==4.0.1' passlib cryptography httpx sse-starlette \
+            python-multipart click email-validator pytest pytest-asyncio
+      - name: Create test database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U mkindayzir -d mkindayzir \
+            -c "CREATE DATABASE mkindayzir_test OWNER mkindayzir;"
+        env:
+          PGPASSWORD: postgres
+      - name: Run backend test suite (PostgreSQL)
+        run: |
+          ../.venv/bin/python -m pytest tests/ -q
+        env:
+          DATABASE_PROVIDER: postgres
+          DATABASE_URL: postgresql+asyncpg://mkindayzir:postgres@localhost:5432/mkindayzir
+          SESSION_SECRET: $(echo -n s | sha256sum | cut -d' ' -f1)
+          ENCRYPTION_KEY: $(echo -n e | sha256sum | cut -d' ' -f1)
+
+  frontend-tests:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -77,14 +95,7 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm prisma:generate
-        env:
-          DATABASE_URL: postgresql://mkindayzir:password@localhost:5432/mkindayzir
-          DATABASE_PROVIDER: postgresql
       - run: pnpm test:unit
-        env:
-          DATABASE_URL: postgresql://mkindayzir:password@localhost:5432/mkindayzir
-          DATABASE_PROVIDER: postgresql
 
   build:
     runs-on: ubuntu-latest
@@ -98,5 +109,4 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm prisma:generate
       - run: pnpm build

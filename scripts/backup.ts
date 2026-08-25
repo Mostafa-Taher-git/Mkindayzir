@@ -22,7 +22,7 @@ function main() {
   console.log(`Creating backup: ${backupFile}`);
 
   // TODO: Implement actual backup logic based on DATABASE_PROVIDER
-  // For SQLite: copy the .db file
+  // PostgreSQL: pg_dump handles backups (see docs/DEPLOYMENT.md).
   // For PostgreSQL: pg_dump
   // Then tar.gz the database + uploads
 

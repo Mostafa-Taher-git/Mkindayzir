@@ -25,9 +25,9 @@ async def get_migration_status(user: dict = Depends(get_current_user)):
     return {
         "mode": settings.MKINDAYZIR_MODE,
         "database_provider": settings.DATABASE_PROVIDER,
-        "database_url": settings.DATABASE_URL if settings.DATABASE_PROVIDER != "sqlite" else str(db_path),
+        "database_url": settings.DATABASE_URL,
         "database_size_mb": round(db_size / (1024 * 1024), 2),
-        "can_migrate": settings.MKINDAYZIR_MODE == "personal" and settings.DATABASE_PROVIDER == "sqlite",
+        "can_migrate": False,  # legacy SQLite import handled via CLI only
     }
 
 
