@@ -184,7 +184,7 @@ export function LoginForm({
             <button
               type="submit"
               disabled={loading}
-              className="w-full border-2 border-outline-strong bg-primary px-4 py-2 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel hover:bg-primary-hover hover:shadow-glow-blue active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 chamfer"
+              className="w-full border-2 border-outline-strong bg-surface-container-high text-foreground hover:border-critical hover:bg-critical hover:text-white hover:shadow-critical-ring px-4 py-2 font-mono text-foreground uppercase tracking-wider shadow-bevel active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 chamfer"
             >
               {loading ? "Authenticating..." : "Sign in"}
             </button>

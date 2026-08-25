@@ -42,6 +42,7 @@
 
   /* Critical — crimson red: ONLY for urgent alerts, critical tickets, CTA */
   --color-critical: #ff5449;
+  --color-critical-hover: #ff6c63;
   --color-critical-deep: #93000a;
   --color-critical-container: #ffb4ab;
 
@@ -102,6 +103,7 @@
   --color-accent-strong: #003353;
 
   --color-critical: #ff5449;
+  --color-critical-hover: #ff6c63;
   --color-critical-deep: #93000a;
   --color-critical-container: #ffb4ab;
 

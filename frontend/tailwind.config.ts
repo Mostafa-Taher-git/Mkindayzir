@@ -28,6 +28,7 @@ const config: Config = {
         },
         critical: {
           DEFAULT: "var(--color-critical)",
+          hover: "var(--color-critical-hover)",
           deep: "var(--color-critical-deep)",
           foreground: "#ffffff",
         },
@@ -103,6 +104,8 @@ const config: Config = {
         "bevel-red": "inset 0 1px 0 rgba(229,226,226,0.08), inset 0 -2px 0 rgba(0,0,0,0.5)",
         "glow-red": "var(--hud-glow-blue)",
         panel: "0 0 0 1px var(--color-border)",
+        // Primary-button hover: 1px crimson ring + soft bloom (marketing .btn-primary:hover)
+        "critical-ring": "0 0 0 1px var(--color-critical), 0 0 14px -2px var(--color-critical)",
       },
       spacing: {
         "1": "4px",
