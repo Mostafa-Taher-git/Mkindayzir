@@ -210,6 +210,11 @@ if _frontend_dir.exists() and _frontend_dir.is_dir():
 
     @app.get("/{path:path}")
     async def serve_spa(path: str):
+        # HTML shells must always be revalidated: hashed asset filenames make
+        # new builds safe, but a stale index.html would keep pointing at an
+        # OLD bundle (heuristic caching has no TTL), so users saw pre-redesign
+        # pages hours after a deploy. no-cache forces the check, costs one 304.
+        no_cache = {"Cache-Control": "no-cache"}
         # Resolve candidate and ensure it stays within the frontend directory
         resolved_frontend = _frontend_dir.resolve()
         # Marketing pages are edited directly in frontend/public/ — serve them
@@ -217,16 +222,16 @@ if _frontend_dir.exists() and _frontend_dir.is_dir():
         if path.endswith(".html"):
             public_candidate = (resolved_frontend.parent / "public" / path).resolve()
             if public_candidate.is_relative_to((resolved_frontend.parent / "public").resolve()) and public_candidate.is_file():
-                return FileResponse(str(public_candidate))
+                return FileResponse(str(public_candidate), headers=no_cache)
         candidate = (resolved_frontend / path).resolve()
         if path and candidate.is_relative_to(resolved_frontend) and candidate.exists() and candidate.is_file():
-            return FileResponse(str(candidate))
+            return FileResponse(str(candidate), headers=no_cache)
         # The marketing landing page is the front door: "/" serves it instead
         # of dropping the visitor straight into the console login. Prefer the
         # live public/ copy so content edits never need a rebuild.
         if not path or path == "/":
             public_landing = (resolved_frontend.parent / "public" / "landing.html").resolve()
             if public_landing.is_file():
-                return FileResponse(str(public_landing))
-            return FileResponse(str(resolved_frontend / "landing.html"))
-        return FileResponse(str(resolved_frontend / "index.html"))
+                return FileResponse(str(public_landing), headers=no_cache)
+            return FileResponse(str(resolved_frontend / "landing.html"), headers=no_cache)
+        return FileResponse(str(resolved_frontend / "index.html"), headers=no_cache)

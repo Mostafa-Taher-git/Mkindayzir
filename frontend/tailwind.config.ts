@@ -20,7 +20,7 @@ const config: Config = {
         "on-surface-variant": "var(--color-text-secondary)",
         primary: {
           DEFAULT: "var(--color-accent)",
-          foreground: "#ffffff",
+          foreground: "var(--color-accent-strong)",
           hover: "var(--color-accent-hover)",
           bright: "var(--color-accent-bright)",
           light: "var(--color-accent-light)",
@@ -56,7 +56,7 @@ const config: Config = {
         accent: "var(--color-bg-tertiary)",
         "accent-foreground": "var(--color-text-primary)",
         destructive: {
-          DEFAULT: "var(--color-error)",
+          DEFAULT: "var(--color-critical)",
           foreground: "#ffffff",
         },
         border: "var(--color-border)",

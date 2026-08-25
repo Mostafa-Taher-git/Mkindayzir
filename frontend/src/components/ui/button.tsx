@@ -10,16 +10,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border-2 border-outline-strong chamfer shadow-bevel-red hover:bg-primary-hover hover:shadow-glow-red active:translate-y-px uppercase tracking-wider font-display",
+          "bg-primary text-primary-foreground border-2 border-outline-strong chamfer shadow-bevel hover:bg-primary-hover hover:shadow-glow-blue active:translate-y-px uppercase tracking-wider font-mono",
         destructive:
-          "bg-destructive text-destructive-foreground border-2 border-outline-strong chamfer shadow-bevel-red hover:brightness-110 active:translate-y-px uppercase tracking-wider font-display",
+          "bg-destructive text-destructive-foreground border-2 border-outline-strong chamfer shadow-bevel hover:brightness-110 active:translate-y-px uppercase tracking-wider font-mono",
         outline:
-          "border-2 border-outline bg-transparent text-foreground hover:border-primary hover:text-primary-light hover:bg-primary/5 active:translate-y-px uppercase tracking-wider font-mono",
+          "border-2 border-outline bg-transparent text-foreground hover:border-primary hover:text-primary hover:bg-primary/5 active:translate-y-px uppercase tracking-wider font-mono",
         secondary:
           "bg-surface text-foreground border-2 border-outline hover:border-outline-strong hover:bg-surface-container-highest active:translate-y-px uppercase tracking-wider font-mono",
         ghost:
           "hover:bg-accent hover:text-accent-foreground active:bg-accent/80 font-mono",
-        link: "text-primary-light underline-offset-4 hover:underline font-mono",
+        link: "text-primary underline-offset-4 hover:underline font-mono",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

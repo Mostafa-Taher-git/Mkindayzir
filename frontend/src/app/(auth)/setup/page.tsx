@@ -258,7 +258,7 @@ export default function SetupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full border-2 border-outline-strong bg-primary px-4 py-3 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel-red chamfer hover:bg-primary-hover hover:shadow-glow-red active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full border-2 border-outline-strong bg-primary px-4 py-3 font-mono text-primary-foreground uppercase tracking-wider shadow-bevel chamfer hover:bg-primary-hover hover:shadow-glow-blue active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Initializing system..." : "Complete Setup →"}
           </button>

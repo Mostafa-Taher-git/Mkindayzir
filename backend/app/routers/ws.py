@@ -112,15 +112,25 @@ class PresenceHub:
 hub = PresenceHub()
 
 
-async def _authenticate(token: str | None):
-    """Validate a session token; return (userId, displayName, avatar) or None."""
-    if not token:
+async def _authenticate(token: str | None, cookies: dict | None = None):
+    """Validate a session token; return (userId, displayName, avatar) or None.
+
+    Two accepted sources, in order:
+      1. the `token` query parameter (scripted/test clients),
+      2. the mkindayzir_session cookie — the browser cannot read that
+         httpOnly cookie to pass it as a query param, but it DOES send it
+         automatically on same-origin WebSocket handshakes.
+    """
+    candidate = token
+    if not candidate and cookies:
+        candidate = cookies.get("mkindayzir_session") or cookies.get("mk_session")
+    if not candidate:
         return None
     from datetime import datetime as _dt, timezone as _tz
     from sqlalchemy import select as _select
 
     async with async_session() as db:
-        row = await db.execute(_select(DBSession).where(DBSession.token == token))
+        row = await db.execute(_select(DBSession).where(DBSession.token == candidate))
         session = row.scalar_one_or_none()
         if not session:
             return None
@@ -138,7 +148,9 @@ async def _authenticate(token: str | None):
 
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: str | None = Query(None)):
-    identity = await _authenticate(token)
+    # Browsers can't read the httpOnly session cookie to pass ?token=, but the
+    # cookie rides along on the handshake — accept it as the primary source.
+    identity = await _authenticate(token, dict(ws.cookies))
 
     if identity is None:
         # Reject before accepting: close with policy code 4401.
