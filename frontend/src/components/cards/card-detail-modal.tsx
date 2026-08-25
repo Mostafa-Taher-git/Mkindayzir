@@ -177,7 +177,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
                 🖼
               </Button>
               <div className="absolute right-0 top-full z-50 hidden group-hover:flex gap-1 border-2 border-outline bg-surface p-2 shadow-lg">
-                {["#bb152c", "#0ea5e9", "#10b981", "#f59e0b", "#a855f7", "#64748b"].map((col) => (
+                {["#ff5449", "#96ccff", "#7adba8", "#ffd75e", "#a855f7", "#909096"].map((col) => (
                   <button
                     key={col}
                     aria-label={`cover ${col}`}

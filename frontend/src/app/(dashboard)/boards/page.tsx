@@ -20,13 +20,14 @@ import {
 import { Select } from "@/components/ui/select";
 import { ROUTES } from "@/lib/constants";
 
+// Board background presets — Mecha palette (deep space + steel + accent tones)
 const BACKGROUND_PRESETS = [
-  "#bb152c",
-  "#001522",
-  "#c7e7ff",
-  "#1e3a5f",
-  "#2a9d8f",
-  "#e9c46a",
+  "#131314",
+  "#0e0e0f",
+  "#2a2a2b",
+  "#003353",
+  "#4581b3",
+  "#8a6d00",
 ];
 
 export default function BoardsPage() {

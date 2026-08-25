@@ -102,14 +102,14 @@ export const SPACE_ROLES = [
 ] as const;
 
 export const BOARD_BACKGROUNDS = [
-  { value: "#ffffff", label: "White" },
-  { value: "#f3f4f6", label: "Light Gray" },
-  { value: "#1f2937", label: "Dark" },
-  { value: "#0ea5e9", label: "Sky Blue" },
-  { value: "#10b981", label: "Emerald" },
-  { value: "#f59e0b", label: "Amber" },
-  { value: "#ef4444", label: "Red" },
-  { value: "#8b5cf6", label: "Violet" },
+  { value: "#131314", label: "Deep Space" },
+  { value: "#0e0e0f", label: "Void" },
+  { value: "#2a2a2b", label: "Titanium" },
+  { value: "#003353", label: "Steel Navy" },
+  { value: "#4581b3", label: "Steel Blue" },
+  { value: "#8a6d00", label: "Dark Gold" },
+  { value: "#4a1f22", label: "Crimson Night" },
+  { value: "#1f2430", label: "Navy Slate" },
 ] as const;
 
 export const VIEW_MODES = [
