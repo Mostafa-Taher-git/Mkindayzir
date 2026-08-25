@@ -100,11 +100,11 @@
       </div>
 
       <h2>How it's made</h2>
-      <p>Mkindayzir is a single self-hosted process: a Python <strong>FastAPI</strong> backend serving both the REST API and the built React/Vite console on one port. Data lives in SQLite (Personal mode) or PostgreSQL (Team/Enterprise), moved between them from inside the app. The AI layer is a small companion service that talks to your provider of choice — your API key is encrypted at rest with AES-256-GCM and never logged.</p>
+      <p>Mkindayzir is a single self-hosted process: a Python <strong>FastAPI</strong> backend serving both the REST API and the built React/Vite console on one port. Data lives in PostgreSQL 16 — the same engine powers every mode, from a single-user install to a full team. The AI layer is a small companion service that talks to your provider of choice — your API key is encrypted at rest with AES-256-GCM and never logged.</p>
       <ul>
         <li>FastAPI (Python 3.11+) — async REST API, RBAC, session auth</li>
         <li>React + Vite console — served by the same process in production</li>
-        <li>SQLAlchemy 2.0 async: SQLite &amp; PostgreSQL from one schema</li>
+        <li>SQLAlchemy 2.0 async on PostgreSQL (asyncpg)</li>
         <li>Ticketing with SLA tracking, Kanban boards, knowledge vault</li>
         <li>One Docker Compose file for team deployments</li>
       </ul>
