@@ -10,48 +10,65 @@
 
 :root,
 [data-theme="dark"] {
-  /* Structure — deep space & mechanical blue */
-  --color-bg-primary: #001522;      /* background / surface */
-  --color-bg-secondary: #002234;     /* surface-container */
-  --color-bg-tertiary: #002d43;      /* surface-container-high */
-  --color-bg-highest: #003952;       /* surface-container-highest */
-  --color-bg-lowest: #00101b;        /* surface-container-lowest */
+  /* ============================================================
+     MKINDAYZIR — Modern Industrial Mecha
+     Deep-space surfaces, titanium structure, steel-blue action,
+     crimson reserved for critical, gold for priority/VIP.
+     ============================================================ */
 
-  /* Ink — titanium white / glowing blue */
-  --color-text-primary: #c7e7ff;     /* on-surface */
-  --color-text-secondary: #a9c6e2;   /* secondary text */
-  --color-text-muted: #6f8eac;       /* dimmed / metadata */
+  /* Structure — deep space surfaces */
+  --color-bg-primary: #131314;       /* background / surface */
+  --color-bg-secondary: #201f20;     /* surface-container */
+  --color-bg-tertiary: #2a2a2b;      /* surface-container-high */
+  --color-bg-highest: #353435;       /* surface-container-highest */
+  --color-bg-lowest: #0e0e0f;        /* surface-container-lowest */
 
-  /* Borders — brushed steel & alloy */
-  --color-border: #4a6378;           /* mechanical grey (steel) */
-  --color-border-strong: #ab8987;    /* alloy outline (warm) */
-  --color-border-subtle: #1c3247;
+  /* Ink */
+  --color-text-primary: #e5e2e2;     /* on-surface */
+  --color-text-secondary: #c6c6cc;   /* on-surface-variant */
+  --color-text-muted: #909096;       /* outline — dimmed metadata */
 
-  /* Power Red — Grendizer */
-  --color-accent: #bb152c;           /* deep grendizer red (action fill) */
-  --color-accent-hover: #d61f33;
-  --color-accent-bright: #ff535b;    /* bright red (hover glow) */
-  --color-accent-light: #ffb3b1;     /* light red (active text / accents) */
-  --color-accent-strong: #5b000e;    /* on red */
+  /* Borders — titanium */
+  --color-border: #45474b;           /* outline-variant — hairline steel */
+  --color-border-strong: #909096;    /* outline — titanium */
+  --color-border-subtle: #1c1b1c;
+
+  /* Action — steel blue (tertiary): links, progress, interactive */
+  --color-accent: #96ccff;           /* steel blue */
+  --color-accent-hover: #b8dcff;
+  --color-accent-bright: #cee5ff;    /* tertiary-fixed-dim */
+  --color-accent-light: #4581b3;     /* on-tertiary-container */
+  --color-accent-strong: #003353;    /* on-tertiary: text on steel blue */
+
+  /* Critical — crimson red: ONLY for urgent alerts, critical tickets, CTA */
+  --color-critical: #ff5449;
+  --color-critical-deep: #93000a;
+  --color-critical-container: #ffb4ab;
+
+  /* Priority — radiant gold: VIP status, priority highlights */
+  --color-gold: #ffd75e;
+  --color-gold-deep: #8a6d00;
 
   /* Status */
-  --color-success: #5fd6a0;
-  --color-warning: #ffce6b;
-  --color-error: #ff8a82;
-  --color-info: #b0c7f1;
+  --color-success: #7adba8;
+  --color-warning: #ffd75e;          /* gold doubles as warning */
+  --color-error: #ffb4ab;
+  --color-info: #96ccff;
 
-  /* Sheen — painted metal armor */
-  --metal-sheen: linear-gradient(180deg, #003952 0%, #002234 55%, #001522 100%);
-  --metal-sheen-raised: linear-gradient(180deg, #00406a 0%, #002a40 100%);
-  --red-sheen: linear-gradient(180deg, #ff535b 0%, #bb152c 100%);
-  --panel-line: rgba(199, 231, 255, 0.06);
+  /* HUD glass — semi-transparent navy panels + blur */
+  --hud-panel: rgba(19, 19, 20, 0.85);
+  --hud-blur: 20px;
+  --hud-glow-blue: inset 0 0 10px rgba(150, 204, 255, 0.25);
+  --hud-glow-crimson: inset 0 0 10px rgba(255, 84, 73, 0.3);
+  --hud-glow-gold: inset 0 0 10px rgba(255, 215, 94, 0.25);
+  --edge-gradient: linear-gradient(90deg, rgba(150,204,255,0.55), rgba(150,204,255,0));
 
-  /* Typography (assigned by next/font in layout) */
-  --font-display: "Sora", system-ui, sans-serif;
-  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  /* Typography */
+  --font-display: "Hanken Grotesk", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Radius — sharp industrial silhouette */
+  /* Radius — strictly geometric */
   --radius: 0px;
 
   /* Motion */
@@ -60,39 +77,50 @@
   color-scheme: dark;
 }
 
+/* The Mecha world is dark-only. Keep the attribute selector so an explicit
+   data-theme="light" still resolves here rather than falling back to browser
+   defaults — it simply renders the same dark system. */
 [data-theme="light"] {
-  /* Grendizer day-ops: bright hangar white-blue, steel lines, power red */
-  --color-bg-primary: #f2f5f8;
-  --color-bg-secondary: #ffffff;
-  --color-bg-tertiary: #e7edf3;
-  --color-bg-highest: #dbe4ec;
-  --color-bg-lowest: #fafcfd;
+  --color-bg-primary: #131314;
+  --color-bg-secondary: #201f20;
+  --color-bg-tertiary: #2a2a2b;
+  --color-bg-highest: #353435;
+  --color-bg-lowest: #0e0e0f;
 
-  --color-text-primary: #10293d;   /* AA on white */
-  --color-text-secondary: #3d5a75;
-  --color-text-muted: #64809a;
+  --color-text-primary: #e5e2e2;
+  --color-text-secondary: #c6c6cc;
+  --color-text-muted: #909096;
 
-  --color-border: #b9c8d6;
-  --color-border-strong: #8fa5b8;
-  --color-border-subtle: #dde6ee;
+  --color-border: #45474b;
+  --color-border-strong: #909096;
+  --color-border-subtle: #1c1b1c;
 
-  --color-accent: #bb152c;
-  --color-accent-hover: #d61f33;
-  --color-accent-bright: #ff535b;
-  --color-accent-light: #8a0014;
-  --color-accent-strong: #ffffff;
+  --color-accent: #96ccff;
+  --color-accent-hover: #b8dcff;
+  --color-accent-bright: #cee5ff;
+  --color-accent-light: #4581b3;
+  --color-accent-strong: #003353;
 
-  --color-success: #147a52;
-  --color-warning: #8a5a00;
-  --color-error: #b3261e;
-  --color-info: #2c4a78;
+  --color-critical: #ff5449;
+  --color-critical-deep: #93000a;
+  --color-critical-container: #ffb4ab;
 
-  --metal-sheen: linear-gradient(180deg, #ffffff 0%, #f2f5f8 55%, #e7edf3 100%);
-  --metal-sheen-raised: linear-gradient(180deg, #ffffff 0%, #eef3f8 100%);
-  --red-sheen: linear-gradient(180deg, #d61f33 0%, #bb152c 100%);
-  --panel-line: rgba(16, 41, 61, 0.07);
+  --color-gold: #ffd75e;
+  --color-gold-deep: #8a6d00;
 
-  color-scheme: light;
+  --color-success: #7adba8;
+  --color-warning: #ffd75e;
+  --color-error: #ffb4ab;
+  --color-info: #96ccff;
+
+  --hud-panel: rgba(19, 19, 20, 0.85);
+  --hud-blur: 20px;
+  --hud-glow-blue: inset 0 0 10px rgba(150, 204, 255, 0.25);
+  --hud-glow-crimson: inset 0 0 10px rgba(255, 84, 73, 0.3);
+  --hud-glow-gold: inset 0 0 10px rgba(255, 215, 94, 0.25);
+  --edge-gradient: linear-gradient(90deg, rgba(150,204,255,0.55), rgba(150,204,255,0));
+
+  color-scheme: dark;
 }
 
 @layer base {
@@ -106,7 +134,6 @@
 
   body {
     background-color: var(--color-bg-primary);
-    background-image: var(--metal-sheen);
     background-attachment: fixed;
     color: var(--color-text-primary);
     font-family: var(--font-sans);
@@ -159,14 +186,7 @@
 }
 
 @layer components {
-  /* Hard bevel — raised tactile edge on controls */
-  .bevel {
-    box-shadow:
-      inset 0 1px 0 rgba(199, 231, 255, 0.18),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.45);
-  }
-
-  /* Chamfered corners — 45° armor-plate cut */
+  /* Chamfered corners — 45° clipped accent for chips and hero actions */
   .chamfer {
     clip-path: polygon(
       9px 0,
@@ -180,16 +200,52 @@
     );
   }
 
-  /* Panel — structural console surface with hairline top edge */
+  /* HUD glass panel — 85% navy + backdrop blur, titanium frame */
   .panel {
-    background-color: var(--color-bg-secondary);
-    background-image: var(--metal-sheen);
-    border: 2px solid var(--color-border);
+    background: var(--hud-panel);
+    backdrop-filter: blur(var(--hud-blur));
+    -webkit-backdrop-filter: blur(var(--hud-blur));
+    border: 1px solid var(--color-border);
   }
 
-  /* Powered-on glow for active red elements */
-  .glow-red {
-    box-shadow: 0 0 0 1px var(--color-accent), 0 0 14px -2px var(--color-accent-bright);
+  /* Holographic edge — steel-blue gradient border top */
+  .hud-edge {
+    position: relative;
+  }
+  .hud-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: var(--edge-gradient);
+    pointer-events: none;
+  }
+
+  /* Active/selected state — inner glow, no lift */
+  .glow-blue { box-shadow: var(--hud-glow-blue); }
+  .glow-crimson { box-shadow: var(--hud-glow-crimson); }
+  .glow-gold { box-shadow: var(--hud-glow-gold); }
+
+  /* Critical CTA — crimson, reserved for urgent actions only */
+  .btn-critical {
+    background-color: var(--color-critical);
+    color: #ffffff;
+    border: 1px solid var(--color-critical);
+  }
+  .btn-critical:hover {
+    background-color: #ff6c63;
+  }
+
+  /* Priority chip — gold */
+  .chip-priority {
+    border: 1px solid var(--color-gold);
+    color: var(--color-gold);
+  }
+
+  /* Critical chip — crimson */
+  .chip-critical {
+    border: 1px solid var(--color-critical);
+    color: var(--color-critical);
   }
 }
 
@@ -209,9 +265,10 @@
 
   .uppercase-label {
     font-family: var(--font-mono);
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 11px;
+    letter-spacing: 0.1em;
+    font-size: 12px;
   }
 }
 

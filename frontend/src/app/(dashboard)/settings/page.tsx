@@ -93,14 +93,6 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const toggleTheme = () => {
-    const current = document.documentElement.getAttribute("data-theme");
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(next);
-    localStorage.setItem("mkindayzir-theme", next);
-  };
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -156,9 +148,7 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">Theme</p>
               <p className="text-xs text-muted-foreground">Switch between light and dark mode</p>
             </div>
-            <Button variant="outline" onClick={toggleTheme}>
-              Toggle Theme
-            </Button>
+            
           </div>
         </CardContent>
       </Card>

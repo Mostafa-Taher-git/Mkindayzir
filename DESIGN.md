@@ -1,190 +1,153 @@
 ---
-name: Grendizer Heroic Industrial
-version: 2.0
-mode: Operate
-theme-default: light
+name: Mkindayzir
 colors:
-  surface: '#001522'
-  surface-dim: '#001522'
-  surface-bright: '#003d59'
-  surface-container-lowest: '#00101b'
-  surface-container-low: '#001e2e'
-  surface-container: '#002234'
-  surface-container-high: '#002d43'
-  surface-container-highest: '#003952'
-  on-surface: '#c7e7ff'
-  on-surface-variant: '#e4bebc'
-  inverse-surface: '#c7e7ff'
-  inverse-on-surface: '#00344c'
-  outline: '#ab8987'
-  outline-variant: '#5b403f'
-  surface-tint: '#ffb3b1'
-  primary: '#ffb3b1'
-  on-primary: '#680011'
-  primary-container: '#ff535b'
-  on-primary-container: '#5b000e'
-  inverse-primary: '#bb152c'
-  secondary: '#b0c7f1'
-  on-secondary: '#183153'
-  secondary-container: '#334a6d'
-  on-secondary-container: '#a2b9e2'
-  tertiary: '#c0c9be'
-  on-tertiary: '#2a322b'
-  tertiary-container: '#8a9389'
-  on-tertiary-container: '#242c24'
+  surface: '#131314'
+  surface-dim: '#131314'
+  surface-bright: '#39393a'
+  surface-container-lowest: '#0e0e0f'
+  surface-container-low: '#1c1b1c'
+  surface-container: '#201f20'
+  surface-container-high: '#2a2a2b'
+  surface-container-highest: '#353435'
+  on-surface: '#e5e2e2'
+  on-surface-variant: '#c6c6cc'
+  inverse-surface: '#e5e2e2'
+  inverse-on-surface: '#313031'
+  outline: '#909096'
+  outline-variant: '#45474b'
+  surface-tint: '#c2c6d5'
+  primary: '#c2c6d5'
+  on-primary: '#2c303b'
+  primary-container: '#0b101a'
+  on-primary-container: '#777c89'
+  inverse-primary: '#5a5e6b'
+  secondary: '#c0c8cd'
+  on-secondary: '#2a3136'
+  secondary-container: '#424a4f'
+  on-secondary-container: '#b2b9bf'
+  tertiary: '#96ccff'
+  on-tertiary: '#003353'
+  tertiary-container: '#001120'
+  on-tertiary-container: '#4581b3'
   error: '#ffb4ab'
   on-error: '#690005'
   error-container: '#93000a'
   on-error-container: '#ffdad6'
-  primary-fixed: '#ffdad8'
-  primary-fixed-dim: '#ffb3b1'
-  on-primary-fixed: '#410007'
-  on-primary-fixed-variant: '#92001c'
-  secondary-fixed: '#d5e3ff'
-  secondary-fixed-dim: '#b0c7f1'
-  on-secondary-fixed: '#001b3c'
-  on-secondary-fixed-variant: '#30476a'
-  tertiary-fixed: '#dce5d9'
-  tertiary-fixed-dim: '#c0c9be'
-  on-tertiary-fixed: '#161d16'
-  on-tertiary-fixed-variant: '#404940'
-  background: '#001522'
-  on-background: '#c7e7ff'
-  surface-variant: '#003952'
-colors-light:
-  background: '#f2f5f8'
-  surface: '#ffffff'
-  surface-container-lowest: '#fafcfd'
-  surface-container-low: '#f2f5f8'
-  surface-container: '#ffffff'
-  surface-container-high: '#e7edf3'
-  surface-container-highest: '#dbe4ec'
-  on-surface: '#10293d'
-  on-surface-variant: '#3d5a75'
-  outline: '#b9c8d6'
-  outline-strong: '#8fa5b8'
-  outline-variant: '#dde6ee'
-  primary: '#bb152c'
-  on-primary: '#ffffff'
-  primary-hover: '#d61f33'
-  primary-bright: '#ff535b'
-  success: '#147a52'
-  warning: '#8a5a00'
-  error: '#b3261e'
-  info: '#2c4a78'
+  primary-fixed: '#dee2f1'
+  primary-fixed-dim: '#c2c6d5'
+  on-primary-fixed: '#171c26'
+  on-primary-fixed-variant: '#424752'
+  secondary-fixed: '#dce4e9'
+  secondary-fixed-dim: '#c0c8cd'
+  on-secondary-fixed: '#151d21'
+  on-secondary-fixed-variant: '#40484c'
+  tertiary-fixed: '#cee5ff'
+  tertiary-fixed-dim: '#96ccff'
+  on-tertiary-fixed: '#001d32'
+  on-tertiary-fixed-variant: '#004a75'
+  background: '#131314'
+  on-background: '#e5e2e2'
+  surface-variant: '#353435'
 typography:
   display-lg:
-    fontFamily: Sora
+    fontFamily: Hanken Grotesk
     fontSize: 48px
     fontWeight: '800'
-    lineHeight: '1.1'
+    lineHeight: 56px
     letterSpacing: -0.02em
-  headline-lg:
-    fontFamily: Sora
+  headline-md:
+    fontFamily: Hanken Grotesk
     fontSize: 32px
     fontWeight: '700'
-    lineHeight: '1.2'
-  headline-lg-mobile:
-    fontFamily: Sora
-    fontSize: 24px
-    fontWeight: '700'
-    lineHeight: '1.2'
-  body-md:
+    lineHeight: 40px
+  headline-sm:
     fontFamily: Hanken Grotesk
+    fontSize: 24px
+    fontWeight: '600'
+    lineHeight: 32px
+  body-lg:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: '400'
+    lineHeight: 28px
+  body-md:
+    fontFamily: Inter
     fontSize: 16px
     fontWeight: '400'
-    lineHeight: '1.6'
-  label-sm:
+    lineHeight: 24px
+  body-sm:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: '400'
+    lineHeight: 20px
+  code-sm:
+    fontFamily: JetBrains Mono
+    fontSize: 13px
+    fontWeight: '500'
+    lineHeight: 18px
+  label-caps:
     fontFamily: JetBrains Mono
     fontSize: 12px
-    fontWeight: '500'
-    lineHeight: '1.0'
-    letterSpacing: 0.05em
+    fontWeight: '700'
+    lineHeight: 16px
+    letterSpacing: 0.1em
 spacing:
   unit: 4px
-  gutter: 24px
-  margin-edge: 32px
-  stack-sm: 8px
-  stack-md: 16px
-  stack-lg: 32px
+  gutter: 16px
+  margin-mobile: 16px
+  margin-desktop: 32px
+  panel-padding: 24px
 ---
 
 ## Brand & Style
-Grendizer Heroic Industrial — a heroic-industrial design language inspired by
-1970s super-robot aesthetics, tuned for **professional helpdesk and project
-management use**. The brand personality is powerful, protective, and precise:
-a cockpit that operators trust all day, not a theme park.
+The design system embodies a "Modern Industrial Mecha" aesthetic, designed for high-stakes productivity where helpdesk speed meets project precision. The brand personality is authoritative and engineering-focused, evoking the feeling of a tactical command center. 
 
-**v2 tone shift (user decision):** the cockpit stays, the cosplay goes.
-Headlines are no longer forced to ALL CAPS; sentence case with Sora's
-geometric weight carries the authority. Emoji are banned from UI chrome —
-all icons are 2px-stroke angular SVGs (`src/components/icons/grendizer.tsx`).
-
-## Themes — LIGHT IS THE DEFAULT
-- **Light ("Day Ops") is the primary theme.** Bright hangar white-blue
-  surfaces (`#f2f5f8` app background, `#ffffff` cards), steel borders
-  (`#b9c8d6`), ink `#10293d` (AA on white), Power Red accents unchanged.
-- **Dark ("Deep Space") remains fully supported** for night shifts.
-- Default is set pre-paint in `index.html`; the user's explicit choice is
-  stored in `localStorage("mkindayzir-theme")`.
-- Every component must read from the CSS custom properties — never hardcode
-  hex values in components. Both themes are first-class.
+The visual style blends **Modern Corporate** reliability with **Glassmorphism** and **Brutalism** elements. It utilizes semi-transparent "HUD" (Heads-Up Display) panels, high-density information layouts, and sharp, aggressive geometry to convey a sense of futuristic efficiency and structural integrity.
 
 ## Colors
-- **Primary (Grendizer Red `#bb152c`):** critical actions, active states,
-  powered-on indicators. One red action per view region.
-- **Structure (Space Blue / Hangar White):** backgrounds, panels, cards.
-- **Steel (borders):** 2px solid borders on all containers; `outline-strong`
-  for emphasis, `outline-variant` for hairlines.
-- **Status:** success `#147a52`, warning `#8a5a00`, error `#b3261e`,
-  info `#2c4a78` (light) — always paired with an icon, never color alone.
+The palette is rooted in the "Deep Space" environment.
+- **Primary (Deep Space Navy):** Used for base surfaces and background voids.
+- **Secondary (Titanium Grey):** Used for structural borders, inactive states, and metallic accents.
+- **Tertiary (Steel Blue):** Used for interactive elements, links, and progress indicators.
+- **Crimson Red:** Reserved exclusively for high-urgency alerts, critical tickets, and primary Call-to-Action (CTA) buttons.
+- **Radiant Gold:** Used for "VIP" status, priority highlights, and system-level achievements.
+- **White:** Provides high-contrast legibility for primary text and iconography.
 
 ## Typography
-- **Headlines: Sora** — geometric, assertive. Sentence case. Page titles 28px/800.
-- **Body: Hanken Grotesk** — clean, high legibility.
-- **Labels/data: JetBrains Mono** — counts, statuses, metadata, timestamps.
-  Uppercase + letterspaced ONLY for tiny section labels (`.uppercase-label`).
+Typography is split between human-centric readability and technical data presentation.
+- **Headlines:** Hanken Grotesk provides a sharp, contemporary "Mecha" feel with tight kerning.
+- **Body:** Inter is the workhorse for high-volume text in tickets and project descriptions.
+- **Technical Data:** JetBrains Mono is used for Ticket IDs, timestamps, and metadata to reinforce the industrial, machine-like nature of the interface. 
+- Use **All-Caps** for labels and section headers to mimic tactical displays.
 
 ## Layout & Spacing
-- 12-column desktop grid, 24px gutters, max-width 1440px.
-- 4px baseline; vertical rhythm in 16px/32px steps.
-- Breakpoints: mobile 4-col/16px margins; tablet 8-col/24px (sidebar collapses
-  to icons); desktop 12-col/32px.
+The layout uses a **Fluid Grid** system built on a 4px baseline. 
+- **Desktop:** 12-column grid with heavy 2px "Titanium" borders separating main application regions (Sidebar, Global Search, Main Stage, Inspector).
+- **Density:** High-density layout is preferred. Minimize vertical white space in lists to maximize the "Data HUD" feel.
+- **Breakpoints:** 
+  - Mobile (<768px): Single column, hidden sidebar via hamburger.
+  - Tablet (768px - 1280px): 8-column, collapsed sidebar icons.
+  - Desktop (>1280px): 12-column with permanent Inspector panel on the right.
 
 ## Elevation & Depth
-- **Tonal layers + hard bevels, no soft ambient shadows.**
-- Hover affordance: `0 2px 0 0 var(--color-border-strong)` (a physical press edge).
-- Active/primary elements: `.glow-red` (1px ring + tight red bloom).
-- Panels: `.panel` (metal sheen gradient + 2px steel border).
+This design system avoids traditional drop shadows in favor of **Tonal Layers** and **Holographic Glows**.
+- **Base:** Deep Space Navy (#0B101A).
+- **Surface:** Semi-transparent Navy (85% opacity) with a 20px backdrop blur to create a glassmorphic effect.
+- **Borders:** All panels must have a 1px or 2px solid border in Titanium Grey or Steel Blue. 
+- **Active State Glow:** Instead of lifting an object, use an inner "Crimson" or "Steel Blue" glow (box-shadow: inset 0 0 10px) to indicate the active/selected state.
+- **Holographic Accents:** Use subtle linear gradients on borders (Steel Blue to Transparent) to simulate light reflecting off metallic edges.
 
 ## Shapes
-- **Sharp and angular.** `--radius: 0px` globally.
-- Complete/check indicators use 3px-rounded squares (not circles).
-- 45° chamfers (`.chamfer`) reserved for primary hero actions only.
+The shape language is **Strictly Geometric**. 
+- All primary containers, buttons, and input fields must have **0px (Sharp) corners** to maintain the industrial, armored aesthetic. 
+- **Beveled Accents:** For secondary decorative elements or status chips, use "clipped corners" (45-degree angles) via CSS `clip-path` to reinforce the Mecha design motif.
 
-## Components (board/workspace specifics)
-- **Cards (kanban):** 2px steel border, solid `bg-card`, sharp corners.
-  Complete = red-free green square-check + strikethrough title.
-  Badges row in mono 11px. Hover reveals Edit/Archive icon buttons top-right.
-- **Lists:** solid `bg-surface` body (must stay readable over board photo
-  backgrounds), header with mono count chip in a boxed border, `⋯` actions menu.
-- **Board backgrounds:** photo → fine dark overlay (0–85%, user-adjusted) →
-  translucent header strip → hard cards. Colors from `BOARD_BACKGROUNDS`.
-- **Buttons:** sharp; primary uses red sheen; secondary 2px steel border.
-- **Inputs:** surface background, 2px steel border, red focus ring (never default blue).
-- **Icons:** exclusively from `src/components/icons/grendizer.tsx`
-  (2px stroke, square caps). No emoji in chrome, buttons, or menus.
-- **Dialogs:** 2px steel border, header row with mono context chip
-  (e.g. list name), sharp corners, `max-h-[92vh]` scroll.
-
-## Motion
-- `--transition: 160ms cubic-bezier(0.2,0.8,0.2,1)` for hovers/focus.
-- Entrance: `.animate-power-on` (280ms, exponential ease-out) — once per view,
-  never on data updates.
-- No bounce, no parallax, no decorative loops. `prefers-reduced-motion` honored.
-
-## Accessibility floor
-- Text contrast ≥ 4.5:1 in both themes (verified for ink/border tokens).
-- Focus-visible: 2px `--color-accent-bright` outline, 2px offset, everywhere.
-- Icon-only buttons require `aria-label` + `title` (tooltips).
-- Status never conveyed by color alone (icon or text accompanies it).
+## Components
+- **Buttons:** 
+  - *Primary:* Solid Crimson Red with White text. Sharp corners.
+  - *Secondary:* Ghost style with Steel Blue borders and "Holographic" hover glow.
+- **Input Fields:** Dark background, 1px Titanium border. On focus, the border turns Gold and a faint Gold glow appears.
+- **Status Chips:** Rectangular with JetBrains Mono text. Use Crimson for "Critical," Gold for "Priority," and Steel Blue for "In Progress."
+- **Cards/Panels:** Semi-transparent background with a visible 1px Titanium frame. Top-left corners of cards may feature a small "Tech ID" tag in monospaced font.
+- **Progress Bars:** Segmented bars (reminiscent of power levels) rather than smooth continuous fills.
+- **Data Tables:** Heavy horizontal lines, no vertical lines. Hovering over a row should trigger a Steel Blue "scan line" effect.

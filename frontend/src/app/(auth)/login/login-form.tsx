@@ -66,7 +66,7 @@ export function LoginForm({
       <div className="relative hidden w-1/2 flex-col justify-between border-r-2 border-outline-strong bg-surface-container-low p-12 lg:flex">
         <div
           className="absolute inset-0 opacity-60"
-          style={{ background: "var(--metal-sheen)" }}
+          style={{ background: "var(--hud-panel)", backdropFilter: "blur(var(--hud-blur))" }}
         />
         <div className="relative flex items-center gap-3">
           <img

@@ -26,6 +26,15 @@ const config: Config = {
           light: "var(--color-accent-light)",
           strong: "var(--color-accent-strong)",
         },
+        critical: {
+          DEFAULT: "var(--color-critical)",
+          deep: "var(--color-critical-deep)",
+          foreground: "#ffffff",
+        },
+        gold: {
+          DEFAULT: "var(--color-gold)",
+          deep: "var(--color-gold-deep)",
+        },
         secondary: {
           DEFAULT: "var(--color-text-secondary)",
           foreground: "var(--color-bg-primary)",
@@ -85,12 +94,15 @@ const config: Config = {
         full: "9999px",
       },
       boxShadow: {
-        bevel:
-          "inset 0 1px 0 rgba(199,231,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.45)",
-        "bevel-red":
-          "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 0 rgba(0,0,0,0.4)",
-        "glow-red": "0 0 0 1px var(--color-accent), 0 0 14px -2px var(--color-accent-bright)",
-        panel: "0 0 0 2px var(--color-border), 0 8px 24px -12px rgba(0,0,0,0.6)",
+        // HUD active-state glows (inner, no lift) per the Mecha system
+        "glow-blue": "var(--hud-glow-blue)",
+        "glow-crimson": "var(--hud-glow-crimson)",
+        "glow-gold": "var(--hud-glow-gold)",
+        // legacy names kept so existing class strings keep compiling
+        bevel: "inset 0 1px 0 rgba(229,226,226,0.08), inset 0 -2px 0 rgba(0,0,0,0.5)",
+        "bevel-red": "inset 0 1px 0 rgba(229,226,226,0.08), inset 0 -2px 0 rgba(0,0,0,0.5)",
+        "glow-red": "var(--hud-glow-blue)",
+        panel: "0 0 0 1px var(--color-border)",
       },
       spacing: {
         "1": "4px",
