@@ -143,11 +143,10 @@ The shape language is **Strictly Geometric**.
 - **Beveled Accents:** For secondary decorative elements or status chips, use "clipped corners" (45-degree angles) via CSS `clip-path` to reinforce the Mecha design motif.
 
 ## Components
-- **Buttons — one structure, two colors.** Every button shares the same armored anatomy: chamfered corners (`clip-path`, 45°), 2px Titanium border, JetBrains Mono uppercase text, inset bevel (`inset 0 1px 0` highlight + `inset 0 -2px 0` shadow), and a 1px translate-down press. Only the color semantics differ:
-  - *Primary (default variant):* **Steel Blue fill at rest** (`#96ccff`) with deep-navy text (`#003353`) → brighter blue on hover (`#b8dcff`), blue border, and a blue ring+bloom (`0 0 0 1px` + soft glow). Used for every ordinary action: New Project, Save, Sign in, Add Card.
-  - *Destructive:* **Crimson fill at rest** (`#ff5449`) with white text → brighter crimson on hover (`#ff6c63`) with a crimson ring+bloom. Used only for danger actions: Log out, Delete, role demotion confirmations.
-  - *Outline / Secondary / Ghost:* Steel panel or transparent with Titanium borders; hover shifts border/text to Steel Blue. No fill change.
-  - *Marketing CTA exception:* The landing "Enter Console" button rests as a steel panel and fills crimson on hover — the one sanctioned place crimson acts as a CTA hover.
+- **Buttons — one anatomy, two hover colors.** Every button shares the Enter Console recipe: **steel panel fill at rest** (`surface-container-high`) with on-surface text, 2px Titanium border, JetBrains Mono uppercase text, inset bevel (`inset 0 1px 0` highlight + `inset 0 -2px 0` shadow), chamfered corners (45° `clip-path`), and a 1px translate-down press. Only the hover color differs:
+  - *Primary (default variant):* **Blue hover** — Steel Blue fill (`#96ccff`) with deep-navy text (`#003353`), blue border, blue ring+bloom. Every ordinary action: New Project, Save, Sign in, Add Card.
+  - *Destructive:* **Crimson hover** — crimson fill (`#ff5449`) with white text, crimson border, crimson ring+bloom. Danger actions only: Log out, Delete, role demotion confirmations.
+  - *Outline / Secondary / Ghost:* Transparent or steel panel; hover shifts border/text to Steel Blue. No fill change.
 - **Input Fields:** Dark background, 1px Titanium border. On focus, the border turns Steel Blue with a faint blue glow.
 - **Status Chips:** Rectangular with JetBrains Mono text. Use Crimson for "Critical," Gold for "Priority," and Steel Blue for "In Progress."
 - **Cards/Panels:** Semi-transparent background with a visible 1px Titanium frame. Top-left corners of cards may feature a small "Tech ID" tag in monospaced font.

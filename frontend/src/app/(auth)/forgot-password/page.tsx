@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             If an account exists with that email, we&apos;ve sent password reset instructions.
           </p>
-          <Link to="/login" className="mt-6 inline-block border-2 border-outline-strong bg-primary text-primary-foreground hover:border-accent hover:bg-primary-hover hover:shadow-accent-ring px-5 py-2 font-mono text-foreground uppercase tracking-wider shadow-bevel chamfer">
+          <Link to="/login" className="mt-6 inline-block border-2 border-outline-strong bg-surface-container-high text-foreground hover:border-accent hover:bg-accent hover:text-accent-strong hover:shadow-accent-ring px-5 py-2 font-mono text-foreground uppercase tracking-wider shadow-bevel chamfer">
             Back to login
           </Link>
         </div>
@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full border-2 border-outline-strong bg-primary text-primary-foreground hover:border-accent hover:bg-primary-hover hover:shadow-accent-ring px-4 py-3 font-mono text-foreground uppercase tracking-wider shadow-bevel chamfer active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full border-2 border-outline-strong bg-surface-container-high text-foreground hover:border-accent hover:bg-accent hover:text-accent-strong hover:shadow-accent-ring px-4 py-3 font-mono text-foreground uppercase tracking-wider shadow-bevel chamfer active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Sending..." : "Send Reset Link →"}
           </button>
