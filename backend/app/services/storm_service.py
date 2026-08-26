@@ -147,13 +147,15 @@ class StormService:
         source = await _owned_storm(db, user_id, source_id)
         target = await _owned_storm(db, user_id, target_id)
 
-        # Reject exact duplicate of the same (src, srcCorner, tgt) triple
-        # without burning a corner cap. The triple index is the safety net.
+        # Reject exact duplicate of the same (src, srcCorner, tgt, tgtCorner)
+        # triple without burning a corner cap. The DB unique index is the
+        # safety net; this early return avoids a needless cap error on retry.
         existing = (await db.execute(
             select(StormLink).where(
                 StormLink.sourceId == source_id,
                 StormLink.sourceCorner == source_corner,
                 StormLink.targetId == target_id,
+                StormLink.targetCorner == target_corner,
             )
         )).scalar_one_or_none()
         if existing:
