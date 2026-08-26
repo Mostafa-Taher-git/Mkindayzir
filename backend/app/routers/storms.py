@@ -36,6 +36,8 @@ def _err(e: StormError) -> HTTPException:
 
 class CreateStormBody(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    positionX: float | None = None
+    positionY: float | None = None
 
 
 class UpdateStormBody(BaseModel):
@@ -59,7 +61,12 @@ async def create_storm(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return {"storm": await StormService.create(db, user["id"], {"name": body.name})}
+        data = {"name": body.name}
+        if body.positionX is not None:
+            data["positionX"] = body.positionX
+        if body.positionY is not None:
+            data["positionY"] = body.positionY
+        return {"storm": await StormService.create(db, user["id"], data)}
     except StormError as e:
         raise _err(e)
 

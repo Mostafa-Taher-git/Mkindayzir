@@ -140,7 +140,12 @@ describe("StormPage", () => {
       const input = screen.getByTestId("new-storm-input");
       await user.type(input, "My idea");
       await user.keyboard("{Enter}");
-      expect(mutateFn).toHaveBeenCalledWith("My idea", expect.objectContaining({ onSuccess: expect.any(Function) }));
+      // submitNew now sends a payload { name, positionX, positionY } (centred
+      // in the viewport) and navigates to the note route on success.
+      expect(mutateFn).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "My idea" }),
+        expect.objectContaining({ onSuccess: expect.any(Function) })
+      );
       expect(mockNavigate).toHaveBeenCalled();
       const navArg = mockNavigate.mock.calls[0][0] as string;
       expect(navArg).toMatch(/\/new-id\/note$/);
@@ -169,15 +174,14 @@ describe("StormPage", () => {
   });
 
   describe("empty-canvas click", () => {
-    it("clicking (press + release, no drag) on the canvas opens the create modal", () => {
+    it("clicking (press + release, no drag) on empty canvas does NOTHING", () => {
       mockStormsQuery.mockReturnValue({ data: { storms: [STORM_A], links: [] }, isLoading: false });
       renderPage();
       const canvas = screen.getByTestId("canvas");
       fireEvent.pointerDown(canvas, { button: 0, clientX: 5, clientY: 5 });
       fireEvent.pointerUp(canvas, { button: 0, clientX: 5, clientY: 5 });
-      expect(screen.getByTestId("new-storm-modal")).toBeInTheDocument();
-      const input = screen.getByTestId("new-storm-input") as HTMLInputElement;
-      expect(input.value).toBe("");
+      // Empty-space clicks must be a no-op; use the "+ New" button to create.
+      expect(screen.queryByTestId("new-storm-modal")).not.toBeInTheDocument();
     });
 
     it("dragging the background does NOT open the create modal", () => {

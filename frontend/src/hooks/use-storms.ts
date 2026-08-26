@@ -16,12 +16,12 @@ export function useStorms() {
 export function useCreateStorm() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async (payload: { name: string; positionX?: number; positionY?: number }) => {
       const res = await fetch(STORM_BASE, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({ error: { message: "Create failed" } }))).error?.message ?? "Create failed");
       return res.json();

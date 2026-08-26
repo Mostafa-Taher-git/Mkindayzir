@@ -200,11 +200,9 @@ export default function StormPage() {
       }
       setDragDelta(new Map());
     }
-    if (bgPress.current) {
-      // A background press that never moved is a click → open the create box.
-      if (!bgPress.current.moved) setDraftName("");
-      bgPress.current = null;
-    }
+    // A background press that never moved is just a click on empty canvas →
+    // intentionally does nothing (use the "+ New" button to create a storm).
+    bgPress.current = null;
     cardPress.current = null;
     setIsPanning(false);
     setDrag(null);
@@ -259,12 +257,21 @@ export default function StormPage() {
   const submitNew = () => {
     const name = (draftName ?? "").trim();
     if (!name) return;
-    create.mutate(name, {
-      onSuccess: ({ storm }: { storm: { id: string } }) => {
-        setDraftName(null);
-        navigate(`${STORM_ROUTES.HOME}/${storm.id}/note`);
-      },
-    });
+    // Place the new rectangle at the centre of the current viewport so the
+    // user always sees it. Convert screen-centre → world coords, then back off
+    // by half the card size so the card is centred, not its top-left.
+    const vp = viewport();
+    const worldCx = (vp.width / 2 - pan.x) / zoom;
+    const worldCy = (vp.height / 2 - pan.y) / zoom;
+    create.mutate(
+      { name, positionX: worldCx - CARD_W / 2, positionY: worldCy - CARD_H / 2 },
+      {
+        onSuccess: ({ storm }: { storm: { id: string } }) => {
+          setDraftName(null);
+          navigate(`${STORM_ROUTES.HOME}/${storm.id}/note`);
+        },
+      }
+    );
   };
 
   if (isLoading) {

@@ -90,13 +90,21 @@ class StormService:
         if len(name) > MAX_NAME_LEN:
             raise StormError("VALIDATION", f"name must be {MAX_NAME_LEN} chars or fewer", 422)
 
-        # Place at the visual center of the canvas (zoom-independent).
+        # Use the requested position when the caller supplies one (the UI
+        # centres new cards in the viewport); otherwise default to the origin.
+        raw_x = (data or {}).get("positionX")
+        raw_y = (data or {}).get("positionY")
+        try:
+            px = float(raw_x) if raw_x is not None else 0.0
+            py = float(raw_y) if raw_y is not None else 0.0
+        except (TypeError, ValueError):
+            px, py = 0.0, 0.0
         storm = Storm(
             id=uuid.uuid4().hex,
             ownerId=user_id,
             name=name,
-            positionX=0.0,
-            positionY=0.0,
+            positionX=px,
+            positionY=py,
         )
         db.add(storm)
         await db.commit()
