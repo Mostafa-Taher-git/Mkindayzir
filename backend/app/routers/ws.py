@@ -123,7 +123,7 @@ async def _authenticate(token: str | None, cookies: dict | None = None):
     """
     candidate = token
     if not candidate and cookies:
-        candidate = cookies.get("mkindayzir_session") or cookies.get("mk_session")
+        candidate = cookies.get("mkindayzir_session")
     if not candidate:
         return None
     from datetime import datetime as _dt, timezone as _tz
