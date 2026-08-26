@@ -133,8 +133,9 @@ export function AddCardComposer({ boardId, columnId }: AddCardComposerProps) {
           variant="ghost"
           onClick={() => setTemplateMenu((v) => !v)}
           title="Create card from template"
+          aria-label="Create card from template"
         >
-          <IconTemplate className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Template ▾
+          <IconTemplate className="h-4 w-4" />
         </Button>
         <Button size="sm" variant="ghost" onClick={() => { setOpen(false); reset(); }}>
           <IconClose className="h-4 w-4" />
