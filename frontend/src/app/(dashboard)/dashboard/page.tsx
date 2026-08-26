@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const quickActions = [
     { label: "Projects", href: ROUTES.PROJECTS, description: "Manage your projects and work items" },
     { label: "Boards", href: ROUTES.BOARDS, description: "Visual task boards" },
+    { label: "Storm", href: ROUTES.STORM, description: "Visual thinking canvas" },
     { label: "Tickets", href: ROUTES.TICKETS, description: "Support tickets & helpdesk" },
     { label: "Vault", href: ROUTES.VAULT, description: "Team knowledge base" },
     { label: "Assistant", href: ROUTES.ASSISTANT, description: "AI-powered assistant" },

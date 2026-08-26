@@ -158,3 +158,9 @@ export const IconUpload = ({ className }: P) => (
     <path d="M4 20h16" />
   </svg>
 );
+
+export const IconStorm = ({ className }: P) => (
+  <svg {...base(className)}>
+    <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+  </svg>
+);

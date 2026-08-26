@@ -10,6 +10,7 @@ export const ROUTES = {
   PROJECTS: "/projects",
   SPACES: "/spaces",
   BOARDS: "/boards",
+  STORM: "/storm",
   VAULT: "/vault",
   ASSISTANT: "/assistant",
   GUIDES: "/guides",
@@ -130,4 +131,8 @@ export const VAULT_ROUTES = {
   NEW_NOTE: "/vault/notes/new",
   GRAPH: "/vault/graph",
   TAGS: "/vault/tags",
+} as const;
+
+export const STORM_ROUTES = {
+  HOME: "/storm",
 } as const;

@@ -42,3 +42,5 @@ from app.models.customer import Customer
 from app.models.ticket import Ticket
 from app.models.ticket_reply import TicketReply
 from app.models.board_star import BoardStar
+from app.models.storm import Storm
+from app.models.storm_link import StormLink

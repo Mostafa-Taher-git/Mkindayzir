@@ -38,6 +38,8 @@ import ReportsPage from "@/app/(dashboard)/reports/page";
 import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 import SystemSettingsPage from "@/app/(dashboard)/settings/system/page";
+import StormPage from "@/app/(dashboard)/storm/page";
+import StormNotePage from "@/app/(dashboard)/storm/[stormId]/note/page";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -355,6 +357,16 @@ export default function App() {
           <ProtectedRoute>
             <DashboardRoute>
               <SystemSettingsPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storm"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <StormPage />
             </DashboardRoute>
           </ProtectedRoute>
         }
