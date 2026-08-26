@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { CardMembers } from "@/components/cards/card-members";
 import { CardLabels } from "@/components/cards/card-labels";
 import { CardChecklists } from "@/components/cards/card-checklists";
+import { CardAttachments } from "@/components/cards/card-attachments";
+import { MoveToBoard } from "@/components/cards/move-to-board";
 import { BoardCard, BoardColumn } from "@/types";
 import { IconMore, IconClose, IconCheck, IconLabel, IconClock, IconChecklist, IconMember, IconComment, IconTemplate, IconTrash } from "@/components/icons/grendizer";
 
@@ -37,7 +39,7 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-type Section = "labels" | "dates" | "checklist" | "members" | null;
+type Section = "labels" | "dates" | "checklist" | "members" | "attachments" | "moveboard" | null;
 
 export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }: CardDetailModalProps) {
   const queryClient = useQueryClient();
@@ -275,6 +277,19 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
           <Button size="sm" variant="outline" onClick={() => setSection(section === "dates" ? null : "dates")}><IconClock className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Dates</Button>
           <Button size="sm" variant="outline" onClick={() => setSection(section === "checklist" ? null : "checklist")}><IconChecklist className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Checklist</Button>
           <Button size="sm" variant="outline" onClick={() => setSection(section === "members" ? null : "members")}><IconMember className="h-4 w-4 inline-block mr-1 -mt-0.5" /> Members</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "attachments" ? null : "attachments")}>Attachments</Button>
+          <Button size="sm" variant="outline" onClick={() => setSection(section === "moveboard" ? null : "moveboard")}>Move to board</Button>
+
+          {section === "attachments" && (
+            <div className="absolute top-full left-0 z-30 mt-1 w-80 border-2 border-outline bg-surface shadow-lg p-2">
+              <CardAttachments cardId={cardId} />
+            </div>
+          )}
+          {section === "moveboard" && (
+            <div className="absolute top-full left-0 z-30 mt-1 w-80 border-2 border-outline bg-surface shadow-lg p-3">
+              <MoveToBoard cardId={cardId} currentBoardId={boardId} onDone={onClose} />
+            </div>
+          )}
 
           {section === "labels" && (
             <div className="absolute top-full left-0 z-30 mt-1 w-80 border-2 border-outline bg-surface shadow-lg p-2">

@@ -34,7 +34,8 @@ class ChecklistService:
         checklist = Checklist(
             id=uuid.uuid4().hex,
             cardId=data["cardId"],
-            name=data["name"],
+            # UI sends {title}; accept both spellings at the boundary.
+            name=data.get("name") or data.get("title") or "Checklist",
             position=position,
         )
         db.add(checklist)

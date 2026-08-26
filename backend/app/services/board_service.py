@@ -10,6 +10,18 @@ from app.models.space import Space
 from app.models.space_member import SpaceMember
 from app.models.column import Column
 from app.models.card import Card
+from app.models.user import User
+
+# Provisioned on every new board so the label picker/filter are useful
+# immediately. Single source of truth; routers import from here.
+DEFAULT_LABEL_PALETTE = [
+    ("Green", "#7adba8"),
+    ("Yellow", "#ffd75e"),
+    ("Orange", "#ff9f43"),
+    ("Red", "#ff5449"),
+    ("Purple", "#b678f0"),
+    ("Blue", "#96ccff"),
+]
 
 
 class BoardService:
@@ -85,6 +97,10 @@ class BoardService:
             settings=str(data.get("settings") or {}),
         )
         db.add(board)
+        # Provision the default label palette so pickers/filters work instantly.
+        from app.models.board_label import BoardLabel
+        for name, color in DEFAULT_LABEL_PALETTE:
+            db.add(BoardLabel(id=uuid.uuid4().hex, boardId=board.id, name=name, color=color))
         await db.commit()
         await db.refresh(board)
         return BoardService._serialize(board)

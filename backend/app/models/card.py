@@ -32,3 +32,4 @@ class Card(Base):
     members: Mapped[list["CardMember"]] = relationship(back_populates="card", cascade="all, delete-orphan")
     checklists: Mapped[list["Checklist"]] = relationship(back_populates="card", cascade="all, delete-orphan")
     cardLabels: Mapped[list["CardLabel"]] = relationship(back_populates="card", cascade="all, delete-orphan")
+    attachments: Mapped[list["CardAttachment"]] = relationship(back_populates="card", cascade="all, delete-orphan")

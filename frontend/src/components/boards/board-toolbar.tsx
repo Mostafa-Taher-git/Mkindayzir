@@ -16,6 +16,7 @@ interface BoardToolbarProps {
   onMemberFilterChange: (value: string) => void;
   labelFilter: string;
   onLabelFilterChange: (value: string) => void;
+  onOpenArchive?: () => void;
 }
 
 function BoardToolbar({
@@ -28,11 +29,12 @@ function BoardToolbar({
   onMemberFilterChange,
   labelFilter,
   onLabelFilterChange,
+  onOpenArchive,
 }: BoardToolbarProps) {
   const { data: labelsData } = useQuery({
     queryKey: ["labels", boardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/boards/${boardId}/labels`, {credentials: "include", 
+      const res = await fetch(`/api/boards/${boardId}/labels`, {credentials: "include",
         cache: "no-store",
       });
       if (!res.ok) return { labels: [] };
@@ -40,7 +42,18 @@ function BoardToolbar({
     },
   });
 
+  // Real member options from the user directory.
+  const { data: usersData } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include", cache: "no-store" });
+      if (!res.ok) return { users: [] };
+      return res.json();
+    },
+  });
+
   const labels = labelsData?.labels ?? [];
+  const users = usersData?.users ?? [];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -52,7 +65,10 @@ function BoardToolbar({
       />
 
       <Select
-        options={[{ value: "", label: "All Members" }]}
+        options={[
+          { value: "", label: "All Members" },
+          ...users.map((u: { id: string; displayName: string }) => ({ value: u.id, label: u.displayName })),
+        ]}
         value={memberFilter}
         onChange={(e) => onMemberFilterChange(e.target.value)}
         className="h-9"
@@ -81,6 +97,12 @@ function BoardToolbar({
           </Button>
         ))}
       </div>
+
+      {onOpenArchive && (
+        <Button variant="secondary" size="sm" onClick={onOpenArchive}>
+          Archive
+        </Button>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Kanban card face:
- *   cover stripe · complete circle · title · badges (desc/checklist/members)
- *   hover actions: edit (opens card) + archive · template banner
+ *   cover stripe · complete square · title · label chips ·
+ *   badges (desc/checklist/comments/due/members) · hover actions: edit+archive · template banner
  */
 import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";
@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CSS } from "@dnd-kit/utilities";
 
 import type { WorkItem } from "@/types/work-item";
-import { IconEdit, IconArchive, IconCheck, IconTemplate } from "@/components/icons/grendizer";
+import { IconEdit, IconArchive, IconTemplate } from "@/components/icons/grendizer";
 
 interface KanbanCardProps {
   item: WorkItem;
@@ -22,18 +22,28 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
   const queryClient = useQueryClient();
-  const meta = (item as any).metadata ?? {};
   const isComplete = !!(item as any).isComplete;
   const isTemplate = !!(item as any).isTemplate;
   const coverColor = (item as any).coverColor as string | null | undefined;
   const description = item.description ?? "";
-  const checklists = (item as any).checklists ?? [];
-  const checklistTotal = checklists.reduce(
-    (acc: number, cl: any) => acc + ((cl.items as any[]) ?? []).length, 0
-  );
-  const checklistDone = checklists.reduce(
-    (acc: number, cl: any) => acc + (((cl.items as any[]) ?? []).filter((i: any) => i.isCompleted).length), 0
-  );
+  const labels = ((item as any).labels ?? []) as { id: string; name: string; color: string }[];
+  const checklistTotal = (item as any).checklistTotal ?? 0;
+  const checklistDone = (item as any).checklistDone ?? 0;
+  const commentCount = (item as any).commentCount ?? 0;
+  const dueDate = (item as any).dueDate as string | null | undefined;
+  const members = ((item as any).members ?? []) as { id: string; displayName: string | null }[];
+
+  const dueInfo = React.useMemo(() => {
+    if (!dueDate) return null;
+    const d = new Date(dueDate);
+    if (Number.isNaN(d.getTime())) return null;
+    const now = new Date();
+    const overdue = d.getTime() < now.getTime() && !isComplete;
+    return {
+      overdue,
+      label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    };
+  }, [dueDate, isComplete]);
 
   const refresh = () => {
     if (!boardId) return;
@@ -51,9 +61,10 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
     onSuccess: refresh,
   });
 
-  const archive = useMutation({
+  const archiveCard = useMutation({
+    // Soft-delete: recoverable from the board archive.
     mutationFn: () =>
-      fetch(`/api/cards/${item.id}`, { method: "DELETE", credentials: "include" }),
+      fetch(`/api/cards/${item.id}/archive`, { method: "POST", credentials: "include" }),
     onSuccess: refresh,
   });
 
@@ -81,14 +92,29 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
         </div>
       )}
 
-      {/* title row: complete circle + title */}
+      {/* label chips */}
+      {labels.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          {labels.map((l) => (
+            <span
+              key={l.id}
+              title={l.name}
+              className="inline-block h-2 w-8 rounded-[2px]"
+              style={{ backgroundColor: l.color }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* title row: complete square + title */}
       <div className="flex items-start gap-2">
         <button
-          aria-label={isComplete ? "Mark complete" : "Mark incomplete"}
-          title={isComplete ? "Mark complete" : "Mark complete"}
+          aria-label={isComplete ? "Mark incomplete" : "Mark complete"}
           onClick={(e) => { e.stopPropagation(); toggleComplete.mutate(); }}
-          className={`mt-0.5 h-4 w-4 shrink-0 rounded-[3px] border-2 flex items-center justify-center text-[9px] leading-none transition-colors ${
-            isComplete ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/50 hover:border-emerald-400"
+          className={`mt-0.5 h-4 w-4 shrink-0 border-2 flex items-center justify-center text-[9px] leading-none transition-colors ${
+            isComplete
+              ? "border-success bg-success text-background"
+              : "border-muted-foreground/50 hover:border-success"
           }`}
         >
           {isComplete ? "✓" : ""}
@@ -102,13 +128,27 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
       <div className="mt-1.5 flex items-center gap-2.5 text-[11px] font-mono text-muted-foreground">
         {description && <span title="This card has a description">≡</span>}
         {checklistTotal > 0 && (
-          <span className={checklistDone === checklistTotal ? "text-emerald-500" : ""}>
+          <span className={checklistDone === checklistTotal ? "text-success" : ""}>
             ☑ {checklistDone}/{checklistTotal}
           </span>
         )}
-        {(item.assignee) && (
-          <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/80 text-[9px] font-bold text-primary-foreground">
-            {(item.assignee.displayName ?? "?").slice(0, 2).toUpperCase()}
+        {commentCount > 0 && <span title={`${commentCount} comments`}>💬 {commentCount}</span>}
+        {dueInfo && (
+          <span className={dueInfo.overdue ? "font-bold text-critical" : ""}>
+            🕐 {dueInfo.label}
+          </span>
+        )}
+        {members.length > 0 && (
+          <span className="ml-auto flex -space-x-1.5">
+            {members.slice(0, 3).map((m) => (
+              <span
+                key={m.id}
+                title={m.displayName ?? ""}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/80 text-[9px] font-bold text-primary-foreground ring-1 ring-card"
+              >
+                {(m.displayName ?? "?").slice(0, 2).toUpperCase()}
+              </span>
+            ))}
           </span>
         )}
       </div>
@@ -120,15 +160,15 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
             aria-label="Edit card"
             title="Edit card (opens details)"
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-primary"
+            className="h-6 w-6 border border-outline bg-background/90 text-[11px] hover:border-primary"
           >
             <IconEdit className="h-3.5 w-3.5" />
           </button>
           <button
             aria-label="Archive card"
             title="Archive card"
-            onClick={(e) => { e.stopPropagation(); archive.mutate(); }}
-            className="h-6 w-6 rounded border border-outline bg-background/90 text-[11px] hover:border-destructive hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); archiveCard.mutate(); }}
+            className="h-6 w-6 border border-outline bg-background/90 text-[11px] hover:border-critical hover:text-critical"
           >
             <IconArchive className="h-3.5 w-3.5" />
           </button>

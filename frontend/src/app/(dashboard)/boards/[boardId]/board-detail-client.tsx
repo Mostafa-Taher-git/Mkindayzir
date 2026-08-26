@@ -25,6 +25,7 @@ import { BoardHeader } from "@/components/boards/board-header";
 import { AddColumnButton } from "@/components/boards/add-column-button";
 import { AddCardComposer } from "@/components/boards/add-card-composer";
 import { BackgroundPicker } from "@/components/boards/background-picker";
+import { BoardArchive } from "@/components/boards/board-archive";
 import { BoardTableView } from "@/components/boards/board-table-view";
 import { KanbanBoard } from "@/components/boards/kanban-board";
 import { Board, BoardColumn, BoardCard, BoardLabel } from "@/types";
@@ -64,12 +65,12 @@ function mapCardToWorkItem(card: BoardCard, _columnNameMap: Record<string, strin
   // status is the column ID — KanbanBoard keys lists by id now.
   const status = card.columnId;
   const firstMember = card.members?.[0];
-  const assignee = firstMember?.user
+  const assignee = firstMember
     ? {
         id: firstMember.userId,
         email: "",
-        displayName: firstMember.user.displayName,
-        avatar: firstMember.user.avatar,
+        displayName: firstMember.displayName ?? firstMember.user?.displayName ?? "Unknown",
+        avatar: firstMember.user?.avatar ?? null,
         role: "",
         status: "ACTIVE" as const,
       }
@@ -101,7 +102,9 @@ function mapCardToWorkItem(card: BoardCard, _columnNameMap: Record<string, strin
     assignee,
     initiative: undefined,
     iteration: undefined,
-    labels: card.labels?.map((l) => ({ label: mapBoardLabelToWorkItemLabel(l.label!) })) ?? [],
+    labels: (card.labels ?? []).map((l) => ({
+      label: { id: l.id, projectId: "", name: l.name, color: l.color, createdAt: "" },
+    })),
   };
 }
 
@@ -131,6 +134,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const [memberFilter, setMemberFilter] = React.useState("");
   const [labelFilter, setLabelFilter] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"kanban" | "table">("kanban");
+  const [archiveOpen, setArchiveOpen] = React.useState(false);
   const [activeCard, setActiveCard] = React.useState<BoardCard | null>(null);
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
 
@@ -172,7 +176,8 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const filteredCards = cards.filter((card: BoardCard) => {
     if (search && !card.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (memberFilter && !card.members?.some((m) => m.userId === memberFilter)) return false;
-    if (labelFilter && !card.labels?.some((l) => l.labelId === labelFilter)) return false;
+    // API returns flat label chips: {id, name, color}
+    if (labelFilter && !card.labels?.some((l) => l.id === labelFilter)) return false;
     return true;
   });
 
@@ -304,6 +309,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
         onMemberFilterChange={setMemberFilter}
         labelFilter={labelFilter}
         onLabelFilterChange={setLabelFilter}
+        onOpenArchive={() => setArchiveOpen(true)}
       />
 
       {viewMode === "kanban" ? (
@@ -353,6 +359,8 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
           }}
         />
       )}
+
+      <BoardArchive boardId={board.id} open={archiveOpen} onOpenChange={setArchiveOpen} />
       </div>
     </div>
   );

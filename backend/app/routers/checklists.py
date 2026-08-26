@@ -36,6 +36,22 @@ async def create_checklist_item(data: dict, user: dict = Depends(get_current_use
     return await ChecklistService.create_item(db, data["checklistId"], data, user)
 
 
+@router.post("/{checklist_id}/items", status_code=201)
+async def create_checklist_item_nested(
+    checklist_id: str, data: dict, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    # REST-style nested route — the UI calls /api/checklists/{id}/items.
+    return await ChecklistService.create_item(db, checklist_id, data, user)
+
+
+@router.get("/{checklist_id}/items")
+async def list_checklist_items(
+    checklist_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    result = await ChecklistService.get(db, checklist_id, user)
+    return {"items": result.get("items", [])}
+
+
 @router.get("/checklist-items/{item_id}")
 async def get_checklist_item(item_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:

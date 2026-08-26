@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+import uuid
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
 from app.middleware.auth import get_current_user
+from app.models.board_label import BoardLabel
 from app.services.board_service import BoardService
 
 router = APIRouter(prefix="/api/boards", tags=["boards"])
@@ -18,6 +23,38 @@ async def list_boards(
     else:
         items = await BoardService.list_all(db, user)
     return {"boards": items}
+
+
+@router.get("/{board_id}/labels")
+async def list_board_labels(
+    board_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(BoardLabel).where(BoardLabel.boardId == board_id).order_by(BoardLabel.createdAt.asc())
+    )
+    labels = result.scalars().all()
+    return {
+        "labels": [{"id": l.id, "name": l.name, "color": l.color} for l in labels]
+    }
+
+
+@router.post("/{board_id}/labels", status_code=201)
+async def create_board_label(
+    board_id: str,
+    data: dict,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    name = (data or {}).get("name", "").strip()
+    color = (data or {}).get("color", "").strip()
+    if not name or not color:
+        raise HTTPException(status_code=400, detail={
+            "error": {"code": "VALIDATION_ERROR", "message": "name and color are required"}
+        })
+    label = BoardLabel(id=uuid.uuid4().hex, boardId=board_id, name=name[:255], color=color[:50])
+    db.add(label)
+    await db.commit()
+    return {"label": {"id": label.id, "name": label.name, "color": label.color}}
 
 
 @router.post("/", status_code=201)

@@ -17,6 +17,7 @@ from app.models.board import Board
 from app.models.column import Column
 from app.models.card import Card
 from app.models.card_member import CardMember
+from app.models.card_attachment import CardAttachment
 from app.models.checklist import Checklist
 from app.models.checklist_item import ChecklistItem
 from app.models.board_label import BoardLabel

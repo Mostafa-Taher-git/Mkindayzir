@@ -90,21 +90,27 @@ export interface BoardCard {
   members?: CardMember[];
   labels?: CardLabel[];
   checklists?: Checklist[];
+  /** face badges from the rich card payload */
+  checklistTotal?: number;
+  checklistDone?: number;
+  commentCount?: number;
 }
 
 export interface CardMember {
   id: string;
-  cardId: string;
+  cardId?: string;
   userId: string;
-  role: SpaceRole;
+  role?: SpaceRole;
+  /** Rich card payloads carry the display name directly. */
+  displayName?: string | null;
   user?: User;
 }
 
+/** Flat label chip as served on rich card payloads. */
 export interface CardLabel {
   id: string;
-  cardId: string;
-  labelId: string;
-  label?: BoardLabel;
+  name: string;
+  color: string;
 }
 
 export interface BoardLabel {
