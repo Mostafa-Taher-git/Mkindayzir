@@ -78,3 +78,36 @@ def backlink_index(notes: Iterable[tuple[str, str]]) -> dict[str, list[str]]:
         for name in extract_wiki_links(body):
             out.setdefault(name, []).append(storm_id)
     return out
+
+
+NOTE_IMG_SUBDIR = "storm-note-images"
+ALLOWED_IMG = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
+
+
+def images_root() -> Path:
+    return Path(settings.DATA_DIR) / NOTE_IMG_SUBDIR
+
+
+def _image_path(stored_name: str) -> Path:
+    return images_root() / stored_name
+
+
+def save_note_image(filename: str, data: bytes) -> str:
+    """Persist an uploaded image; returns its public relative URL."""
+    ext = Path(filename or "").suffix.lower()
+    if ext not in ALLOWED_IMG:
+        raise ValueError("unsupported image type")
+    if len(data) > 8 * 1024 * 1024:
+        raise ValueError("image too large")
+    images_root().mkdir(parents=True, exist_ok=True)
+    stored = f"{__import__('uuid').uuid4().hex}{ext}"
+    _image_path(stored).write_bytes(data)
+    return f"/api/storms/images/{stored}"
+
+
+def image_path_safe(stored_name: str):
+    """Resolve an image path, refusing anything that escapes the image dir."""
+    candidate = _image_path(stored_name).resolve()
+    if candidate.parent != images_root().resolve() or not candidate.exists():
+        return None
+    return candidate

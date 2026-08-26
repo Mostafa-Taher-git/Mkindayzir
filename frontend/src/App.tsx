@@ -371,6 +371,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/storm/:stormId/note"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <StormNotePage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

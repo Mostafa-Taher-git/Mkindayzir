@@ -16,6 +16,9 @@ from app.services.storm_service import (
     _serialize_storm,
 )
 from app.services import storm_note_store
+from fastapi import UploadFile, File
+from pathlib import Path
+import uuid
 
 
 router = APIRouter(prefix="/api/storms", tags=["storms"])
@@ -177,6 +180,32 @@ async def put_note(
     await StormService.update(db, user["id"], storm_id, {})
     await storm_note_store.write_note(storm_id, body.body)
     return {"ok": True}
+
+
+@router.post("/images", status_code=201)
+async def upload_note_image(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
+    """Upload an image for embedding in a storm note via ![](url). Personal
+    scope: the current user is the owner; files live under DATA_DIR/storm-note-images."""
+    try:
+        data = await file.read()
+        url = storm_note_store.save_note_image(file.filename or "image.png", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_IMAGE", "message": str(exc)}})
+    return {"url": url}
+
+
+@router.get("/images/{stored_name}")
+async def serve_note_image(stored_name: str):
+    """Serve an uploaded note image (path-traversal safe)."""
+    from fastapi.responses import FileResponse
+
+    path = storm_note_store.image_path_safe(stored_name)
+    if path is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Image not found"}})
+    return FileResponse(path)
 
 
 @router.get("/_backlinks")

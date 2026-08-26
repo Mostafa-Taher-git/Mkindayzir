@@ -4,6 +4,7 @@
  */
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { STORM_ROUTES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,25 @@ export default function StormNotePage() {
         body: JSON.stringify({ body: next }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({ error: { message: "Save failed" } }))).error?.message ?? "Save failed");
+    },
+  });
+
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = React.useState(false);
+
+  const uploadImage = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch(`/api/storms/images`, { method: "POST", credentials: "include", body });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message ?? "Upload failed");
+      }
+      return (await res.json()).url as string;
+    },
+    onSuccess: (url: string) => {
+      setBody((prev) => `${prev}${prev && !prev.endsWith("\n") ? "\n" : ""}![]( ${url} )\n`.replace("![]( ", "!(").replace(" )", ")"));
     },
   });
 
@@ -91,6 +111,13 @@ export default function StormNotePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => navigate(STORM_ROUTES.HOME)}>← Back</Button>
+          <Button size="sm" variant="secondary" onClick={() => setPreview((v) => !v)}>{preview ? "Edit" : "Preview"}</Button>
+          <Button size="sm" variant="secondary" disabled={uploadImage.isPending} onClick={() => fileInput.current?.click()}>            {uploadImage.isPending ? "Uploading…" : "Image"}
+          </Button>
+          {uploadImage.isError && (
+            <span className="text-xs text-critical">{(uploadImage.error as Error).message}</span>
+          )}
+          <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage.mutate(f); e.target.value = ""; }} />
           <span className="text-xs text-muted-foreground font-mono">{dirty ? "unsaved" : "saved"}</span>
           <span className="text-xs text-muted-foreground font-mono">{words} words · {chars} chars</span>
         </div>
@@ -124,18 +151,24 @@ export default function StormNotePage() {
         }}
       />
 
-      <textarea
-        className="mt-2 flex-1 resize-none bg-transparent p-2 font-mono text-sm leading-relaxed outline-none"
-        value={body}
-        onChange={onChange}
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-            e.preventDefault();
-            if (timer.current) window.clearTimeout(timer.current);
-            save.mutate(body);
-          }
-        }}
-      />
+      {preview ? (
+        <div className="mt-2 flex-1 overflow-auto rounded border-2 border-outline bg-background p-3 prose prose-invert max-w-none">
+          <ReactMarkdown>{body || "_Nothing yet. Write in markdown and link notes with [[name]]."}</ReactMarkdown>
+        </div>
+      ) : (
+        <textarea
+          className="mt-2 flex-1 resize-none bg-transparent p-2 font-mono text-sm leading-relaxed outline-none"
+          value={body}
+          onChange={onChange}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+              e.preventDefault();
+              if (timer.current) window.clearTimeout(timer.current);
+              save.mutate(body);
+            }
+          }}
+        />
+      )}
 
       <div className="mt-2 border-t-2 border-outline pt-2">
         <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Linked notes</div>

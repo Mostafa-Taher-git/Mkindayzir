@@ -1,7 +1,7 @@
 /**
  * Storm canvas: pan/zoom, fixed-size cards, 4 corner circles,
  * drag-with-subtree, link creation, cap enforcement, create-anywhere,
- * fit-to-view, archive. Note opening via dialog on click.
+ * fit-to-view. A plain click on a card opens its note; a drag moves it.
  *
  * Why a native non-passive wheel listener: React's onWheel is registered
  * as a passive listener at the root, so preventDefault() is a no-op and the
@@ -26,6 +26,8 @@ import {
 type Linking = { stormId: string; corner: number; mouseX: number; mouseY: number };
 type Drag = { stormId: string; originX: number; originY: number; subtreeIds: Set<string> };
 type Delta = { dx: number; dy: number };
+type CardPress = { x: number; y: number; moved: boolean; id: string };
+const CLICK_THRESHOLD = 4; // px of movement below which a press counts as a click
 const CORNER_STYLES = [
   { left: -5, top: -5 }, { right: -5, top: -5 },
   { left: -5, bottom: -5 }, { right: -5, bottom: -5 },
@@ -64,6 +66,8 @@ export default function StormPage() {
   // Per-card live offset during a drag. Reset on pointer-up; the final delta
   // is persisted via useMoveSubtree so the server repositions the whole subtree.
   const [dragDelta, setDragDelta] = React.useState<Map<string, Delta>>(new Map());
+  const bgPress = React.useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const cardPress = React.useRef<CardPress | null>(null);
 
   const viewport = React.useCallback((): { width: number; height: number } => {
     const r = canvasRef.current?.getBoundingClientRect();
@@ -92,6 +96,11 @@ export default function StormPage() {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  const openNote = React.useCallback(
+    (stormId: string) => navigate(`${STORM_ROUTES.HOME}/${stormId}/note`),
+    [navigate]
+  );
+
   const toCanvas = React.useCallback(
     (clientX: number, clientY: number) => {
       const r = canvasRef.current?.getBoundingClientRect();
@@ -100,8 +109,6 @@ export default function StormPage() {
     },
     [pan, zoom]
   );
-
-  const bgPress = React.useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   const onCanvasDown = (e: React.PointerEvent) => {
     // Middle-button or Alt+left always pans.
@@ -137,6 +144,10 @@ export default function StormPage() {
         });
         return next;
       });
+      // Only count it as a drag once movement passes the click threshold;
+      // a stray same-coordinate pointermove must not swallow a click.
+      const moved = Math.hypot(e.clientX - (cardPress.current?.x ?? e.clientX), e.clientY - (cardPress.current?.y ?? e.clientY)) > CLICK_THRESHOLD;
+      if (cardPress.current) cardPress.current.moved = moved;
       setDrag((d) => (d ? { ...d, originX: p.x - dx, originY: p.y - dy } : d));
       return;
     }
@@ -145,7 +156,7 @@ export default function StormPage() {
       return;
     }
     if (bgPress.current) {
-      const moved = Math.hypot(e.clientX - bgPress.current.x, e.clientY - bgPress.current.y) > 4;
+      const moved = Math.hypot(e.clientX - bgPress.current.x, e.clientY - bgPress.current.y) > CLICK_THRESHOLD;
       if (moved) {
         bgPress.current.moved = true;
         setIsPanning(true);
@@ -175,7 +186,10 @@ export default function StormPage() {
     }
     if (drag) {
       const root = dragDelta.get(drag.stormId) ?? { dx: 0, dy: 0 };
-      if (root.dx !== 0 || root.dy !== 0) {
+      // No movement past the threshold ⇒ treat the press as a click → open note.
+      if (!cardPress.current?.moved) {
+        openNote(drag.stormId);
+      } else if (root.dx !== 0 || root.dy !== 0) {
         moveSubtree.mutate({ stormId: drag.stormId, dx: root.dx, dy: root.dy });
       }
       setDragDelta(new Map());
@@ -185,6 +199,7 @@ export default function StormPage() {
       if (!bgPress.current.moved) setDraftName("");
       bgPress.current = null;
     }
+    cardPress.current = null;
     setIsPanning(false);
     setDrag(null);
   };
@@ -205,6 +220,7 @@ export default function StormPage() {
     // Corner circles have data-corner="true"; don't start a card drag from them.
     if ((e.target as HTMLElement).dataset.corner === "true") return;
     e.stopPropagation();
+    cardPress.current = { x: e.clientX, y: e.clientY, moved: false, id: storm.id };
     setDrag({
       stormId: storm.id,
       originX: storm.positionX, originY: storm.positionY,
@@ -285,7 +301,7 @@ export default function StormPage() {
                    className={`absolute rounded-xl border-2 bg-surface p-2 shadow-lg select-none ${selectedId === s.id ? "border-accent" : "border-outline"}`}
                    style={{ left: s.positionX + (d?.dx ?? 0), top: s.positionY + (d?.dy ?? 0), width: CARD_W, height: CARD_H }}
                    onPointerDown={(e) => onCardDown(e, s)}
-                   onDoubleClick={() => navigate(`${STORM_ROUTES.HOME}/${s.id}/note`)}>
+                   onDoubleClick={() => openNote(s.id)}>
                 <div className="flex h-full flex-col">
                   {renamingId === s.id ? (
                     <input autoFocus data-testid="rename-input" aria-label="Rename storm"
