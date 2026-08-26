@@ -40,6 +40,7 @@ import SettingsPage from "@/app/(dashboard)/settings/page";
 import SystemSettingsPage from "@/app/(dashboard)/settings/system/page";
 import StormPage from "@/app/(dashboard)/storm/page";
 import StormNotePage from "@/app/(dashboard)/storm/[stormId]/note/page";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -366,7 +367,9 @@ export default function App() {
         element={
           <ProtectedRoute>
             <DashboardRoute>
-              <StormPage />
+              <ErrorBoundary label="Storm canvas">
+                <StormPage />
+              </ErrorBoundary>
             </DashboardRoute>
           </ProtectedRoute>
         }
@@ -376,7 +379,9 @@ export default function App() {
         element={
           <ProtectedRoute>
             <DashboardRoute>
-              <StormNotePage />
+              <ErrorBoundary label="Storm note">
+                <StormNotePage />
+              </ErrorBoundary>
             </DashboardRoute>
           </ProtectedRoute>
         }

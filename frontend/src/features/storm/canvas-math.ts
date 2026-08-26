@@ -26,6 +26,25 @@ export const CARD_W = 200;
 export const CARD_H = 120;
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
+// Hard world bound so a corrupted/absurd stored position can never produce a
+// ~300k-px-wide element that hangs or crashes the browser renderer.
+export const WORLD_LIMIT = 50000;
+
+/** Clamp a single stored coordinate to the safe world bound. */
+export function clampCoord(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(WORLD_LIMIT, Math.max(-WORLD_LIMIT, n));
+}
+
+/** Return a copy of `storms` with every position clamped to the safe world. */
+export function sanitizeStormPositions<T extends StormCard>(storms: ReadonlyArray<T>): T[] {
+  return storms.map((s) => ({
+    ...s,
+    positionX: clampCoord(s.positionX),
+    positionY: clampCoord(s.positionY),
+  }));
+}
 export const CORNERS_PER_CARD = 3;
 export const LINKS_PER_CARD = 12;
 export const PADDING = 80;

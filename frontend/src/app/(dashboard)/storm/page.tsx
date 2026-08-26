@@ -21,6 +21,7 @@ import {
   cardCorners, nearestCorner, linkCapsAtCorner, canCreateLink,
   nearestCardToPoint, collectSubtree, clampPan, computeFitView,
   type StormCard, type StormLink, type Pan,
+  sanitizeStormPositions, WORLD_LIMIT,
 } from "@/features/storm/canvas-math";
 
 type Linking = { stormId: string; corner: number; mouseX: number; mouseY: number };
@@ -43,8 +44,10 @@ export default function StormPage() {
   const deleteLink = useDeleteLink();
   const moveSubtree = useMoveSubtree();
 
+  // Clamp stored positions to a safe world bound so a corrupted/absurd
+  // coordinate can never generate a giant element that crashes the renderer.
   const storms = React.useMemo<StormCard[]>(
-    () => (Array.isArray(data?.storms) ? (data.storms as StormCard[]) : []), [data]
+    () => (Array.isArray(data?.storms) ? sanitizeStormPositions(data.storms as StormCard[]) : []), [data]
   );
   const links = React.useMemo<StormLink[]>(
     () => (Array.isArray(data?.links) ? (data.links as StormLink[]) : []), [data]
@@ -134,8 +137,10 @@ export default function StormPage() {
     if (drag) {
       const p = toCanvas(e.clientX, e.clientY);
       const cur = storms.find((s) => s.id === drag.stormId);
-      const dx = p.x - drag.originX - (cur?.positionX ?? drag.originX);
-      const dy = p.y - drag.originY - (cur?.positionY ?? drag.originY);
+      // Clamp the raw delta to the safe world bound so a drag can never blow a
+      // card up to an absurd coordinate (the original source of the blank-page crash).
+      const dx = Math.min(WORLD_LIMIT, Math.max(-WORLD_LIMIT, p.x - drag.originX - (cur?.positionX ?? drag.originX)));
+      const dy = Math.min(WORLD_LIMIT, Math.max(-WORLD_LIMIT, p.y - drag.originY - (cur?.positionY ?? drag.originY)));
       setDragDelta((prev) => {
         const next = new Map(prev);
         drag.subtreeIds.forEach((id) => {
@@ -148,6 +153,7 @@ export default function StormPage() {
       // a stray same-coordinate pointermove must not swallow a click.
       const moved = Math.hypot(e.clientX - (cardPress.current?.x ?? e.clientX), e.clientY - (cardPress.current?.y ?? e.clientY)) > CLICK_THRESHOLD;
       if (cardPress.current) cardPress.current.moved = moved;
+
       setDrag((d) => (d ? { ...d, originX: p.x - dx, originY: p.y - dy } : d));
       return;
     }
