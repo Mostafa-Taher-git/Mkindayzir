@@ -169,14 +169,25 @@ describe("StormPage", () => {
   });
 
   describe("empty-canvas click", () => {
-    it("clicking directly on the canvas opens the create modal", () => {
+    it("clicking (press + release, no drag) on the canvas opens the create modal", () => {
       mockStormsQuery.mockReturnValue({ data: { storms: [STORM_A], links: [] }, isLoading: false });
       renderPage();
       const canvas = screen.getByTestId("canvas");
       fireEvent.pointerDown(canvas, { button: 0, clientX: 5, clientY: 5 });
+      fireEvent.pointerUp(canvas, { button: 0, clientX: 5, clientY: 5 });
       expect(screen.getByTestId("new-storm-modal")).toBeInTheDocument();
       const input = screen.getByTestId("new-storm-input") as HTMLInputElement;
       expect(input.value).toBe("");
+    });
+
+    it("dragging the background does NOT open the create modal", () => {
+      mockStormsQuery.mockReturnValue({ data: { storms: [STORM_A], links: [] }, isLoading: false });
+      renderPage();
+      const canvas = screen.getByTestId("canvas");
+      fireEvent.pointerDown(canvas, { button: 0, clientX: 5, clientY: 5 });
+      fireEvent.pointerMove(canvas, { clientX: 80, clientY: 60 });
+      fireEvent.pointerUp(canvas, { button: 0, clientX: 80, clientY: 60 });
+      expect(screen.queryByTestId("new-storm-modal")).not.toBeInTheDocument();
     });
   });
 

@@ -317,15 +317,17 @@ export default function StormPage() {
             );
           })}
 
-          {/* Links: pointer-events intentionally NOT disabled — lines must be clickable to delete. */}
-          <svg className="absolute inset-0 h-full w-full overflow-visible">
+          {/* Links: the SVG must be click-through so the corner handles and
+              cards underneath stay interactive. Only the link lines and their
+              delete buttons capture pointer events (set per-element below). */}
+          <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
             {links.map((l) => {
               const src = stormLookup.get(l.sourceId), tgt = stormLookup.get(l.targetId);
               if (!src || !tgt) return null;
               const from = cornerOf(src, l.sourceCorner), to = cornerOf(tgt, l.targetCorner);
               const sel = selectedLinkId === l.id;
               return (
-                <g key={l.id} data-testid="link-line" style={{ cursor: "pointer" }}
+                <g key={l.id} data-testid="link-line" className="pointer-events-auto" style={{ cursor: "pointer" }}
                    onClick={(e) => { e.stopPropagation(); setSelectedLinkId(l.id); }}>
                   {/* Wide transparent overlay (14px) makes lines easy to click. */}
                   <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="transparent" strokeWidth={14} />
