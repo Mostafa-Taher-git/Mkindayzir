@@ -1,8 +1,9 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from app.models.vault_folder import VaultFolder
 from app.models.vault_note import VaultNote
 from app.models.note_tag import NoteTag
@@ -11,6 +12,9 @@ from app.models.note_version import NoteVersion
 from app.models.note_feedback import NoteFeedback
 from app.models.internal_link import InternalLink
 from app.models.user import User
+
+
+TAG_PATTERN = re.compile(r"\[\[([^\[\]\n]{1,80})\]\]")
 
 
 class VaultService:
@@ -34,6 +38,15 @@ class VaultService:
             folder = note.folder
             if folder is not None:
                 folder_name = folder.name
+        tag_list = []
+        if note.tags:
+            for nt in note.tags:
+                if nt.tag is not None:
+                    tag_list.append({
+                        "id": nt.tag.id,
+                        "name": nt.tag.name,
+                        "color": nt.tag.color,
+                    })
         return {
             "id": note.id,
             "folderId": note.folderId,
@@ -46,6 +59,7 @@ class VaultService:
             "authorId": note.authorId,
             "metadata": note.meta,
             "version": note.version,
+            "tags": tag_list,
             "createdAt": note.createdAt.isoformat() if note.createdAt else None,
             "updatedAt": note.updatedAt.isoformat() if note.updatedAt else None,
             "publishedAt": note.publishedAt.isoformat() if note.publishedAt else None,
@@ -170,7 +184,10 @@ class VaultService:
         per_page = params.get("perPage", 20)
         offset = (page - 1) * per_page
 
-        query = query.offset(offset).limit(per_page).order_by(VaultNote.updatedAt.desc()).options(joinedload(VaultNote.folder))
+        query = query.offset(offset).limit(per_page).order_by(VaultNote.updatedAt.desc()).options(
+            joinedload(VaultNote.folder),
+            selectinload(VaultNote.tags).joinedload(NoteTag.tag),
+        )
         result = await db.execute(query)
         items = result.scalars().all()
 
@@ -203,6 +220,63 @@ class VaultService:
             n += 1
 
     @staticmethod
+    def extract_tag_names(content: str) -> list[str]:
+        if not content:
+            return []
+        seen: set[str] = set()
+        names: list[str] = []
+        for m in TAG_PATTERN.finditer(content):
+            name = m.group(1).strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            names.append(name)
+        return names
+
+    @staticmethod
+    async def _sync_note_tags(
+        db: AsyncSession,
+        note_id: str,
+        content: str | None,
+        explicit_ids: list[str] | None,
+    ) -> list[Tag]:
+        explicit_ids = explicit_ids or []
+        if not explicit_ids:
+            existing_links = (
+                await db.execute(
+                    select(NoteTag).where(NoteTag.noteId == note_id)
+                )
+            ).scalars().all()
+            for link in existing_links:
+                await db.delete(link)
+            await db.flush()
+            return []
+
+        explicit_tags = (
+            await db.execute(select(Tag).where(Tag.id.in_(explicit_ids)))
+        ).scalars().all()
+        keep = {t.id for t in explicit_tags}
+
+        existing_links = (
+            await db.execute(
+                select(NoteTag).where(NoteTag.noteId == note_id)
+            )
+        ).scalars().all()
+        for link in existing_links:
+            if link.tagId not in keep:
+                await db.delete(link)
+        linked_ids = {link.tagId for link in existing_links}
+        for tag_id in keep:
+            if tag_id in linked_ids:
+                continue
+            db.add(NoteTag(noteId=note_id, tagId=tag_id))
+        await db.flush()
+        return list(explicit_tags)
+
+    @staticmethod
     async def create_note(db: AsyncSession, data: dict, user: dict) -> dict:
         base_slug = data.get("slug") or data["title"].lower().replace(" ", "-")
         note = VaultNote(
@@ -216,14 +290,32 @@ class VaultService:
             meta=str(data.get("metadata") or {}),
         )
         db.add(note)
+        await db.flush()
+        explicit = data.get("tagIds") or []
+        await VaultService._sync_note_tags(db, note.id, note.content, explicit)
         await db.commit()
-        await db.refresh(note)
-        return VaultService._serialize_note(note)
+
+        reloaded = await db.execute(
+            select(VaultNote)
+            .where(VaultNote.id == note.id)
+            .options(
+                joinedload(VaultNote.folder),
+                selectinload(VaultNote.tags).joinedload(NoteTag.tag),
+            )
+        )
+        return VaultService._serialize_note(reloaded.unique().scalar_one())
 
     @staticmethod
     async def get_note(db: AsyncSession, note_id: str, user: dict) -> dict:
-        result = await db.execute(select(VaultNote).where(VaultNote.id == note_id, VaultNote.deletedAt.is_(None)))
-        note = result.scalar_one_or_none()
+        result = await db.execute(
+            select(VaultNote)
+            .where(VaultNote.id == note_id, VaultNote.deletedAt.is_(None))
+            .options(
+                joinedload(VaultNote.folder),
+                selectinload(VaultNote.tags).joinedload(NoteTag.tag),
+            )
+        )
+        note = result.unique().scalar_one_or_none()
         if not note:
             raise ValueError("Note not found")
         return VaultService._serialize_note(note)
@@ -244,9 +336,6 @@ class VaultService:
             raise ValueError("Note not found")
 
         content_fields = {"title", "content"}
-        # Snapshot the CURRENT state as a version before applying changes,
-        # but only when a content field is actually being modified. Without
-        # this the /versions endpoint always returned an empty list.
         if content_fields.intersection(data.keys()) and any(
             data.get(f) is not None and getattr(note, f) != data[f] for f in content_fields
         ):
@@ -267,9 +356,25 @@ class VaultService:
         if "metadata" in data and data["metadata"] is not None:
             note.meta = str(data["metadata"])
 
+        if "content" in data or "tagIds" in data:
+            await VaultService._sync_note_tags(
+                db,
+                note.id,
+                note.content,
+                data.get("tagIds"),
+            )
+
         await db.commit()
-        await db.refresh(note)
-        return VaultService._serialize_note(note)
+
+        reloaded = await db.execute(
+            select(VaultNote)
+            .where(VaultNote.id == note_id)
+            .options(
+                joinedload(VaultNote.folder),
+                selectinload(VaultNote.tags).joinedload(NoteTag.tag),
+            )
+        )
+        return VaultService._serialize_note(reloaded.unique().scalar_one())
 
     @staticmethod
     async def delete_note(db: AsyncSession, note_id: str, user: dict) -> dict:

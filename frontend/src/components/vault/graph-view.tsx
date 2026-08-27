@@ -67,15 +67,6 @@ export function GraphView({ nodes, links, onNodeClick }: GraphViewProps) {
     isDragging.current = false;
   };
 
-  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({
-      ...prev,
-      scale: Math.min(3, Math.max(0.3, prev.scale * scaleFactor)),
-    }));
-  };
-
   const resetView = () => {
     setTransform({ x: 0, y: 0, scale: 1 });
   };
@@ -96,7 +87,6 @@ export function GraphView({ nodes, links, onNodeClick }: GraphViewProps) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
       >
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
           {links.map((link, i) => {

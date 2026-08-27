@@ -94,6 +94,7 @@ function MarkdownRenderer({ content }: { content: string }) {
         text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
         text = text.replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs">$1</code>');
+        text = text.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
         elements.push(
           <p
             key={i}

@@ -35,7 +35,7 @@ export function NoteEditor({
   const [selectedTagIds, setSelectedTagIds] = React.useState<string[]>(
     note?.tags?.map((t) => t.id) || []
   );
-  const [status] = React.useState<NoteStatus>(note?.status || "DRAFT");
+  const [status, setStatus] = React.useState<NoteStatus>(note?.status || "DRAFT");
 
   const rootFolders = folders.filter((f) => !f.parentId);
 
@@ -45,14 +45,16 @@ export function NoteEditor({
     );
   };
 
-  const handleSave = async () => {
+  const handleSave = async (publish: boolean) => {
     if (!onSave) return;
+    const nextStatus: NoteStatus = publish ? "PUBLISHED" : status;
+    if (publish) setStatus("PUBLISHED");
     await onSave({
       title,
       content,
       folderId: folderId === "none" ? null : folderId,
       tagIds: selectedTagIds,
-      status,
+      status: nextStatus,
     });
   };
 
@@ -66,8 +68,11 @@ export function NoteEditor({
           <Button variant="outline" onClick={() => navigate(-1)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Publish"}
+          <Button variant="secondary" onClick={() => handleSave(false)} disabled={saving}>
+            {saving ? "Saving..." : "Save draft"}
+          </Button>
+          <Button onClick={() => handleSave(true)} disabled={saving}>
+            {saving ? "Publishing..." : "Publish"}
           </Button>
         </div>
       </div>
