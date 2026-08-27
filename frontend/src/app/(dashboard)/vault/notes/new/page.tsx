@@ -1,5 +1,6 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder, Tag } from "@/types";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
@@ -7,6 +8,37 @@ import { NoteEditor } from "@/components/vault/note-editor";
 import { api } from "@/lib/api";
 
 export default function NewNotePage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: async (data: {
+      title: string;
+      content: string;
+      folderId: string | null;
+      tagIds: string[];
+      status: string;
+    }) => {
+      const res = await fetch("/api/vault/notes", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || "Failed to create note");
+      }
+      return res.json();
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["vault", "notes"] });
+      const id = res?.note?.id;
+      if (id) navigate(`/vault/notes/${id}`);
+      else navigate(VAULT_ROUTES.HOME);
+    },
+  });
+
   const { data: foldersData } = useQuery<{ folders: VaultFolder[] }>({
     queryKey: ["vault", "folders"],
     queryFn: () => api.get<{ folders: VaultFolder[] }>("/api/vault/folders"),
@@ -30,7 +62,12 @@ export default function NewNotePage() {
             <span className="text-muted-foreground">/</span>
             <span className="text-sm">New Note</span>
           </div>
-          <NoteEditor folders={folders} availableTags={tags} />
+          <NoteEditor
+            folders={folders}
+            availableTags={tags}
+            saving={createMutation.isPending}
+            onSave={async (data) => { await createMutation.mutateAsync(data); }}
+          />
         </div>
       </div>
     </div>

@@ -325,6 +325,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
             onItemClick={(id) => setSelectedCardId(id)}
             onStatusChange={handleStatusChange}
             boardId={board.id}
+            statusNames={columnNameMap}
           />
           <DragOverlay>
             {activeCard ? (

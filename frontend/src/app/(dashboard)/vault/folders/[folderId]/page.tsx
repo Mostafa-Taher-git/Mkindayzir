@@ -1,6 +1,6 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder, VaultNote } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,13 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
 
 export default function VaultFolderPage() {
   const { folderId } = useParams<{ folderId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: folderData } = useQuery<{ folder: VaultFolder }>({
     queryKey: ["vault", "folder", folderId],
@@ -29,6 +33,28 @@ export default function VaultFolderPage() {
     queryFn: () => api.get<{ notes: VaultNote[] }>(`/api/vault/notes?folderId=${folderId}`),
   });
 
+  const deleteFolder = useMutation({
+    mutationFn: () => api.delete(`/api/vault/folders/${folderId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vault", "folders"] });
+      queryClient.invalidateQueries({ queryKey: ["vault", "folder", folderId] });
+      queryClient.invalidateQueries({ queryKey: ["vault", "notes", "folder", folderId] });
+      toast({ title: "Folder deleted" });
+      navigate(VAULT_ROUTES.HOME);
+    },
+    onError: (e) => toast({ title: "Cannot delete", description: String(e) }),
+  });
+
+  function onDelete() {
+    if (!folder) return;
+    const hasContent = subfolders.length > 0 || notes.length > 0;
+    const message = hasContent
+      ? `Folder "${folder.name}" contains ${notes.length} note(s) and ${subfolders.length} subfolder(s). The server will only allow delete if it's empty. Continue?`
+      : `Delete folder "${folder.name}"?`;
+    if (!window.confirm(message)) return;
+    deleteFolder.mutate();
+  }
+
   if (!folderData?.folder) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -40,7 +66,7 @@ export default function VaultFolderPage() {
   const folder = folderData.folder;
   const allFolders = foldersData?.folders ?? [];
   const notes = notesData?.notes ?? [];
-  const subfolders = allFolders.filter((f: VaultFolder) => f.parentId === folderId);
+  const subfolders = folderId ? collectChildren(allFolders, folderId) : [];
 
   return (
     <div className="flex h-full">
@@ -50,6 +76,12 @@ export default function VaultFolderPage() {
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Link to={VAULT_ROUTES.HOME} className="hover:text-foreground transition-colors">Vault</Link>
+              {folderId && getAncestors(allFolders, folderId).map((ancestor) => (
+                <span key={ancestor.id} className="flex items-center gap-2">
+                  <span>/</span>
+                  <Link to={`${VAULT_ROUTES.FOLDERS}/${ancestor.id}`} className="hover:text-foreground transition-colors">{ancestor.name}</Link>
+                </span>
+              ))}
               <span>/</span>
               <span className="text-foreground">{folder.name}</span>
             </div>
@@ -57,11 +89,15 @@ export default function VaultFolderPage() {
             <p className="text-muted-foreground mt-1">{folder.path}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to={`${VAULT_ROUTES.FOLDERS}/${folderId}`}>Open Folder</Link>
-            </Button>
             <Button asChild>
               <Link to={VAULT_ROUTES.NEW_NOTE}>New Note</Link>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onDelete}
+              disabled={deleteFolder.isPending}
+            >
+              {deleteFolder.isPending ? "Deleting…" : "Delete folder"}
             </Button>
           </div>
         </div>
@@ -94,4 +130,31 @@ export default function VaultFolderPage() {
       </div>
     </div>
   );
+}
+
+function collectChildren(folders: VaultFolder[], parentId: string): VaultFolder[] {
+  for (const f of folders) {
+    if (f.id === parentId) return f.children ?? [];
+    if (f.children?.length) {
+      const found = collectChildren(f.children, parentId);
+      if (found.length) return found;
+    }
+  }
+  return [];
+}
+
+function getAncestors(folders: VaultFolder[], targetId: string): VaultFolder[] {
+  const path: VaultFolder[] = [];
+  function walk(items: VaultFolder[], trail: VaultFolder[]): boolean {
+    for (const f of items) {
+      if (f.id === targetId) {
+        path.push(...trail);
+        return true;
+      }
+      if (f.children?.length && walk(f.children, [...trail, f])) return true;
+    }
+    return false;
+  }
+  walk(folders, []);
+  return path;
 }

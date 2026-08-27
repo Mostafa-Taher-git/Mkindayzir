@@ -1,6 +1,6 @@
 
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceIndicator } from "@/components/shared/presence-indicator";
@@ -95,21 +95,27 @@ export default function VaultNotePage() {
       <VaultSidebar folders={folders} currentFolderId={note.folderId} />
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <a href={VAULT_ROUTES.HOME} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Vault</a>
-            {note.folderId && (
+          <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+            <Link to={VAULT_ROUTES.HOME} className="hover:text-foreground transition-colors">Vault</Link>
+            {note.folderId && findFolder(folders, note.folderId) && (
               <>
-                <span className="text-muted-foreground">/</span>
-                <a href={`${VAULT_ROUTES.FOLDERS}/${note.folderId}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Folder</a>
+                <span>/</span>
+                <Link
+                  to={`${VAULT_ROUTES.FOLDERS}/${note.folderId}`}
+                  className="hover:text-foreground transition-colors"
+                >
+                  {findFolder(folders, note.folderId)!.name}
+                </Link>
               </>
             )}
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm">{note.title || "Untitled"}</span>
+            <span>/</span>
+            <span className="text-foreground">{note.title || "Untitled"}</span>
             {user && <NotePresence noteId={noteId!} currentUserId={user.id} />}
           </div>
 
           <NoteViewer
             note={note}
+            folderLabel={note.folderId ? findFolder(folders, note.folderId)?.name : undefined}
             onEdit={handleEdit}
             onArchive={handleArchive}
             onDelete={handleDelete}
@@ -133,4 +139,17 @@ export default function VaultNotePage() {
 function NotePresence({ noteId, currentUserId }: { noteId: string; currentUserId: string }) {
   const { presentUsers } = usePresence("vault_note", noteId);
   return <PresenceIndicator users={presentUsers} currentUserId={currentUserId} />;
+}
+
+type FolderNode = { id: string; name?: string; children?: FolderNode[] };
+
+function findFolder(folders: FolderNode[], id: string): FolderNode | null {
+  for (const f of folders) {
+    if (f.id === id) return f;
+    if (f.children?.length) {
+      const hit: FolderNode | null = findFolder(f.children, id);
+      if (hit) return hit;
+    }
+  }
+  return null;
 }

@@ -84,8 +84,17 @@ export function VersionHistory({
           return (
             <div
               key={version.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedVersion(version)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedVersion(version);
+                }
+              }}
               className={cn(
-                "flex items-center justify-between p-3 rounded-md border transition-colors",
+                "flex items-center justify-between p-3 rounded-md border transition-colors cursor-pointer hover:border-primary",
                 isCurrent && "border-primary bg-primary/5"
               )}
             >
@@ -106,7 +115,7 @@ export function VersionHistory({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedVersion(version)}
+                  onClick={(e) => { e.stopPropagation(); setSelectedVersion(version); }}
                 >
                   View
                 </Button>
@@ -115,7 +124,8 @@ export function VersionHistory({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         const current = versions.find((v) => v.version === currentVersion);
                         if (current) handleCompare(version, current);
                       }}
@@ -125,7 +135,7 @@ export function VersionHistory({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onRestore(version)}
+                      onClick={(e) => { e.stopPropagation(); onRestore(version); }}
                       disabled={restoring}
                     >
                       {restoring ? "Restoring..." : "Restore"}
@@ -146,7 +156,7 @@ export function VersionHistory({
               {selectedVersion && new Date(selectedVersion.createdAt).toLocaleString()}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-auto border rounded-md p-4 font-mono text-sm whitespace-pre-wrap">
+          <div className="flex-1 overflow-auto border rounded-md p-4 text-sm whitespace-pre-wrap">
             {selectedVersion?.content || "No content"}
           </div>
         </DialogContent>

@@ -7,9 +7,11 @@ import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CSS } from "@dnd-kit/utilities";
+import { Link } from "react-router-dom";
 
 import type { WorkItem } from "@/types/work-item";
 import { IconEdit, IconArchive, IconTemplate } from "@/components/icons/grendizer";
+import { useToast } from "@/components/ui/toast";
 
 interface KanbanCardProps {
   item: WorkItem;
@@ -61,12 +63,32 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
     onSuccess: refresh,
   });
 
+  const { toast } = useToast();
+
   const archiveCard = useMutation({
-    // Soft-delete: recoverable from the board archive.
     mutationFn: () =>
-      fetch(`/api/cards/${item.id}/archive`, { method: "POST", credentials: "include" }),
-    onSuccess: refresh,
+      fetch(`/api/cards/${item.id}/archive`, { method: "POST", credentials: "include" })
+        .then(async (r) => { if (!r.ok) throw new Error("Archive failed"); return r.json(); }),
+    onSuccess: () => {
+      refresh();
+      toast({
+        title: "Card archived",
+        description: `${item.title} is now in the Vault.`,
+        action: (
+          <Link to="/vault" className="text-xs underline">
+            Open Vault
+          </Link>
+        ),
+      });
+    },
+    onError: (e) => toast({ title: "Archive failed", description: String(e) }),
   });
+
+  function confirmArchive(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm(`Archive "${item.title}"?\n\nIt will be moved to the Vault. You can restore it from there.`)) return;
+    archiveCard.mutate();
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -166,8 +188,8 @@ function KanbanCard({ item, onClick, boardId }: KanbanCardProps) {
           </button>
           <button
             aria-label="Archive card"
-            title="Archive card"
-            onClick={(e) => { e.stopPropagation(); archiveCard.mutate(); }}
+            title="Archive card (moves to Vault)"
+            onClick={confirmArchive}
             className="h-6 w-6 border border-outline bg-background/90 text-[11px] hover:border-critical hover:text-critical"
           >
             <IconArchive className="h-3.5 w-3.5" />

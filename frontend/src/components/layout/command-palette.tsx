@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 const commands = [
   { label: "Go to Projects", href: ROUTES.PROJECTS, shortcut: "G P" },
   { label: "Go to Boards", href: ROUTES.BOARDS, shortcut: "G B" },
-  { label: "Go to Storm", href: ROUTES.STORM, shortcut: "G M" },
   { label: "Go to Vault", href: ROUTES.VAULT, shortcut: "G V" },
   { label: "Go to Assistant", href: ROUTES.ASSISTANT, shortcut: "G A" },
   { label: "Go to Guides", href: ROUTES.GUIDES, shortcut: "G U" },

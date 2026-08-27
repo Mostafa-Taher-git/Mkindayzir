@@ -8,7 +8,17 @@ type SocketEvent = {
 
 type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
 
-export function useWebSocket(sessionToken: string | null) {
+/**
+ * Open a WebSocket to the realtime hub. Authentication uses the session cookie
+ * (the browser sends it automatically on same-origin handshakes); we DO NOT
+ * pass an explicit `?token=` because the cookie is the only authoritative
+ * session source and any value we could put in the URL would be either the
+ * user id (wrong) or require a non-httpOnly mirror of the session secret.
+ *
+ * `userId` is used purely to (re)open the socket when the user identity
+ * changes (login/logout).
+ */
+export function useWebSocket(userId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -16,10 +26,10 @@ export function useWebSocket(sessionToken: string | null) {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
 
   useEffect(() => {
-    if (!sessionToken) return;
+    if (!userId) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${sessionToken}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -56,7 +66,7 @@ export function useWebSocket(sessionToken: string | null) {
       setReconnecting(false);
       setStatus("disconnected");
     };
-  }, [sessionToken]);
+  }, [userId]);
 
   const send = (data: unknown) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

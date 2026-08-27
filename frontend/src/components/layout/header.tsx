@@ -21,6 +21,10 @@ const routeLabels: Record<string, string> = {
   [ROUTES.ADMIN]: "Admin",
 };
 
+function looksLikeEntityId(segment: string): boolean {
+  return /^[0-9a-f]{8,}$/i.test(segment) || /^[0-9a-f-]{20,}$/i.test(segment);
+}
+
 function Header({
   onMenuClick,
   onSearchClick,
@@ -64,11 +68,19 @@ function Header({
   }, [notifOpen, profileOpen]);
 
   const segments = pathname.split("/").filter(Boolean);
-  const breadcrumbs = segments.map((segment, index) => {
-    const href = "/" + segments.slice(0, index + 1).join("/");
-    const label = routeLabels[href] || segment.charAt(0).toUpperCase() + segment.slice(1);
-    return { href, label };
-  });
+  const breadcrumbs = segments
+    .map((segment, index) => {
+      const href = "/" + segments.slice(0, index + 1).join("/");
+      let label = routeLabels[href] || segment.charAt(0).toUpperCase() + segment.slice(1);
+      let linkHref = href;
+      if (segment === "notes" && segments[index - 1] === "vault") {
+        label = "Notes";
+        linkHref = "/vault";
+      }
+      const current = index === segments.length - 1;
+      return { href: linkHref, label, segment, current };
+    })
+    .filter((crumb) => !looksLikeEntityId(crumb.segment));
 
   return (
     <header className="flex h-14 items-center justify-between border-b-2 border-outline bg-surface px-4">

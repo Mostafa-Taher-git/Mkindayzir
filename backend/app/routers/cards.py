@@ -149,9 +149,24 @@ async def copy_card(card_id: str, user: dict = Depends(get_current_user), db: As
 async def archive_card(card_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Soft-delete a card; it stays recoverable from the board's archive."""
     try:
-        return {"card": await CardService.archive(db, card_id, user)}
+        result = {"card": await CardService.archive(db, card_id, user)}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": str(exc)}})
+    try:
+        from app.services.archive_service import ArchiveService
+        card = result["card"]
+        snapshot = await ArchiveService.archive(
+            db, user,
+            entity_type="card",
+            entity_id=card.get("id"),
+            title=card.get("title") or "Untitled card",
+            summary=card.get("description"),
+            payload={"card": card},
+        )
+        result["archiveItem"] = snapshot["item"]
+    except Exception:
+        pass
+    return result
 
 
 @router.post("/{card_id}/restore")

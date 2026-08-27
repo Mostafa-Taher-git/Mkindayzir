@@ -17,7 +17,7 @@ from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
-    tickets, ws, board_backgrounds, card_comments, users, storms
+    tickets, ws, board_backgrounds, card_comments, users, archive
 )
 
 
@@ -63,6 +63,13 @@ async def lifespan(app: FastAPI):
     for _dir in (config_settings.data_dir, config_settings.UPLOAD_DIR, config_settings.BACKUP_DIR):
         Path(_dir).mkdir(parents=True, exist_ok=True)
 
+    # Idempotent schema bootstrap: create any tables that don't exist yet.
+    # New models added to app.models register here and become available
+    # without requiring a manual `mkindayzir migrate upgrade` run.
+    from app.database import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     yield
 
 
@@ -95,7 +102,7 @@ for router in [
     checklists.router, vault.router, assistant.router, settings.router,
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
     dashboard.router, tickets.router, ws.router, board_backgrounds.router,
-    card_comments.router, users.router, storms.router,
+    card_comments.router, users.router, archive.router,
 ]:
     app.include_router(router)
 

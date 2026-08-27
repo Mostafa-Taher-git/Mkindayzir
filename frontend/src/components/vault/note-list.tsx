@@ -20,12 +20,6 @@ interface NoteListProps {
 }
 
 function NoteCard({ note }: { note: VaultNote }) {
-  const statusColors: Record<NoteStatus, string> = {
-    DRAFT: "secondary",
-    PUBLISHED: "default",
-    ARCHIVED: "outline",
-  };
-
   return (
     <Link to={`${VAULT_ROUTES.NOTES}/${note.id}`}
       className="block group"
@@ -35,8 +29,8 @@ function NoteCard({ note }: { note: VaultNote }) {
           <h3 className="font-medium text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {note.title || "Untitled"}
           </h3>
-          <Badge variant={statusColors[note.status] as any} className="shrink-0">
-            {note.status}
+          <Badge variant="secondary" className="shrink-0">
+            {note.folderName || "No Folder"}
           </Badge>
         </div>
         {note.excerpt && (
@@ -111,7 +105,7 @@ function NoteTableRow({ note }: { note: VaultNote }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <Badge variant={statusColors[note.status] as any}>{note.status}</Badge>
+        <Badge variant="secondary">{note.folderName || "No Folder"}</Badge>
       </td>
       <td className="px-4 py-3 text-xs text-muted-foreground">
         {new Date(note.updatedAt).toLocaleDateString()}

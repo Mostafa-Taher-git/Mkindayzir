@@ -24,9 +24,10 @@ interface KanbanBoardProps {
   onItemClick: (id: string) => void;
   onStatusChange: (itemId: string, newStatus: string) => void;
   boardId?: string;
+  statusNames?: Record<string, string>;
 }
 
-function KanbanBoard({ workflow, items, onItemClick, onStatusChange, boardId }: KanbanBoardProps) {
+function KanbanBoard({ workflow, items, onItemClick, onStatusChange, boardId, statusNames }: KanbanBoardProps) {
   const [activeItem, setActiveItem] = React.useState<WorkItem | null>(null);
   const columns = workflow.statuses;
 
@@ -77,7 +78,7 @@ function KanbanBoard({ workflow, items, onItemClick, onStatusChange, boardId }: 
           <KanbanColumn
             key={status}
             id={status}
-            title={status}
+            title={statusNames?.[status] ?? "Untitled list"}
             items={getItemsForStatus(status)}
             onItemClick={onItemClick}
             boardId={boardId}

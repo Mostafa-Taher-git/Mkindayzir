@@ -28,6 +28,8 @@ import EditNotePage from "@/app/(dashboard)/vault/notes/[noteId]/edit/page";
 import VaultFolderPage from "@/app/(dashboard)/vault/folders/[folderId]/page";
 import VaultTagsPage from "@/app/(dashboard)/vault/tags/page";
 import VaultGraphPage from "@/app/(dashboard)/vault/graph/page";
+import VaultArchivePage from "@/app/(dashboard)/vault/archive/page";
+import VaultArchiveFolderPage from "@/app/(dashboard)/vault/archive/[folderId]/page";
 import AssistantPage from "@/app/(dashboard)/assistant/page";
 import ConversationPage from "@/app/(dashboard)/assistant/[conversationId]/page";
 import TicketsPage from "@/app/(dashboard)/tickets/page";
@@ -38,8 +40,6 @@ import ReportsPage from "@/app/(dashboard)/reports/page";
 import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 import SystemSettingsPage from "@/app/(dashboard)/settings/system/page";
-import StormPage from "@/app/(dashboard)/storm/page";
-import StormNotePage from "@/app/(dashboard)/storm/[stormId]/note/page";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -233,6 +233,26 @@ export default function App() {
         }
       />
       <Route
+        path="/vault/archive"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <VaultArchivePage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vault/archive/:folderId"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <VaultArchiveFolderPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/vault/notes/new"
         element={
           <ProtectedRoute>
@@ -358,30 +378,6 @@ export default function App() {
           <ProtectedRoute>
             <DashboardRoute>
               <SystemSettingsPage />
-            </DashboardRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/storm"
-        element={
-          <ProtectedRoute>
-            <DashboardRoute>
-              <ErrorBoundary label="Storm canvas">
-                <StormPage />
-              </ErrorBoundary>
-            </DashboardRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/storm/:stormId/note"
-        element={
-          <ProtectedRoute>
-            <DashboardRoute>
-              <ErrorBoundary label="Storm note">
-                <StormNotePage />
-              </ErrorBoundary>
             </DashboardRoute>
           </ProtectedRoute>
         }

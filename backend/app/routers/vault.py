@@ -109,9 +109,24 @@ async def publish_note(note_id: str, user: dict = Depends(get_current_user), db:
 @router.post("/notes/{note_id}/archive")
 async def archive_note(note_id: str, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        return await VaultService.archive_note(db, note_id, user)
+        result = {"note": await VaultService.archive_note(db, note_id, user)}
     except ValueError:
         raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "Note not found"}})
+    try:
+        from app.services.archive_service import ArchiveService
+        note = result["note"]
+        snapshot = await ArchiveService.archive(
+            db, user,
+            entity_type="note",
+            entity_id=note.get("id"),
+            title=note.get("title") or "Untitled note",
+            summary=(note.get("excerpt") or "")[:200] or None,
+            payload={"note": note},
+        )
+        result["archiveItem"] = snapshot["item"]
+    except Exception:
+        pass
+    return result
 
 
 @router.get("/notes/{note_id}/versions")

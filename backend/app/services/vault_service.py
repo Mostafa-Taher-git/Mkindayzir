@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
+from sqlalchemy.orm import joinedload
 from app.models.vault_folder import VaultFolder
 from app.models.vault_note import VaultNote
 from app.models.note_tag import NoteTag
@@ -28,9 +29,15 @@ class VaultService:
 
     @staticmethod
     def _serialize_note(note: VaultNote) -> dict:
+        folder_name = None
+        if note.folderId:
+            folder = note.folder
+            if folder is not None:
+                folder_name = folder.name
         return {
             "id": note.id,
             "folderId": note.folderId,
+            "folderName": folder_name,
             "title": note.title,
             "slug": note.slug,
             "content": note.content,
@@ -82,8 +89,18 @@ class VaultService:
         result = await db.execute(
             select(VaultFolder).where(VaultFolder.deletedAt.is_(None)).order_by(VaultFolder.position.asc())
         )
-        folders = result.scalars().all()
-        return [VaultService._serialize_folder(f) for f in folders]
+        folders = list(result.scalars().all())
+        by_parent: dict[str | None, list[VaultFolder]] = {}
+        for f in folders:
+            by_parent.setdefault(f.parentId, []).append(f)
+        serialized: dict[str, dict] = {}
+        for f in folders:
+            serialized[f.id] = VaultService._serialize_folder(f)
+        for f in folders:
+            if f.parentId and f.parentId in serialized:
+                serialized[f.parentId].setdefault("children", []).append(serialized[f.id])
+        roots = [serialized[f.id] for f in folders if not f.parentId]
+        return roots
 
     @staticmethod
     async def create_folder(db: AsyncSession, data: dict, user: dict) -> dict:
@@ -153,7 +170,7 @@ class VaultService:
         per_page = params.get("perPage", 20)
         offset = (page - 1) * per_page
 
-        query = query.offset(offset).limit(per_page).order_by(VaultNote.updatedAt.desc())
+        query = query.offset(offset).limit(per_page).order_by(VaultNote.updatedAt.desc()).options(joinedload(VaultNote.folder))
         result = await db.execute(query)
         items = result.scalars().all()
 

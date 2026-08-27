@@ -174,6 +174,7 @@ export type VaultFolder = {
 export type VaultNote = {
   id: string;
   folderId: string | null;
+  folderName: string | null;
   title: string;
   slug: string;
   content: string;
@@ -206,6 +207,18 @@ export type Tag = {
   id: string;
   name: string;
   color: string | null;
+};
+
+export type ArchiveFolder = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  isDefault: boolean;
+  entityType: string | null;
+  position: number;
+  count?: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type InternalLink = {
