@@ -46,6 +46,7 @@ function Sidebar({
   const isMobile = useMobile();
   const { user } = useAuth();
   const { data: myOrg } = useMyOrg();
+  const inAnyOrg = (myOrg?.organizations?.length ?? 0) > 0;
 
   const displayName = user?.displayName ?? "User";
   const initials = displayName
@@ -95,7 +96,7 @@ function Sidebar({
       </div>
       <nav className="flex-1 space-y-1 px-2 py-2">
         {navItems.map((item) => {
-          if (item.teamOnly && !myOrg?.organization) return null;
+          if (item.teamOnly && !inAnyOrg) return null;
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <a

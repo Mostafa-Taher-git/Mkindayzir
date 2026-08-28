@@ -43,6 +43,7 @@ async def resolve_workspace(
         "orgId": workspace,
         "ownerType": "org",
         "ownerUserId": None,
+        "role": m.role,
     }
 
 

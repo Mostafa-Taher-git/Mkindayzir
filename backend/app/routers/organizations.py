@@ -36,7 +36,7 @@ async def get_mine(
     db: AsyncSession = Depends(get_db),
 ):
     org = await OrganizationService.get_mine(db, user)
-    return {"organization": org}
+    return {"organizations": org.get("organizations", [])}
 
 
 @router.get("/{org_id}")
@@ -68,11 +68,12 @@ async def list_members(
 
 @router.post("/leave", status_code=200)
 async def leave(
+    data: dict,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await OrganizationService.leave(db, user)
+        return await OrganizationService.leave(db, user, org_id=data.get("orgId", ""))
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": str(e)}})
 
@@ -86,7 +87,7 @@ async def transfer_ownership(
 ):
     try:
         return {"organization": await OrganizationService.transfer_ownership(
-            db, user, new_owner_id=data.get("userId", ""),
+            db, user, org_id=org_id, new_owner_id=data.get("userId", ""),
         )}
     except PermissionError as e:
         raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})

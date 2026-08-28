@@ -61,12 +61,6 @@ class OrganizationService:
         if type_ not in ("team", "enterprise"):
             raise ValueError("type must be 'team' or 'enterprise'")
 
-        existing = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
-        )).scalar_one_or_none()
-        if existing is not None:
-            raise ValueError("You already belong to an organization. Leave first.")
-
         base_slug = _slugify(slug or name)
         final_slug = base_slug
         i = 1
@@ -99,21 +93,19 @@ class OrganizationService:
         return _serialize_org(org, member_count=1, role="admin")
 
     @staticmethod
-    async def get_mine(db: AsyncSession, user: dict) -> dict | None:
-        membership = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
-        )).scalar_one_or_none()
-        if membership is None:
-            return None
-        org = (await db.execute(
-            select(Organization).where(Organization.id == membership.orgId)
-        )).scalar_one_or_none()
-        if org is None:
-            return None
-        count = (await db.execute(
-            select(func.count(OrganizationMember.id)).where(OrganizationMember.orgId == org.id)
-        )).scalar_one() or 0
-        return _serialize_org(org, member_count=int(count), role=membership.role)
+    async def get_mine(db: AsyncSession, user: dict) -> dict:
+        rows = (await db.execute(
+            select(OrganizationMember, Organization)
+            .join(Organization, Organization.id == OrganizationMember.orgId)
+            .where(OrganizationMember.userId == user["id"])
+        )).all()
+        orgs = []
+        for m, org in rows:
+            count = (await db.execute(
+                select(func.count(OrganizationMember.id)).where(OrganizationMember.orgId == org.id)
+            )).scalar_one() or 0
+            orgs.append(_serialize_org(org, member_count=int(count), role=m.role))
+        return {"organizations": orgs}
 
     @staticmethod
     async def get(db: AsyncSession, user: dict, org_id: str) -> dict:
@@ -164,14 +156,17 @@ class OrganizationService:
         return out
 
     @staticmethod
-    async def leave(db: AsyncSession, user: dict) -> dict:
+    async def leave(db: AsyncSession, user: dict, org_id: str) -> dict:
         m = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
+            select(OrganizationMember).where(
+                OrganizationMember.userId == user["id"],
+                OrganizationMember.orgId == org_id,
+            )
         )).scalar_one_or_none()
         if m is None:
-            raise ValueError("you are not in an organization")
+            raise ValueError("you are not a member of this organization")
         org = (await db.execute(
-            select(Organization).where(Organization.id == m.orgId)
+            select(Organization).where(Organization.id == org_id)
         )).scalar_one_or_none()
         if org is None:
             raise ValueError("organization not found")
@@ -192,14 +187,17 @@ class OrganizationService:
         return {"ok": True, "orgId": org.id}
 
     @staticmethod
-    async def transfer_ownership(db: AsyncSession, user: dict, new_owner_id: str) -> dict:
+    async def transfer_ownership(db: AsyncSession, user: dict, org_id: str, new_owner_id: str) -> dict:
         m = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
+            select(OrganizationMember).where(
+                OrganizationMember.orgId == org_id,
+                OrganizationMember.userId == user["id"],
+            )
         )).scalar_one_or_none()
         if m is None:
-            raise ValueError("you are not in an organization")
+            raise ValueError("you are not a member of this organization")
         org = (await db.execute(
-            select(Organization).where(Organization.id == m.orgId)
+            select(Organization).where(Organization.id == org_id)
         )).scalar_one_or_none()
         if org is None:
             raise ValueError("organization not found")
@@ -226,12 +224,13 @@ class OrganizationService:
     @staticmethod
     async def remove_member(db: AsyncSession, user: dict, org_id: str, target_user_id: str) -> dict:
         m = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
+            select(OrganizationMember).where(
+                OrganizationMember.orgId == org_id,
+                OrganizationMember.userId == user["id"],
+            )
         )).scalar_one_or_none()
-        if m is None or m.orgId != org_id:
-            raise PermissionError("not a member of this organization")
-        if m.role != "admin":
-            raise PermissionError("only admins can remove members")
+        if m is None or m.role != "admin":
+            raise PermissionError("not an admin of this organization")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)
         )).scalar_one_or_none()
@@ -256,9 +255,12 @@ class OrganizationService:
         if new_role not in ("admin", "manager", "member", "viewer"):
             raise ValueError("invalid role")
         m = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
+            select(OrganizationMember).where(
+                OrganizationMember.orgId == org_id,
+                OrganizationMember.userId == user["id"],
+            )
         )).scalar_one_or_none()
-        if m is None or m.orgId != org_id or m.role != "admin":
+        if m is None or m.role != "admin":
             raise PermissionError("only admins can change roles")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)

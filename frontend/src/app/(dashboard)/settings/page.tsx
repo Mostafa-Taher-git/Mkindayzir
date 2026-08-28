@@ -11,7 +11,7 @@ import { DataPicker } from "@/components/organizations/data-picker";
 import { TransitionModal } from "@/components/organizations/transition-modal";
 import { PendingInvitations } from "@/components/organizations/pending-invitations";
 import { OrgMembers } from "@/components/organizations/org-members";
-import { useMyOrg, useWorkspaceSetter } from "@/hooks/use-workspace";
+import { useMyOrg, useWorkspace, useWorkspaceSetter } from "@/hooks/use-workspace";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
@@ -27,13 +27,18 @@ export default function SettingsPage() {
   const [startOrgType, setStartOrgType] = useState<"team" | "enterprise" | null>(null);
   const queryClient = useQueryClient();
   const { data: myOrg } = useMyOrg();
+  const active = useWorkspace();
+  const activeOrgId = active.type === "org" ? active.orgId : null;
+  const activeOrg = myOrg?.organizations?.find((o) => o.orgId === activeOrgId) ?? null;
+  const isInOrg = active.type === "org" && Boolean(activeOrg);
   const { toast } = useToast();
   const setActive = useWorkspaceSetter();
   const [showInvite, setShowInvite] = useState(false);
-  const [transferMode, setTransferMode] = useState<"to_org" | "from_org" | null>(null);
+  const [transferMode, setTransferMode] = useState<"to_org" | null>(null);
+  const [showDataPicker, setShowDataPicker] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const leaveMutation = useMutation({
-    mutationFn: () => api.post("/api/organizations/leave", {}),
+    mutationFn: () => api.post("/api/organizations/leave", { orgId: activeOrg?.orgId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
       setActive({ type: "personal" });
@@ -42,7 +47,7 @@ export default function SettingsPage() {
     onError: (e) => toast({ title: "Could not leave", description: String(e) }),
   });
   const deleteMutation = useMutation({
-    mutationFn: () => api.delete(`/api/organizations/${myOrg?.organization?.id ?? ""}`),
+    mutationFn: () => api.delete(`/api/organizations/${activeOrg?.orgId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
       setActive({ type: "personal" });
@@ -143,22 +148,22 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Organization</CardTitle>
           <CardDescription>
-            {myOrg?.organization
+            {activeOrg
               ? "Manage members, transfer data, or leave."
               : "Start a team or enterprise to share boards, notes, and tickets with others."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {myOrg?.organization ? (
+          {activeOrg ? (
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">{myOrg.organization.orgName}</p>
+                  <p className="text-sm font-medium">{activeOrg.orgName}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {myOrg.organization.orgType === "enterprise" ? "Enterprise" : "Team"} · your role: {myOrg.organization.role}
+                    {activeOrg.orgType === "enterprise" ? "Enterprise" : "Team"} · your role: {activeOrg.role}
                   </p>
                 </div>
-                {myOrg.organization.role === "admin" && (
+                {activeOrg.role === "admin" && (
                   <Button size="sm" onClick={() => setShowInvite(true)}>
                     Invite member
                   </Button>
@@ -166,27 +171,22 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTransferMode("to_org")}
-                >
-                  Bring data to org
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTransferMode("from_org")}
-                >
-                  Pull data to personal
-                </Button>
-                {myOrg.organization.role === "admin" && (
+                {activeOrg.role === "admin" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setTransferMode("to_org"); setShowDataPicker(true); }}
+                  >
+                    Bring data to org
+                  </Button>
+                )}
+                {activeOrg.role === "admin" && (
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setShowTransition(true)}
                   >
-                    Move to {myOrg.organization.orgType === "team" ? "Enterprise" : "Team"}
+                    Move to {activeOrg.orgType === "team" ? "Enterprise" : "Team"}
                   </Button>
                 )}
               </div>
@@ -196,8 +196,8 @@ export default function SettingsPage() {
               <div className="pt-2">
                 <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Members</h3>
                 <OrgMembers
-                  orgId={myOrg.organization.id}
-                  isOwner={myOrg.organization.role === "admin" && user?.id !== undefined}
+                  orgId={activeOrg.orgId}
+                  isOwner={activeOrg.role === "admin" && user?.id !== undefined}
                   myUserId={user?.id ?? ""}
                   onLeave={() => leaveMutation.mutate()}
                   onDelete={() => deleteMutation.mutate()}
@@ -206,19 +206,22 @@ export default function SettingsPage() {
 
               {showInvite && (
                 <InviteModal
-                  orgId={myOrg.organization.id}
+                  orgId={activeOrg.orgId}
                   open={showInvite}
                   onOpenChange={setShowInvite}
                 />
               )}
 
-              {transferMode && (
+              {showDataPicker && (
                 <DataPicker
-                  direction={transferMode}
-                  orgId={myOrg.organization.id}
-                  open={Boolean(transferMode)}
-                  onOpenChange={(o) => { if (!o) setTransferMode(null); }}
-                  onComplete={() => {}}
+                  direction="to_org"
+                  orgId={activeOrg.orgId}
+                  open={showDataPicker}
+                  onOpenChange={setShowDataPicker}
+                  onComplete={() => {
+                    queryClient.invalidateQueries({ queryKey: ["data-transfer", "personal"] });
+                    toast({ title: "Data transferred successfully" });
+                  }}
                 />
               )}
 
@@ -227,6 +230,8 @@ export default function SettingsPage() {
                   open={showTransition}
                   onOpenChange={setShowTransition}
                   myUserId={user?.id ?? ""}
+                  orgId={activeOrg.orgId}
+                  orgType={activeOrg.orgType}
                 />
               )}
             </>
@@ -354,7 +359,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {myOrg?.organization?.role === "admin" && (
+      {activeOrg?.role === "admin" && (
         <Card className="border-2 border-destructive/30">
           <CardHeader>
             <CardTitle>Account Role</CardTitle>

@@ -32,7 +32,6 @@ class OrganizationMember(Base):
     __tablename__ = "organization_members"
     __table_args__ = (
         UniqueConstraint("orgId", "userId", name="uq_org_member_org_user"),
-        UniqueConstraint("userId", name="uq_org_member_one_org_per_user"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)

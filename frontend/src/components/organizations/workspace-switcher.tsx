@@ -11,10 +11,11 @@ export function WorkspaceSwitcher() {
   const active = useWorkspace();
   const setActive = useWorkspaceSetter();
   const { data, isLoading } = useMyOrg();
-  const org = data?.organization ?? null;
+  const orgs = data?.organizations ?? [];
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement | null>(null);
   const location = useLocation();
+  const [search, setSearch] = React.useState("");
 
   React.useEffect(() => { setOpen(false); }, [location.pathname]);
 
@@ -72,38 +73,37 @@ export function WorkspaceSwitcher() {
           />
           {isLoading ? (
             <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>
-          ) : org ? (
-            <SwitcherItem
-              active={active.type === "org" && active.orgId === org.orgId}
-              onClick={() => setActive({
-                type: "org",
-                orgId: org.orgId,
-                orgName: org.orgName,
-                orgType: org.orgType,
-                role: org.role,
-              })}
-              label={org.orgName}
-              sub={`${org.orgType === "enterprise" ? "Enterprise" : "Team"} · ${org.role}`}
-              dotClass="bg-blue-500"
-            />
           ) : null}
+          {orgs
+            .filter((o) => !search || o.orgName.toLowerCase().includes(search.toLowerCase()))
+            .map((o) => (
+              <SwitcherItem
+                key={o.orgId}
+                active={active.type === "org" && active.orgId === o.orgId}
+                onClick={() => setActive({
+                  type: "org",
+                  orgId: o.orgId,
+                  orgName: o.orgName,
+                  orgType: o.orgType,
+                  role: o.role,
+                })}
+                label={o.orgName}
+                sub={`${o.orgType === "enterprise" ? "Enterprise" : "Team"} · ${o.role}`}
+                dotClass="bg-blue-500"
+              />
+            ))}
           <div className="border-t border-outline my-1" />
-          {org ? (
-            <Link
-              to="/settings"
-              className="block px-3 py-2 text-sm rounded hover:bg-accent text-foreground no-underline"
-            >
-              <span className="flex items-center gap-2">
-                <SettingsIcon />
-                Organization settings
-              </span>
-            </Link>
-          ) : (
-            <>
-              <StartOrgLink label="Start a Team" />
-              <StartOrgLink label="Start an Enterprise" />
-            </>
-          )}
+          <Link
+            to="/settings"
+            className="block px-3 py-2 text-sm rounded hover:bg-accent text-foreground no-underline"
+          >
+            <span className="flex items-center gap-2">
+              <SettingsIcon />
+              {active.type === "org" ? "Organization settings" : "Settings"}
+            </span>
+          </Link>
+          <StartOrgLink label="Start a Team" />
+          <StartOrgLink label="Start an Enterprise" />
         </div>
       )}
     </div>

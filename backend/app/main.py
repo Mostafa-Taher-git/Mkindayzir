@@ -111,21 +111,51 @@ async def lifespan(app: FastAPI):
                 f"WHERE \"ownerType\" = 'personal' AND \"ownerUserId\" IS NULL"
             )
 
-        # PostgreSQL does not support ADD CONSTRAINT IF NOT EXISTS. Keep the
-        # organization membership invariant in sync for existing databases.
+        # Remove the single-org constraint — users may now belong to multiple orgs.
         await conn.exec_driver_sql(
             """
             DO $$
             BEGIN
-                IF NOT EXISTS (
+                IF EXISTS (
                     SELECT 1 FROM pg_constraint
                     WHERE conname = 'uq_org_member_one_org_per_user'
                 ) THEN
                     ALTER TABLE organization_members
-                    ADD CONSTRAINT uq_org_member_one_org_per_user UNIQUE ("userId");
+                    DROP CONSTRAINT uq_org_member_one_org_per_user;
                 END IF;
             END $$;
             """
+        )
+
+        # Onboarded flag: replaces the fragile "0 projects → /onboarding" guard.
+        await conn.exec_driver_sql(
+            'ALTER TABLE users ADD COLUMN IF NOT EXISTS "onboarded" BOOLEAN NOT NULL DEFAULT FALSE'
+        )
+
+        # Make Project.key org-scoped instead of globally unique, so copies
+        # within the same org don't collide.
+        await conn.exec_driver_sql(
+            "DO $$ BEGIN "
+            "IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'projects_key_key') THEN "
+            "ALTER TABLE projects DROP CONSTRAINT projects_key_key; "
+            "END IF; "
+            "END $$;"
+        )
+        await conn.exec_driver_sql(
+            "DO $$ BEGIN "
+            "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_project_key_personal') THEN "
+            "ALTER TABLE projects ADD CONSTRAINT uq_project_key_personal UNIQUE (\"key\") "
+            "WHERE \"ownerType\" = 'personal'; "
+            "END IF; "
+            "END $$;"
+        )
+        await conn.exec_driver_sql(
+            "DO $$ BEGIN "
+            "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_project_key_org') THEN "
+            "ALTER TABLE projects ADD CONSTRAINT uq_project_key_org UNIQUE (\"key\") "
+            "WHERE \"ownerType\" = 'org'; "
+            "END IF; "
+            "END $$;"
         )
 
     yield

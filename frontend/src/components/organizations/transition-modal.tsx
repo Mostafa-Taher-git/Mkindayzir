@@ -16,21 +16,21 @@ interface TransitionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   myUserId: string;
+  orgId: string;
+  orgType: string;
 }
 
-export function TransitionModal({ open, onOpenChange, myUserId }: TransitionModalProps) {
-  const { data: myOrg } = useMyOrg();
+export function TransitionModal({ open, onOpenChange, myUserId, orgId, orgType }: TransitionModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const org = myOrg?.organization ?? null;
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
-  const target = org?.orgType === "team" ? "enterprise" : "team";
+  const target = orgType === "team" ? "enterprise" : "team";
 
   const { data, isLoading } = useQuery<{ members: Member[] }>({
-    queryKey: ["organization", "members", org?.id],
-    queryFn: () => api.get<{ members: Member[] }>(`/api/organizations/${org!.id}/members`),
-    enabled: Boolean(org?.id) && open,
+    queryKey: ["organization", "members", orgId],
+    queryFn: () => api.get<{ members: Member[] }>(`/api/organizations/${orgId}/members`),
+    enabled: open,
   });
 
   useEffect(() => {
@@ -39,19 +39,18 @@ export function TransitionModal({ open, onOpenChange, myUserId }: TransitionModa
 
   const transition = useMutation({
     mutationFn: () => api.post<{ organization: any }>(
-      `/api/organizations/${org!.id}/transition`,
+      `/api/organizations/${orgId}/transition`,
       { newType: target, excludedMemberIds: Array.from(excluded) },
     ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
-      queryClient.invalidateQueries({ queryKey: ["organization", "members", org?.id] });
+      queryClient.invalidateQueries({ queryKey: ["organization", "members", orgId] });
       toast({ title: "Organization type updated" });
       onOpenChange(false);
     },
     onError: (e) => toast({ title: "Could not transition", description: String(e) }),
   });
 
-  if (!org) return null;
   const members = data?.members ?? [];
   const excludedCount = Array.from(excluded).filter((id) => id !== myUserId).length;
 
@@ -68,7 +67,7 @@ export function TransitionModal({ open, onOpenChange, myUserId }: TransitionModa
           Move to {target === "enterprise" ? "Enterprise" : "Team"}
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
-          <span className="capitalize">{org.orgType}</span> → <span className="capitalize">{target}</span>.
+          <span className="capitalize">{orgType}</span> → <span className="capitalize">{target}</span>.
           Members you uncheck will be removed from the org and return to personal-only.
         </p>
 

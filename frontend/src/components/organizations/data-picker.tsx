@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
-type Direction = "to_org" | "from_org";
+type Direction = "to_org";
 
 type Preview = {
   projects: { id: string; name: string; key: string }[];
@@ -32,9 +32,7 @@ export function DataPicker({ direction, orgId, open, onOpenChange, onComplete }:
   const { data, isLoading } = useQuery<Preview>({
     queryKey: ["transfers", "preview", direction, orgId],
     queryFn: () => {
-      const qs = new URLSearchParams({ direction });
-      if (direction === "from_org") qs.set("orgId", orgId);
-      return api.get<Preview>(`/api/transfers/preview?${qs.toString()}`);
+      return api.get<Preview>(`/api/transfers/preview?direction=${direction}&orgId=${orgId}`);
     },
     enabled: open,
   });
@@ -45,12 +43,12 @@ export function DataPicker({ direction, orgId, open, onOpenChange, onComplete }:
 
   const transfer = useMutation({
     mutationFn: () => api.post(
-      direction === "to_org" ? "/api/transfers/to-org" : "/api/transfers/from-org",
+      "/api/transfers/to-org",
       { orgId, ...selected },
     ),
     onSuccess: (res: any) => {
       toast({
-        title: direction === "to_org" ? "Moved to organization" : "Moved to personal",
+        title: "Moved to organization",
         description: `Projects: ${res?.moved?.projects ?? 0}, Spaces: ${res?.moved?.spaces ?? 0}, Notes: ${res?.moved?.notes ?? 0}, Tickets: ${res?.moved?.tickets ?? 0}`,
       });
       onComplete?.(res?.moved);
@@ -81,12 +79,10 @@ export function DataPicker({ direction, orgId, open, onOpenChange, onComplete }:
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">
-          {direction === "to_org" ? "Bring data to organization" : "Pull data back to personal"}
+          Bring data to organization
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
-          {direction === "to_org"
-            ? "Select the data you'd like to move into this organization."
-            : "Select the data you'd like to take back to your personal workspace."}
+          Select the data you'd like to move into this organization.
         </p>
 
         {isLoading || !data ? (

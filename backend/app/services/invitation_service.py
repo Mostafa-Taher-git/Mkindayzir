@@ -156,13 +156,6 @@ class InvitationService:
         if inv.invitedEmail.lower() != user_email:
             raise PermissionError("this invitation is for a different email")
 
-        # Check user isn't already in an org
-        existing = (await db.execute(
-            select(OrganizationMember).where(OrganizationMember.userId == user["id"])
-        )).scalar_one_or_none()
-        if existing is not None:
-            raise ValueError("you must leave your current organization first")
-
         inv.status = "accepted"
         inv.acceptedAt = _now()
         m = OrganizationMember(

@@ -100,13 +100,13 @@ export function useWorkspaceRefresh(): () => void {
 }
 
 export function useMyOrg() {
-  return useQuery<{ organization: OrgMembership | null }>({
+  return useQuery<{ organizations: OrgMembership[] }>({
     queryKey: ["organization", "mine"],
     queryFn: async () => {
-      const r = await api.get<{ organization: OrgMembership | null }>(
+      const r = await api.get<{ organizations: OrgMembership[] }>(
         "/api/organizations/mine",
       );
-      return { organization: r.organization };
+      return { organizations: r.organizations ?? [] };
     },
     staleTime: 60_000,
   });
