@@ -64,6 +64,30 @@ function FolderIcon({ className }: { className?: string }) {
   );
 }
 
+const EXPANDED_KEY = "vault.folders.expanded";
+
+function readExpandedSet(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(EXPANDED_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed.filter((x) => typeof x === "string"));
+    return new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function writeExpandedSet(ids: Iterable<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    /* ignore quota or privacy mode */
+  }
+}
+
 function FolderTreeItem({
   folder,
   level = 0,
@@ -85,8 +109,36 @@ function FolderTreeItem({
   childCount?: number;
   isLastChild?: boolean;
 }) {
-  const [expanded, setExpanded] = React.useState(!!autoExpand || (childCount !== undefined && childCount > 0));
-  React.useEffect(() => { if (autoExpand) setExpanded(true); }, [autoExpand]);
+  const [expandedSet, setExpandedSet] = React.useState<Set<string>>(() => {
+    const stored = readExpandedSet();
+    if (stored.size > 0) return stored;
+    if (autoExpand || (childCount !== undefined && childCount > 0)) {
+      return new Set([folder.id]);
+    }
+    return new Set();
+  });
+  const expanded = expandedSet.has(folder.id);
+
+  React.useEffect(() => {
+    if (autoExpand && !expanded) {
+      const next = new Set(expandedSet);
+      next.add(folder.id);
+      setExpandedSet(next);
+      writeExpandedSet(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExpand]);
+
+  const toggleExpanded = () => {
+    const next = new Set(expandedSet);
+    if (next.has(folder.id)) {
+      next.delete(folder.id);
+    } else {
+      next.add(folder.id);
+    }
+    setExpandedSet(next);
+    writeExpandedSet(next);
+  };
   const pathname = useLocation().pathname;
   const isActive = pathname === `${VAULT_ROUTES.FOLDERS}/${folder.id}`;
   const hasChildren = (folder.children?.length ?? 0) > 0;
@@ -116,7 +168,7 @@ function FolderTreeItem({
           />
         )}
         <button
-          onClick={() => hasChildren && setExpanded(!expanded)}
+          onClick={() => hasChildren && toggleExpanded()}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors flex-1 text-left",
             isActive
