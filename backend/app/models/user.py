@@ -10,6 +10,9 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    clerkId: Mapped[Optional[str]] = mapped_column(
+        "clerkId", String(255), unique=True, nullable=True, index=True
+    )
     passwordHash: Mapped[str] = mapped_column("passwordHash", String(255), nullable=False)
     displayName: Mapped[str] = mapped_column("displayName", String(255), nullable=False)
     avatar: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)

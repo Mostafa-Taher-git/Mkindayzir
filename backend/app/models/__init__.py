@@ -43,3 +43,7 @@ from app.models.ticket import Ticket
 from app.models.ticket_reply import TicketReply
 from app.models.board_star import BoardStar
 from app.models.archive import ArchiveFolder, ArchiveItem
+from app.models.organization import Organization, OrganizationMember
+from app.models.invitation import Invitation
+from app.models.data_transfer import DataTransfer
+from app.models.org_transition import OrgTransition

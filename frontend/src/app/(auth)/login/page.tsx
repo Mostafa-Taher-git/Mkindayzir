@@ -1,12 +1,9 @@
-
-import { useConfig } from "@/hooks/use-config";
-import { LoginForm } from "./login-form";
+import { SignIn } from "@clerk/clerk-react";
 
 export default function LoginPage() {
-  const { registrationEnabled, mode } = useConfig();
-  const isPersonal = mode === "personal";
-
   return (
-    <LoginForm registrationEnabled={registrationEnabled} isPersonal={isPersonal} />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <SignIn routing="path" path="/login" signUpUrl="/register" afterSignInUrl="/dashboard" />
+    </div>
   );
 }

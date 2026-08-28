@@ -1,10 +1,19 @@
 
 import { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ROUTES } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { RoleDemotionSection } from "@/components/settings/role-demotion";
+import { StartOrgModal } from "@/components/organizations/start-org-modal";
+import { InviteModal } from "@/components/organizations/invite-modal";
+import { DataPicker } from "@/components/organizations/data-picker";
+import { TransitionModal } from "@/components/organizations/transition-modal";
+import { PendingInvitations } from "@/components/organizations/pending-invitations";
+import { OrgMembers } from "@/components/organizations/org-members";
+import { useMyOrg, useWorkspaceSetter } from "@/hooks/use-workspace";
+import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -15,8 +24,32 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [mode, setMode] = useState<string>("personal");
-  const [dbSize, setDbSize] = useState<number>(0);
+  const [startOrgType, setStartOrgType] = useState<"team" | "enterprise" | null>(null);
+  const queryClient = useQueryClient();
+  const { data: myOrg } = useMyOrg();
+  const { toast } = useToast();
+  const setActive = useWorkspaceSetter();
+  const [showInvite, setShowInvite] = useState(false);
+  const [transferMode, setTransferMode] = useState<"to_org" | "from_org" | null>(null);
+  const [showTransition, setShowTransition] = useState(false);
+  const leaveMutation = useMutation({
+    mutationFn: () => api.post("/api/organizations/leave", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
+      setActive({ type: "personal" });
+      toast({ title: "You left the organization" });
+    },
+    onError: (e) => toast({ title: "Could not leave", description: String(e) }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/api/organizations/${myOrg?.organization?.id ?? ""}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
+      setActive({ type: "personal" });
+      toast({ title: "Organization deleted" });
+    },
+    onError: (e) => toast({ title: "Could not delete", description: String(e) }),
+  });
 
   useEffect(() => {
     fetch("/api/auth/session", { credentials: "include" })
@@ -39,13 +72,6 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    fetch("/api/system/migration/status", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        setMode(data.mode);
-        setDbSize(data.database_size_mb || 0);
-      })
-      .catch(() => {});
   }, []);
 
   const saveProfile = async () => {
@@ -112,6 +138,110 @@ export default function SettingsPage() {
           {message.text}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+          <CardDescription>
+            {myOrg?.organization
+              ? "Manage members, transfer data, or leave."
+              : "Start a team or enterprise to share boards, notes, and tickets with others."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {myOrg?.organization ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{myOrg.organization.orgName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {myOrg.organization.orgType === "enterprise" ? "Enterprise" : "Team"} · your role: {myOrg.organization.role}
+                  </p>
+                </div>
+                {myOrg.organization.role === "admin" && (
+                  <Button size="sm" onClick={() => setShowInvite(true)}>
+                    Invite member
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTransferMode("to_org")}
+                >
+                  Bring data to org
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTransferMode("from_org")}
+                >
+                  Pull data to personal
+                </Button>
+                {myOrg.organization.role === "admin" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowTransition(true)}
+                  >
+                    Move to {myOrg.organization.orgType === "team" ? "Enterprise" : "Team"}
+                  </Button>
+                )}
+              </div>
+
+              <PendingInvitations />
+
+              <div className="pt-2">
+                <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Members</h3>
+                <OrgMembers
+                  orgId={myOrg.organization.id}
+                  isOwner={myOrg.organization.role === "admin" && user?.id !== undefined}
+                  myUserId={user?.id ?? ""}
+                  onLeave={() => leaveMutation.mutate()}
+                  onDelete={() => deleteMutation.mutate()}
+                />
+              </div>
+
+              {showInvite && (
+                <InviteModal
+                  orgId={myOrg.organization.id}
+                  open={showInvite}
+                  onOpenChange={setShowInvite}
+                />
+              )}
+
+              {transferMode && (
+                <DataPicker
+                  direction={transferMode}
+                  orgId={myOrg.organization.id}
+                  open={Boolean(transferMode)}
+                  onOpenChange={(o) => { if (!o) setTransferMode(null); }}
+                  onComplete={() => {}}
+                />
+              )}
+
+              {showTransition && (
+                <TransitionModal
+                  open={showTransition}
+                  onOpenChange={setShowTransition}
+                  myUserId={user?.id ?? ""}
+                />
+              )}
+            </>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setStartOrgType("team")}>
+                Start a Team
+              </Button>
+              <Button variant="outline" onClick={() => setStartOrgType("enterprise")}>
+                Start an Enterprise
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -224,7 +354,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {mode !== "personal" && user?.role === "ADMIN" && (
+      {myOrg?.organization?.role === "admin" && (
         <Card className="border-2 border-destructive/30">
           <CardHeader>
             <CardTitle>Account Role</CardTitle>
@@ -238,30 +368,15 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {mode === "personal" && (
-        <Card className="border-2 border-accent/30">
-          <CardHeader>
-            <CardTitle>System</CardTitle>
-            <CardDescription>Database and deployment settings</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Current Mode: Personal (PostgreSQL)</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Database: ./data/mkindayzir.db ({dbSize.toFixed(2)} MB)
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => (window.location.href = ROUTES.SETTINGS_SYSTEM)}
-              >
-                Manage System
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {startOrgType && (
+        <StartOrgModal
+          open={Boolean(startOrgType)}
+          onOpenChange={(open) => { if (!open) setStartOrgType(null); }}
+          defaultType={startOrgType}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["organization", "mine"] });
+          }}
+        />
       )}
     </div>
   );

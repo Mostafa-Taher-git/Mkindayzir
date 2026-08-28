@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 
 import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -77,6 +77,10 @@ function Header({
         label = "Notes";
         linkHref = "/vault";
       }
+      if (segment === "folders" && segments[index - 1] === "vault") {
+        label = "Folders";
+        linkHref = "/vault";
+      }
       const current = index === segments.length - 1;
       return { href: linkHref, label, segment, current };
     })
@@ -98,18 +102,18 @@ function Header({
           />
         </div>
         <nav className="flex items-center gap-2 text-sm text-muted-foreground font-mono uppercase tracking-wider">
-          <a href={ROUTES.DASHBOARD} className="hover:text-foreground">
+          <Link to={ROUTES.DASHBOARD} className="hover:text-foreground">
             Home
-          </a>
+          </Link>
           {breadcrumbs.map((crumb) => (
             <React.Fragment key={crumb.href}>
               <span className="text-muted-foreground/50">/</span>
-              <a
-                href={crumb.href}
+              <Link
+                to={crumb.href}
                 className="hover:text-foreground"
               >
                 {crumb.label}
-              </a>
+              </Link>
             </React.Fragment>
           ))}
         </nav>

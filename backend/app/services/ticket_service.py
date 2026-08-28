@@ -5,6 +5,10 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc, update, and_
 from sqlalchemy.orm import selectinload
+from app.services.workspace_filter import (
+    resolve_workspace, stamp_owner,
+    personal_owner_filter, org_owner_filter,
+)
 
 from app.models.ticket import Ticket
 from app.models.ticket_reply import TicketReply
@@ -129,6 +133,12 @@ class TicketService:
     async def list_tickets(db: AsyncSession, filters: dict, user: dict) -> dict:
         query = select(Ticket).where(Ticket.deletedAt.is_(None))
 
+        ws = await resolve_workspace(db, user, filters.get("workspace"))
+        if ws["ownerType"] == "personal":
+            query = query.where(personal_owner_filter(Ticket, user["id"]))
+        else:
+            query = query.where(org_owner_filter(Ticket, ws["orgId"]))
+
         if filters.get("status"):
             status_filter = filters["status"]
             if "," in status_filter:
@@ -242,7 +252,7 @@ class TicketService:
         return TicketService._serialize_ticket(ticket, replies=active_replies)
 
     @staticmethod
-    async def create_ticket(db: AsyncSession, data: dict, created_by_id: str) -> dict:
+    async def create_ticket(db: AsyncSession, data: dict, created_by_id: str, user: dict | None = None) -> dict:
         num_res = await db.execute(select(func.coalesce(func.max(Ticket.number), 0)))
         next_number = num_res.scalar_one() + 1
 
@@ -278,6 +288,14 @@ class TicketService:
             meta=meta_str,
             position=0,
         )
+        if user is not None:
+            ws = await resolve_workspace(db, user, data.get("workspace"))
+            await stamp_owner(
+                ticket,
+                owner_type=ws["ownerType"],
+                owner_user_id=ws["ownerUserId"],
+                owner_org_id=ws["orgId"],
+            )
 
         # If due date already in past, check breach
         if ticket.dueDate and ticket.dueDate.tzinfo is None:

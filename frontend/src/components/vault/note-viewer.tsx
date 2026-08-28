@@ -6,9 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { VAULT_ROUTES } from "@/lib/constants";
-import { VaultNote, NoteStatus, NoteVersion } from "@/types";
+import { VaultNote, NoteVersion } from "@/types";
 
 import { cn } from "@/lib/utils";
+import { type FolderKind } from "@/lib/folder-kind";
+
+const NOTE_KIND_BG: Record<FolderKind, string> = {
+  root: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  sub: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+  none: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  archived: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+};
 
 function MarkdownRenderer({ content }: { content: string }) {
   const render = React.useMemo(() => {
@@ -113,6 +121,7 @@ function MarkdownRenderer({ content }: { content: string }) {
 export function NoteViewer({
   note,
   folderLabel,
+  folderKind,
   onEdit,
   onArchive,
   onDelete,
@@ -125,6 +134,7 @@ export function NoteViewer({
 }: {
   note: VaultNote;
   folderLabel?: string;
+  folderKind?: FolderKind;
   onEdit?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
@@ -141,13 +151,9 @@ export function NoteViewer({
   const [showFeedbackForm, setShowFeedbackForm] = React.useState(false);
   const [showVersions, setShowVersions] = React.useState(false);
 
-  const statusColors: Record<NoteStatus, string> = {
-    DRAFT: "secondary",
-    PUBLISHED: "default",
-    ARCHIVED: "outline",
-  };
-
   const folderBadgeLabel = folderLabel || "No Folder";
+  const badgeKind: FolderKind = folderKind ?? (note.folderId ? "root" : "none");
+  const badgeClass = NOTE_KIND_BG[badgeKind];
 
   const initials = note.author?.displayName
     ?.split(" ")
@@ -161,15 +167,20 @@ export function NoteViewer({
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary">{folderBadgeLabel}</Badge>
-            {note.tags?.map((tag) => (
-              <span
-                key={tag.id}
-                className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-              >
-                {tag.name}
-              </span>
-            ))}
+            <Badge className={"border " + badgeClass}>{folderBadgeLabel}</Badge>
+            {note.tags?.map((tag) => {
+              const tint = tag.color
+                ? `border-[${tag.color}] text-[${tag.color}] bg-[${tag.color}]/15`
+                : "border-zinc-500/30 text-zinc-300 bg-zinc-500/15";
+              return (
+                <span
+                  key={tag.id}
+                  className={"text-xs px-2 py-0.5 rounded-full border " + tint}
+                >
+                  {tag.name}
+                </span>
+              );
+            })}
           </div>
           <h1 className="text-3xl font-bold mb-2">{note.title || "Untitled"}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">

@@ -71,7 +71,6 @@ Build output goes to `frontend/dist/`; the backend serves it via `FRONTEND_DIR`.
 ## Database
 
 ```env
-DATABASE_PROVIDER=postgres
 DATABASE_URL=postgresql+asyncpg://mkindayzir:<password>@127.0.0.1:5432/mkindayzir
 ```
 

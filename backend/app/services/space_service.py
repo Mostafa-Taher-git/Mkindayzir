@@ -7,6 +7,10 @@ from app.models.space import Space
 from app.models.space_member import SpaceMember
 from app.models.board import Board
 from app.models.user import User
+from app.services.workspace_filter import (
+    resolve_workspace, stamp_owner,
+    personal_owner_filter, org_owner_filter,
+)
 
 
 class SpaceService:
@@ -18,15 +22,23 @@ class SpaceService:
             "description": space.description,
             "visibility": space.visibility,
             "createdById": space.createdById,
+            "ownerType": getattr(space, "ownerType", None),
+            "ownerUserId": getattr(space, "ownerUserId", None),
+            "ownerOrgId": getattr(space, "ownerOrgId", None),
             "createdAt": space.createdAt.isoformat() if space.createdAt else None,
             "updatedAt": space.updatedAt.isoformat() if space.updatedAt else None,
             "deletedAt": space.deletedAt.isoformat() if space.deletedAt else None,
         }
 
     @staticmethod
-    async def list(db: AsyncSession, user: dict) -> List[dict]:
+    async def list(db: AsyncSession, user: dict, workspace: str | None = None) -> List[dict]:
+        ws = await resolve_workspace(db, user, workspace)
+        if ws["ownerType"] == "personal":
+            filt = personal_owner_filter(Space, user["id"])
+        else:
+            filt = org_owner_filter(Space, ws["orgId"])
         result = await db.execute(
-            select(Space).where(Space.deletedAt.is_(None)).order_by(Space.createdAt.desc())
+            select(Space).where(Space.deletedAt.is_(None), filt).order_by(Space.createdAt.desc())
         )
         spaces = result.scalars().all()
         return [SpaceService._serialize(s) for s in spaces]
@@ -39,6 +51,13 @@ class SpaceService:
             description=data.get("description"),
             visibility=data.get("visibility", "PRIVATE"),
             createdById=user["id"],
+        )
+        ws = await resolve_workspace(db, user, data.get("workspace"))
+        await stamp_owner(
+            space,
+            owner_type=ws["ownerType"],
+            owner_user_id=ws["ownerUserId"],
+            owner_org_id=ws["orgId"],
         )
         db.add(space)
         await db.commit()

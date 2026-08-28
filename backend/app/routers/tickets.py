@@ -27,6 +27,7 @@ async def list_tickets(
     projectId: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     slaBreached: Optional[bool] = Query(None),
+    workspace: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     perPage: int = Query(10, ge=1, le=100),
     user: dict = Depends(get_current_user),
@@ -44,10 +45,14 @@ async def list_tickets(
         "projectId": projectId,
         "search": search,
         "slaBreached": slaBreached,
+        "workspace": workspace,
         "page": page,
         "perPage": perPage,
     }
-    return await TicketService.list_tickets(db, filters, user)
+    try:
+        return await TicketService.list_tickets(db, filters, user)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})
 
 
 @router.get("/stats")
@@ -70,7 +75,9 @@ async def create_ticket(
     if not has_permission(user["role"], "create:tickets"):
         raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": "Forbidden"}})
 
-    result = await TicketService.create_ticket(db, data.model_dump(exclude_none=True), user["id"])
+    result = await TicketService.create_ticket(
+        db, data.model_dump(exclude_none=True), user["id"], user=user,
+    )
     return result
 
 

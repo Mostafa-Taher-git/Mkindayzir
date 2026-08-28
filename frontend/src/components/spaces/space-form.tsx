@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { VISIBILITIES } from "@/lib/constants";
 import { Space } from "@/types";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 type FormData = {
   name: string;
@@ -23,6 +24,7 @@ interface SpaceFormProps {
 
 function SpaceForm({ space, onSuccess }: SpaceFormProps) {
   const queryClient = useQueryClient();
+  const activeWorkspace = useWorkspace();
 
   const [form, setForm] = React.useState<FormData>({
     name: space?.name ?? "",
@@ -38,7 +40,11 @@ function SpaceForm({ space, onSuccess }: SpaceFormProps) {
       const res = await fetch(url, {
         method: space ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        credentials: "include",
+        body: JSON.stringify(space ? data : {
+          ...data,
+          workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
+        }),
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Request failed" }));

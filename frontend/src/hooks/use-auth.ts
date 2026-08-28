@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 
-import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
-type User = {
+export type User = {
   id: string;
+  clerkId: string;
   email: string;
   displayName: string;
   role: string;
@@ -14,31 +17,34 @@ type User = {
   aiModel?: string;
 };
 
-type UseAuthReturn = {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-};
+export function useLocalUser() {
+  const { isSignedIn } = useClerkAuth();
+  return useQuery({
+    queryKey: ["auth", "session"],
+    queryFn: () => api.get<{ data: User }>("/api/auth/session").then((result) => result.data),
+    enabled: Boolean(isSignedIn),
+    staleTime: 60_000,
+  });
+}
 
-export function useAuth(): UseAuthReturn {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function useAuth() {
+  const { isSignedIn, isLoaded } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+  const localUser = useLocalUser();
+  const fallbackUser: User | null = isSignedIn && clerkUser ? {
+    id: "",
+    clerkId: clerkUser.id,
+    email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
+    displayName: clerkUser.fullName ?? clerkUser.firstName ?? "",
+    role: "MEMBER",
+    status: "ACTIVE",
+    avatar: clerkUser.imageUrl,
+  } : null;
 
-  useEffect(() => {
-    async function fetchSession() {
-      try {
-        const res = await fetch("/api/auth/session", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.data);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchSession();
-  }, []);
-
-  return { user, isLoading, isAuthenticated: !!user };
+  return {
+    user: localUser.data ?? fallbackUser,
+    isLoading: !isLoaded || (Boolean(isSignedIn) && localUser.isLoading),
+    isAuthenticated: Boolean(isSignedIn),
+    clerkUser,
+  };
 }

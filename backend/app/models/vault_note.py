@@ -23,6 +23,10 @@ class VaultNote(Base):
     deletedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     publishedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    ownerType: Mapped[str] = mapped_column(String(10), server_default=text("'personal'"), nullable=False)
+    ownerUserId: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    ownerOrgId: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True)
+
     __table_args__ = (
         Index("ix_vault_notes_folder_id", "folderId"),
         Index("ix_vault_notes_author_id", "authorId"),

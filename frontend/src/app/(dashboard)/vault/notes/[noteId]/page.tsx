@@ -10,6 +10,7 @@ import { NoteViewer } from "@/components/vault/note-viewer";
 import { VersionHistory } from "@/components/vault/version-history";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { api } from "@/lib/api";
+import { getFolderKind } from "@/lib/folder-kind";
 
 export default function VaultNotePage() {
   const { noteId } = useParams<{ noteId: string }>();
@@ -116,6 +117,10 @@ export default function VaultNotePage() {
           <NoteViewer
             note={note}
             folderLabel={note.folderId ? findFolder(folders, note.folderId)?.name : undefined}
+            folderKind={getFolderKind(
+              note.folderId ? findFolder(folders, note.folderId) : null,
+              note.status === "ARCHIVED",
+            )}
             onEdit={handleEdit}
             onArchive={handleArchive}
             onDelete={handleDelete}
@@ -141,7 +146,7 @@ function NotePresence({ noteId, currentUserId }: { noteId: string; currentUserId
   return <PresenceIndicator users={presentUsers} currentUserId={currentUserId} />;
 }
 
-type FolderNode = { id: string; name?: string; children?: FolderNode[] };
+type FolderNode = { id: string; name?: string; parentId?: string | null; children?: FolderNode[] };
 
 function findFolder(folders: FolderNode[], id: string): FolderNode | null {
   for (const f of folders) {

@@ -13,13 +13,17 @@ async def list_projects(
     status: str | None = Query(None),
     teamId: str | None = Query(None),
     search: str | None = Query(None),
+    workspace: str | None = Query(None),
     page: int = Query(1, ge=1),
     perPage: int = Query(10, ge=1, le=100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    params = {"status": status, "teamId": teamId, "search": search, "page": page, "perPage": perPage}
-    result = await ProjectService.list(db, params, user)
+    params = {"status": status, "teamId": teamId, "search": search, "workspace": workspace, "page": page, "perPage": perPage}
+    try:
+        result = await ProjectService.list(db, params, user)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})
     return {"projects": result["items"], "pagination": {"page": result["page"], "limit": result["perPage"], "total": result["total"], "totalPages": result["totalPages"]}}
 
 

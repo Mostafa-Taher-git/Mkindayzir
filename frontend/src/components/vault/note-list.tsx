@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -6,8 +6,51 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VAULT_ROUTES } from "@/lib/constants";
-import { VaultNote, Tag } from "@/types";
+import { VaultNote, Tag, VaultFolder } from "@/types";
 import { api } from "@/lib/api";
+import { getFolderKind } from "@/lib/folder-kind";
+
+type FolderKind = ReturnType<typeof getFolderKind>;
+const KIND_DEFAULT_BG: Record<FolderKind, string> = {
+  root: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  sub: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+  none: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  archived: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+};
+
+function tagPillClass(tag: { color?: string | null }): string {
+  if (!tag.color) return "bg-muted text-muted-foreground border border-transparent";
+  return "border";
+}
+
+function tagPillStyle(tag: { color?: string | null }): React.CSSProperties {
+  if (!tag.color) return {};
+  return {
+    backgroundColor: `${tag.color}22`,
+    color: tag.color,
+    borderColor: `${tag.color}55`,
+  };
+}
+
+function findFolderKind(
+  folders: VaultFolder[],
+  folderId: string | null | undefined,
+  archived: boolean,
+): FolderKind {
+  if (archived) return "archived";
+  if (!folderId) return "none";
+  function walk(items: VaultFolder[]): VaultFolder | null {
+    for (const f of items) {
+      if (f.id === folderId) return f;
+      if (f.children?.length) {
+        const hit = walk(f.children);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
+  return getFolderKind(walk(folders ?? []));
+}
 
 
 interface NoteListProps {
@@ -15,7 +58,36 @@ interface NoteListProps {
   loading?: boolean;
 }
 
-function NoteCard({ note }: { note: VaultNote }) {
+function TagFilterSelect({
+  tags,
+  value,
+  onChange,
+}: {
+  tags: Tag[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
+    >
+      <option value="">All Tags</option>
+      {tags.length === 0 ? (
+        <option value="" disabled>No tags yet</option>
+      ) : (
+        tags.map((tag) => (
+          <option key={tag.id} value={tag.id}>
+            {tag.name}
+          </option>
+        ))
+      )}
+    </select>
+  );
+}
+
+function NoteCard({ note, kind }: { note: VaultNote; kind: FolderKind }) {
   return (
     <Link to={`${VAULT_ROUTES.NOTES}/${note.id}`}
       className="block group"
@@ -25,7 +97,7 @@ function NoteCard({ note }: { note: VaultNote }) {
           <h3 className="font-medium text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {note.title || "Untitled"}
           </h3>
-          <Badge variant="secondary" className="shrink-0">
+          <Badge className={"shrink-0 border " + KIND_DEFAULT_BG[kind]}>
             {note.folderName || "No Folder"}
           </Badge>
         </div>
@@ -37,11 +109,12 @@ function NoteCard({ note }: { note: VaultNote }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {note.tags && note.tags.length > 0 && (
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {note.tags.slice(0, 2).map((tag) => (
                   <span
                     key={tag.id}
-                    className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                    className={"text-xs px-1.5 py-0.5 rounded " + tagPillClass(tag)}
+                    style={tagPillStyle(tag)}
                   >
                     {tag.name}
                   </span>
@@ -63,7 +136,7 @@ function NoteCard({ note }: { note: VaultNote }) {
   );
 }
 
-function NoteTableRow({ note }: { note: VaultNote }) {
+function NoteTableRow({ note, kind }: { note: VaultNote; kind: FolderKind }) {
   return (
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-4 py-3">
@@ -79,23 +152,26 @@ function NoteTableRow({ note }: { note: VaultNote }) {
         )}
       </td>
       <td className="px-4 py-3">
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {note.tags && note.tags.length > 0 ? (
             note.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag.id}
-                className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                className={"text-xs px-1.5 py-0.5 rounded " + tagPillClass(tag)}
+                style={tagPillStyle(tag)}
               >
                 {tag.name}
               </span>
             ))
           ) : (
-            <span className="text-xs text-muted-foreground">-</span>
+            <span className="text-xs text-muted-foreground">—</span>
           )}
         </div>
       </td>
       <td className="px-4 py-3">
-        <Badge variant="secondary">{note.folderName || "No Folder"}</Badge>
+        <Badge className={"border " + KIND_DEFAULT_BG[kind]}>
+          {note.folderName || "No Folder"}
+        </Badge>
       </td>
       <td className="px-4 py-3 text-xs text-muted-foreground">
         {new Date(note.updatedAt).toLocaleDateString()}
@@ -111,13 +187,24 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
 
   const { data: tagsData } = useQuery<{ tags: Tag[] }>({
     queryKey: ["vault", "tags"],
-    queryFn: async () => {
-      const res = await api.get<{ tags: Tag[] }>("/api/vault/tags");
-      return res;
-    },
+    queryFn: () => api.get<{ tags: Tag[] }>("/api/vault/tags"),
     staleTime: 30_000,
   });
   const tags = tagsData?.tags ?? [];
+
+  const { data: foldersData } = useQuery<{ folders: VaultFolder[] }>({
+    queryKey: ["vault", "folders"],
+    queryFn: () => api.get<{ folders: VaultFolder[] }>("/api/vault/folders"),
+  });
+  const allFolders = foldersData?.folders ?? [];
+
+  const kindByNote = React.useMemo(() => {
+    const m = new Map<string, FolderKind>();
+    for (const n of notes) {
+      m.set(n.id, findFolderKind(allFolders, n.folderId, n.status === "ARCHIVED"));
+    }
+    return m;
+  }, [notes, allFolders]);
 
   const visibleNotes = React.useMemo(() => {
     let out = notes;
@@ -135,7 +222,6 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
     return out;
   }, [notes, activeTagId, searchQuery]);
 
-  const setActiveTag = (id: string) => setActiveTagId(id);
   const clearFilters = () => {
     setActiveTagId("");
     setSearchQuery("");
@@ -157,57 +243,58 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
     );
   }
 
+  const toolbar = (
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-2 flex-1">
+        <Input
+          placeholder="Search notes..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
+        <TagFilterSelect
+          tags={tags}
+          value={activeTagId}
+          onChange={setActiveTagId}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          variant={viewMode === "grid" ? "secondary" : "ghost"}
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setViewMode("grid")}
+          aria-label="Grid view"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="7" height="7" x="3" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="3" rx="1" />
+            <rect width="7" height="7" x="3" y="14" rx="1" />
+            <rect width="7" height="7" x="14" y="14" rx="1" />
+          </svg>
+        </Button>
+        <Button
+          variant={viewMode === "table" ? "secondary" : "ghost"}
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setViewMode("table")}
+          aria-label="Table view"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3v18" />
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M3 9h18" />
+            <path d="M3 15h18" />
+          </svg>
+        </Button>
+      </div>
+    </div>
+  );
+
   if (visibleNotes.length === 0 && !loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-1">
-            <Input
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
-            <select
-              value={activeTagId}
-              onChange={(e) => setActiveTag(e.target.value)}
-              className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-            >
-              <option value="">All Tags</option>
-              {tags.length === 0 ? (
-                <option value="" disabled>No tags yet</option>
-              ) : (
-                tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" />
-              </svg>
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("table")}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18" /><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" />
-              </svg>
-            </Button>
-          </div>
-        </div>
+        {toolbar}
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -231,7 +318,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
           <p className="text-sm text-muted-foreground mb-4">
             Try a different tag or clear the filter to see all notes.
           </p>
-          <Button variant="outline" onClick={() => setActiveTag("")}>
+          <Button variant="outline" onClick={clearFilters}>
             Clear filter
           </Button>
         </div>
@@ -241,85 +328,12 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1">
-          <Input
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-sm"
-          />
-            <select
-              value={activeTagId}
-              onChange={(e) => setActiveTag(e.target.value)}
-              className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-            >
-              <option value="">All Tags</option>
-              {tags.length === 0 ? (
-                <option value="" disabled>No tags yet</option>
-              ) : (
-                tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))
-              )}
-            </select>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setViewMode("grid")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="7" height="7" x="3" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="3" rx="1" />
-              <rect width="7" height="7" x="3" y="14" rx="1" />
-              <rect width="7" height="7" x="14" y="14" rx="1" />
-            </svg>
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setViewMode("table")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 3v18" />
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="M3 9h18" />
-              <path d="M3 15h18" />
-            </svg>
-          </Button>
-        </div>
-      </div>
+      {toolbar}
 
       {viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleNotes.map((note) => (
-            <NoteCard key={note.id} note={note} />
+          {visibleNotes.map((note) => (
+            <NoteCard key={note.id} note={note} kind={kindByNote.get(note.id) ?? "none"} />
           ))}
         </div>
       ) : (
@@ -334,7 +348,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
                   Tags
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
-                  Status
+                  Folder
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                   Updated
@@ -342,8 +356,8 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
               </tr>
             </thead>
             <tbody>
-          {visibleNotes.map((note) => (
-                <NoteTableRow key={note.id} note={note} />
+              {visibleNotes.map((note) => (
+                <NoteTableRow key={note.id} note={note} kind={kindByNote.get(note.id) ?? "none"} />
               ))}
             </tbody>
           </table>

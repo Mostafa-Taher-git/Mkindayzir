@@ -9,6 +9,7 @@ import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+import { getFolderKind, folderKindClass } from "@/lib/folder-kind";
 
 export default function VaultFolderPage() {
   const { folderId } = useParams<{ folderId: string }>();
@@ -121,7 +122,9 @@ export default function VaultFolderPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-                        <CardTitle className="text-base group-hover:text-primary transition-colors">{sub.name}</CardTitle>
+                        <CardTitle className="text-base group-hover:text-primary transition-colors">
+                          {sub.name}
+                        </CardTitle>
                       </div>
                       <CardDescription className="text-xs">
                         {getAncestors(allFolders, sub.id).map((a) => a.name).join(" / ") || "Root"}

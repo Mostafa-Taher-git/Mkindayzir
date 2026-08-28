@@ -48,21 +48,15 @@ class Settings(BaseSettings):
 
     # Core
     ENV: str = "development"
-    MKINDAYZIR_MODE: str = "personal"
-    AUTO_LOGIN: bool = False
 
-    # Database
-    # PostgreSQL is the only supported engine (user decision). "sqlite" is
-    # accepted solely as a legacy migration SOURCE via app.cli.migrate.
-    DATABASE_PROVIDER: str = "postgres"
-    DATABASE_URL: str = "file:./data/mkindayzir.db"
+    # Database — PostgreSQL is the only supported engine.
+    DATABASE_URL: str = "postgresql://localhost/mkindayzir"
     DATA_DIR: str = "./data"
 
     # Security
     SESSION_SECRET: str
     ENCRYPTION_KEY: str
     SESSION_MAX_AGE: int = 86400
-    BCRYPT_ROUNDS: int = 12
 
     # File Storage
     UPLOAD_DIR: str = "./data/uploads"
@@ -82,6 +76,15 @@ class Settings(BaseSettings):
     # (personal user keys, stored encrypted, always take precedence).
     OPENROUTER_API_KEY: str = ""
 
+    # Clerk authentication. The secret key is reserved for Clerk management
+    # operations; request authentication uses only Clerk-issued JWTs.
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_SECRET_KEY: str = ""
+    CLERK_JWKS_URL: str = "https://humorous-dassie-2146.clerk.accounts.dev/.well-known/jwks.json"
+    CLERK_JWT_PUBLIC_KEY: str = ""
+    CLERK_FRONTEND_API: str = "https://humorous-dassie-2146.clerk.accounts.dev"
+    CLERK_WEBHOOK_SIGNING_SECRET: str = ""
+
     # Email
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -94,7 +97,6 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
 
     # Features
-    REGISTRATION_ENABLED: bool = False
     GUIDE_CENTER_ENABLED: bool = True
     MAX_PROJECTS: int = 0
     MAX_USERS: int = 0
@@ -111,10 +113,6 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         # PostgreSQL only. DATABASE_URL must be set in .env.
         return self.DATABASE_URL
-
-    @property
-    def database_provider(self) -> str:
-        return self.DATABASE_PROVIDER
 
     @property
     def data_dir(self) -> str:

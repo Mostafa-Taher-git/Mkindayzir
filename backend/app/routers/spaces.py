@@ -10,12 +10,16 @@ router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 @router.get("/")
 async def list_spaces(
     search: str | None = Query(None),
+    workspace: str | None = Query(None),
     page: int = Query(1, ge=1),
     perPage: int = Query(20, ge=1, le=100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items = await SpaceService.list(db, user)
+    try:
+        items = await SpaceService.list(db, user, workspace=workspace)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})
     return {"spaces": items}
 
 

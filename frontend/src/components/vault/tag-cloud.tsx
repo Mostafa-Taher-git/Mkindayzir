@@ -10,16 +10,29 @@ interface TagCloudProps {
   onSelectTag?: (tagId: string | null) => void;
 }
 
-const COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+const FALLBACK_COLORS = [
+  "#3b82f6",
+  "#22c55e",
+  "#eab308",
+  "#8b5cf6",
+  "#ec4899",
+  "#f97316",
+  "#06b6d4",
+  "#6366f1",
 ];
+
+function tagStyle(tag: Tag): React.CSSProperties {
+  let color = tag.color;
+  if (!color) {
+    const hash = tag.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    color = FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
+  }
+  return {
+    backgroundColor: `${color}22`,
+    color,
+    borderColor: `${color}55`,
+  };
+}
 
 export function TagCloud({ tags, selectedTagId, onSelectTag }: TagCloudProps) {
   if (!tags || tags.length === 0) {
@@ -36,17 +49,12 @@ export function TagCloud({ tags, selectedTagId, onSelectTag }: TagCloudProps) {
     return sizes[hash % sizes.length];
   };
 
-  const getColor = (tag: Tag) => {
-    const hash = tag.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    return COLORS[hash % COLORS.length];
-  };
-
   return (
-    <div className="flex flex-wrap gap-2 justify-center">
+    <div className="flex flex-wrap gap-2 justify-center items-center py-2">
       <button
         onClick={() => onSelectTag?.(null)}
         className={cn(
-          "px-3 py-1.5 rounded-full border transition-colors",
+          "px-3 py-1.5 rounded-full border transition-colors text-sm",
           !selectedTagId
             ? "bg-primary text-primary-foreground border-primary"
             : "bg-background hover:bg-accent border-input"
@@ -70,11 +78,12 @@ export function TagCloud({ tags, selectedTagId, onSelectTag }: TagCloudProps) {
                 onSelectTag(isSelected ? null : tag.id);
               }
             }}
+            style={tagStyle(tag)}
             className={cn(
-              "px-3 py-1.5 rounded-full border transition-colors no-underline",
-              isSelected
-                ? "bg-primary text-primary-foreground border-primary"
-                : `${getColor(tag)} ${getSize(tag)} hover:opacity-80`
+              "px-3 py-1.5 rounded-full border transition-opacity no-underline",
+              getSize(tag),
+              isSelected && "ring-2 ring-offset-2 ring-offset-background",
+              "hover:opacity-80",
             )}
           >
             {tag.name}

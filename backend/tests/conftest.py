@@ -34,11 +34,9 @@ def _test_database_url() -> str:
     return _re.sub(r"/([^/@]+)(\?|$)", r"/mkindayzir_test\2", url)
 
 os.environ["DATABASE_URL"] = _test_database_url()
-os.environ["DATABASE_PROVIDER"] = "postgres"
 os.environ["DATA_DIR"] = os.path.join(_TMP, "data")
 os.environ["UPLOAD_DIR"] = os.path.join(_TMP, "uploads")
 os.environ["BACKUP_DIR"] = os.path.join(_TMP, "backups")
-os.environ["MKINDAYZIR_MODE"] = "team"           # exercise RBAC paths
 os.environ["AUTO_LOGIN"] = "false"
 os.environ["REGISTRATION_ENABLED"] = "true"
 # deterministic 32-byte hex keys so encryption round-trips are testable

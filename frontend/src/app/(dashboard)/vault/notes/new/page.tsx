@@ -6,10 +6,12 @@ import { VaultFolder, Tag } from "@/types";
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteEditor } from "@/components/vault/note-editor";
 import { api } from "@/lib/api";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 export default function NewNotePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const activeWorkspace = useWorkspace();
 
   const createMutation = useMutation({
     mutationFn: async (data: {
@@ -17,13 +19,15 @@ export default function NewNotePage() {
       content: string;
       folderId: string | null;
       tagIds: string[];
-      status: string;
     }) => {
       const res = await fetch("/api/vault/notes", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -33,7 +37,7 @@ export default function NewNotePage() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["vault", "notes"] });
-      const id = res?.note?.id;
+      const id = res?.id ?? res?.note?.id;
       if (id) navigate(`/vault/notes/${id}`);
       else navigate(VAULT_ROUTES.HOME);
     },

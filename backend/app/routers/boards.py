@@ -15,14 +15,18 @@ router = APIRouter(prefix="/api/boards", tags=["boards"])
 @router.get("/")
 async def list_boards(
     spaceId: str | None = Query(None),
+    workspace: str | None = Query(None),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if spaceId:
-        items = await BoardService.list(db, spaceId, user)
-    else:
-        items = await BoardService.list_all(db, user)
-    return {"boards": items}
+    try:
+        if spaceId:
+            items = await BoardService.list(db, spaceId, user)
+        else:
+            items = await BoardService.list_all(db, user, workspace=workspace)
+        return {"boards": items}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})
 
 
 @router.get("/{board_id}/labels")

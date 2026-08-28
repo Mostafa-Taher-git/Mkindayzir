@@ -10,6 +10,7 @@ import {
   ROUTES,
 } from "@/lib/constants";
 import { Loader2 } from "lucide-react";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface TicketFormProps {
   initialData?: Partial<Ticket>;
@@ -19,6 +20,7 @@ interface TicketFormProps {
 
 export function TicketForm({ initialData, ticketId, isEdit = false }: TicketFormProps) {
   const navigate = useNavigate();
+  const activeWorkspace = useWorkspace();
 
   const [subject, setSubject] = useState(initialData?.subject || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -92,6 +94,7 @@ export function TicketForm({ initialData, ticketId, isEdit = false }: TicketForm
       projectId: projectId || null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       tags,
+      ...(isEdit ? {} : { workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal" }),
     };
 
     try {

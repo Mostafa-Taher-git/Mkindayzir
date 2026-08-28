@@ -59,18 +59,7 @@ docker compose -f docker/docker-compose.yml --profile team up -d
 bash docker/init.sh
 ```
 
-When using the `team` profile, set `MKINDAYZIR_MODE=team`, `DATABASE_PROVIDER=postgres`, and point `DATABASE_URL` at the `postgres` service. See [docs/CONFIGURATION.md](./CONFIGURATION.md) for the full variable list.
-
-## Upgrading Personal -> Team (in-place, no terminal)
-
-Once the app is running, open **Settings → System → "Upgrade to Team Mode"** in the UI. The wizard walks you through:
-
-1. Entering the PostgreSQL connection string.
-2. A pre-check (connectivity, version, disk space).
-3. A live migration with Server-Sent-Events progress.
-4. Automatic rollback on failure.
-
-No CLI or terminal access is required. The endpoints live in `backend/app/routers/system.py`.
+When using the `team` profile, point `DATABASE_URL` at the `postgres` service. See [docs/CONFIGURATION.md](./CONFIGURATION.md) for the full variable list.
 
 ## Operations
 

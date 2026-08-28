@@ -1,10 +1,14 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from app.models.project import Project
 from app.models.work_item import WorkItem
 from app.models.user import User
+from app.services.workspace_filter import (
+    resolve_workspace, stamp_owner,
+    personal_owner_filter, org_owner_filter,
+)
 
 
 class ProjectService:
@@ -20,6 +24,9 @@ class ProjectService:
             "teamId": project.teamId,
             "settings": project.settings,
             "createdById": project.createdById,
+            "ownerType": getattr(project, "ownerType", None),
+            "ownerUserId": getattr(project, "ownerUserId", None),
+            "ownerOrgId": getattr(project, "ownerOrgId", None),
             "createdAt": project.createdAt.isoformat() if project.createdAt else None,
             "updatedAt": project.updatedAt.isoformat() if project.updatedAt else None,
         }
@@ -27,6 +34,11 @@ class ProjectService:
     @staticmethod
     async def list(db: AsyncSession, params: dict, user: dict) -> dict:
         query = select(Project).where(Project.deletedAt.is_(None))
+        ws = await resolve_workspace(db, user, params.get("workspace"))
+        if ws["ownerType"] == "personal":
+            query = query.where(personal_owner_filter(Project, user["id"]))
+        else:
+            query = query.where(org_owner_filter(Project, ws["orgId"]))
         if params.get("status"):
             query = query.where(Project.status == params["status"])
         if params.get("teamId"):
@@ -74,6 +86,13 @@ class ProjectService:
             teamId=data.get("teamId"),
             settings=str(data.get("settings") or {}),
             createdById=user["id"],
+        )
+        ws = await resolve_workspace(db, user, data.get("workspace"))
+        await stamp_owner(
+            project,
+            owner_type=ws["ownerType"],
+            owner_user_id=ws["ownerUserId"],
+            owner_org_id=ws["orgId"],
         )
         db.add(project)
         await db.commit()

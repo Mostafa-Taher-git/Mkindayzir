@@ -1,5 +1,11 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
+let getClerkToken: (() => Promise<string | null>) | null = null;
+
+export function setClerkTokenGetter(getToken: () => Promise<string | null>) {
+  getClerkToken = getToken;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -9,6 +15,10 @@ async function request<T>(
   const headers: Record<string, string> = {};
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
+  }
+  if (getClerkToken) {
+    const token = await getClerkToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
   }
   if (options.headers) {
     for (const [k, v] of Object.entries(options.headers)) {

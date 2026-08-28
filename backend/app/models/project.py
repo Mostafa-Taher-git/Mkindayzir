@@ -28,3 +28,7 @@ class Project(Base):
     initiatives: Mapped[list["Initiative"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     workflows: Mapped[list["Workflow"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     labels: Mapped[list["Label"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+
+    ownerType: Mapped[str] = mapped_column("ownerType", String(10), server_default=text("'personal'"), nullable=False)
+    ownerUserId: Mapped[Optional[str]] = mapped_column("ownerUserId", String(36), ForeignKey("users.id"), nullable=True)
+    ownerOrgId: Mapped[Optional[str]] = mapped_column("ownerOrgId", String(36), ForeignKey("organizations.id"), nullable=True)

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 const VISIBILITY_OPTIONS = [
   { value: "PRIVATE", label: "Private" },
@@ -26,6 +27,7 @@ type FormData = {
 function NewProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const activeWorkspace = useWorkspace();
 
   const [form, setForm] = React.useState<FormData>({
     key: "",
@@ -39,7 +41,10 @@ function NewProjectPage() {
       const res = await fetch("/api/projects", {credentials: "include", 
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
+        }),
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to create project" }));

@@ -8,7 +8,6 @@ All configuration is via environment variables. The backend reads these from the
 |----------|---------|-------------|
 | `PORT` | `3000` | Port the FastAPI process binds in production (API + SPA). |
 | `BASE_URL` | `http://localhost:3000` | Public base URL of the app. |
-| `MKINDAYZIR_MODE` | `personal` | Deployment mode: `personal` or `team`. |
 | `AUTO_LOGIN` | `false` | Auto-login for Personal Mode (single user). |
 | `FRONTEND_DIR` | `<project root>/dist` | Optional override of the directory serving the built SPA. |
 | `DATA_DIR` | `./data` | Uploads and backups directory. |
@@ -17,8 +16,7 @@ All configuration is via environment variables. The backend reads these from the
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_PROVIDER` | `postgres` | Only `postgres` is supported. |
-| `DATABASE_URL` | `file:./data/mkindayzir.db` | Connection string. `postgresql://user:pass@host:5432/dbname` for Team mode. |
+| `DATABASE_URL` | `postgresql://localhost/mkindayzir` | PostgreSQL connection string. |
 | `DB_PASSWORD` | `change-me-in-production` | Fallback PostgreSQL password used by Docker Compose when `POSTGRES_PASSWORD` is not explicitly set. |
 
 ## Security
@@ -83,24 +81,20 @@ All configuration is via environment variables. The backend reads these from the
 
 ## Examples
 
-### Personal mode (no Docker)
+### Local PostgreSQL
 
 ```env
-MKINDAYZIR_MODE=personal
-DATABASE_PROVIDER=postgres
-DATABASE_URL=file:./data/mkindayzir.db
+DATABASE_URL=postgresql+asyncpg://mkindayzir:<password>@127.0.0.1:5432/mkindayzir
 DATA_DIR=./data
 AUTO_LOGIN=false
 SESSION_SECRET=<64-char-random-string>
 ENCRYPTION_KEY=<32-byte-hex-string>
 ```
 
-### Team mode (PostgreSQL)
+### Docker PostgreSQL
 
 ```env
-MKINDAYZIR_MODE=team
-DATABASE_PROVIDER=postgres
-DATABASE_URL=postgresql://mkindayzir:password@localhost:5432/mkindayzir
+DATABASE_URL=postgresql+asyncpg://mkindayzir:<password>@postgres:5432/mkindayzir
 DB_PASSWORD=change-me-in-production
 DATA_DIR=/app/data
 SESSION_SECRET=<64-char-random-string>

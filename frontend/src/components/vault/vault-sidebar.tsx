@@ -97,7 +97,6 @@ function FolderTreeItem({
   onCreateSubfolder,
   autoExpand,
   childCount,
-  isLastChild,
 }: {
   folder: VaultFolder;
   level?: number;
@@ -107,7 +106,6 @@ function FolderTreeItem({
   onCreateSubfolder: (parentId: string, name: string) => void;
   autoExpand?: boolean;
   childCount?: number;
-  isLastChild?: boolean;
 }) {
   const [expandedSet, setExpandedSet] = React.useState<Set<string>>(() => {
     const stored = readExpandedSet();
@@ -126,8 +124,7 @@ function FolderTreeItem({
       setExpandedSet(next);
       writeExpandedSet(next);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoExpand]);
+  }, [autoExpand, folder.id, expandedSet]);
 
   const toggleExpanded = () => {
     const next = new Set(expandedSet);
@@ -230,7 +227,7 @@ function FolderTreeItem({
       )}
       {expanded && hasChildren && (
         <div>
-          {folder.children!.map((child, idx) => (
+          {folder.children!.map((child) => (
             <FolderTreeItem
               key={child.id}
               folder={child}
@@ -240,7 +237,6 @@ function FolderTreeItem({
               onCancelSubfolder={onCancelSubfolder}
               onCreateSubfolder={onCreateSubfolder}
               childCount={child.children?.length ?? 0}
-              isLastChild={idx === folder.children!.length - 1}
             />
           ))}
         </div>

@@ -51,3 +51,7 @@ class Ticket(Base):
         cascade="all, delete-orphan",
         order_by="TicketReply.createdAt.asc()"
     )
+
+    ownerType: Mapped[str] = mapped_column("ownerType", String(10), server_default=text("'personal'"), nullable=False)
+    ownerUserId: Mapped[Optional[str]] = mapped_column("ownerUserId", String(36), ForeignKey("users.id"), nullable=True)
+    ownerOrgId: Mapped[Optional[str]] = mapped_column("ownerOrgId", String(36), ForeignKey("organizations.id"), nullable=True)

@@ -8,16 +8,14 @@ from pathlib import Path
 import os
 
 from app.config import settings as config_settings
-
-# Single source of truth for the running app version. Bump on every release;
-# surfaced via /api/config and shown on the roadmap page ("Your Installation").
-APP_VERSION = "1.0.0"
+from app.version import APP_VERSION
 
 from app.routers import (
     auth, setup, projects, work_items, iterations, initiatives,
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
-    tickets, ws, board_backgrounds, card_comments, users, archive
+    tickets, ws, board_backgrounds, card_comments, users, archive,
+    organizations, invitations, transfers, clerk_webhook,
 )
 
 
@@ -70,6 +68,66 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        await conn.exec_driver_sql(
+            'ALTER TABLE users ADD COLUMN IF NOT EXISTS "clerkId" VARCHAR(255) UNIQUE'
+        )
+
+        # Idempotent column adds for the org/owner migration. The underlying
+        # driver is asyncpg/PostgreSQL. Each block checks information_schema
+        # so re-running is a no-op.
+        await conn.exec_driver_sql(
+            "ALTER TABLE vault_notes ADD COLUMN IF NOT EXISTS \"ownerType\" VARCHAR(10) NOT NULL DEFAULT 'personal'"
+        )
+        await conn.exec_driver_sql(
+            "ALTER TABLE vault_notes ADD COLUMN IF NOT EXISTS \"ownerUserId\" VARCHAR(36)"
+        )
+        await conn.exec_driver_sql(
+            "ALTER TABLE vault_notes ADD COLUMN IF NOT EXISTS \"ownerOrgId\" VARCHAR(36)"
+        )
+        # Backfill ownerUserId = authorId for any rows that pre-date the columns
+        # (should be a no-op after the ADD COLUMN above, kept for safety).
+        await conn.exec_driver_sql(
+            'UPDATE vault_notes SET "ownerUserId" = "authorId" '
+            "WHERE \"ownerType\" = 'personal' AND \"ownerUserId\" IS NULL"
+        )
+
+        # Project, space, ticket owner columns
+        for table, user_col in (
+            ("projects", "createdById"),
+            ("spaces", "createdById"),
+            ("tickets", "createdById"),
+        ):
+            await conn.exec_driver_sql(
+                f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "ownerType" VARCHAR(10) NOT NULL DEFAULT \'personal\''
+            )
+            await conn.exec_driver_sql(
+                f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "ownerUserId" VARCHAR(36)'
+            )
+            await conn.exec_driver_sql(
+                f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "ownerOrgId" VARCHAR(36)'
+            )
+            await conn.exec_driver_sql(
+                f'UPDATE {table} SET "ownerUserId" = "{user_col}" '
+                f"WHERE \"ownerType\" = 'personal' AND \"ownerUserId\" IS NULL"
+            )
+
+        # PostgreSQL does not support ADD CONSTRAINT IF NOT EXISTS. Keep the
+        # organization membership invariant in sync for existing databases.
+        await conn.exec_driver_sql(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'uq_org_member_one_org_per_user'
+                ) THEN
+                    ALTER TABLE organization_members
+                    ADD CONSTRAINT uq_org_member_one_org_per_user UNIQUE ("userId");
+                END IF;
+            END $$;
+            """
+        )
+
     yield
 
 
@@ -83,9 +141,12 @@ app.add_exception_handler(Exception, custom_exception_handler)
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
-_allowed_origins = os.environ.get(
-    "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+_allowed_origins = list(dict.fromkeys([
+    *os.environ.get(
+        "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(","),
+    config_settings.CLERK_FRONTEND_API,
+]))
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,6 +164,7 @@ for router in [
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
     dashboard.router, tickets.router, ws.router, board_backgrounds.router,
     card_comments.router, users.router, archive.router,
+    organizations.router, invitations.router, transfers.router, clerk_webhook.router,
 ]:
     app.include_router(router)
 
@@ -113,12 +175,7 @@ async def health():
 
 @app.get("/api/config")
 async def public_config():
-    # Public, unauthenticated. Only non-sensitive launch info lives here.
-    return {
-        "mode": config_settings.MKINDAYZIR_MODE,
-        "registrationEnabled": config_settings.REGISTRATION_ENABLED,
-        "version": APP_VERSION,
-    }
+    return {"version": APP_VERSION}
 
 
 

@@ -57,6 +57,7 @@ async def list_notes(
     authorId: str | None = Query(None),
     search: str | None = Query(None),
     tagId: str | None = Query(None),
+    workspace: str | None = Query(None, description="'personal' or an org id"),
     page: int = Query(1, ge=1),
     perPage: int = Query(20, ge=1, le=100),
     user: dict = Depends(get_current_user),
@@ -64,9 +65,13 @@ async def list_notes(
 ):
     params = {
         "folderId": folderId, "status": status, "authorId": authorId,
-        "search": search, "tagId": tagId, "page": page, "perPage": perPage,
+        "search": search, "tagId": tagId, "workspace": workspace,
+        "page": page, "perPage": perPage,
     }
-    result = await VaultService.list_notes(db, params, user)
+    try:
+        result = await VaultService.list_notes(db, params, user)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail={"error": {"code": "FORBIDDEN", "message": str(e)}})
     return {
         "notes": result["items"],
         "pagination": {"page": result["page"], "perPage": result["perPage"], "total": result["total"], "totalPages": result["totalPages"]},

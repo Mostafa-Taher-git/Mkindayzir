@@ -1,12 +1,10 @@
 import { ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
-import { useConfig } from "@/hooks/use-config";
+import { useAuth } from "@clerk/clerk-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
-import ForgotPasswordPage from "@/app/(auth)/forgot-password/page";
 import SetupPage from "@/app/(auth)/setup/page";
 
 import DashboardPage from "@/app/(dashboard)/dashboard/page";
@@ -30,6 +28,7 @@ import VaultTagsPage from "@/app/(dashboard)/vault/tags/page";
 import VaultGraphPage from "@/app/(dashboard)/vault/graph/page";
 import VaultArchivePage from "@/app/(dashboard)/vault/archive/page";
 import VaultArchiveFolderPage from "@/app/(dashboard)/vault/archive/[folderId]/page";
+import InvitationPage from "@/app/invitations/[token]/page";
 import AssistantPage from "@/app/(dashboard)/assistant/page";
 import ConversationPage from "@/app/(dashboard)/assistant/[conversationId]/page";
 import TicketsPage from "@/app/(dashboard)/tickets/page";
@@ -39,27 +38,24 @@ import GuidesPage from "@/app/(dashboard)/guides/page";
 import ReportsPage from "@/app/(dashboard)/reports/page";
 import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
-import SystemSettingsPage from "@/app/(dashboard)/settings/system/page";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) {
+  const { isSignedIn, isLoaded } = useAuth();
+  if (!isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center font-mono uppercase tracking-wider text-muted-foreground">
         Initializing console...
       </div>
     );
   }
-  if (!isAuthenticated) {
+  if (!isSignedIn) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
 
 function DashboardRoute({ children }: { children: ReactNode }) {
-  const { mode } = useConfig();
-  return <DashboardLayout mode={mode}>{children}</DashboardLayout>;
+  return <DashboardLayout>{children}</DashboardLayout>;
 }
 
 export default function App() {
@@ -68,7 +64,6 @@ export default function App() {
       {/* Public / auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/setup" element={<SetupPage />} />
 
       {/* Protected dashboard routes */}
@@ -372,13 +367,13 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Public-ish invitation accept page (login required, no dashboard chrome) */}
       <Route
-        path="/settings/system"
+        path="/invitations/:token"
         element={
           <ProtectedRoute>
-            <DashboardRoute>
-              <SystemSettingsPage />
-            </DashboardRoute>
+            <InvitationPage />
           </ProtectedRoute>
         }
       />

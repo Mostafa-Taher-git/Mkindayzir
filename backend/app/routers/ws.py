@@ -1,5 +1,5 @@
 """
-Realtime WebSocket endpoint: /ws?token=<session-token>
+Realtime WebSocket endpoint: /ws
 
 Serves two features the frontend ships but that never worked because this
 endpoint did not exist (every connect attempt was answered 403 by FastAPI's
@@ -17,9 +17,8 @@ Protocol (JSON text frames):
                        entityType, entityId, userId, displayName?, avatar?}
                       {"type": "pong"}
 
-Auth: the ?token= query parameter must match a live session in the sessions
-table (same tokens as the mkindayzir_session cookie). Connections without a
-valid token are closed with code 4401.
+Auth: a Clerk JWT is read from the optional ``?token=`` parameter or the
+``__session`` cookie. Connections without a valid JWT are closed with 4401.
 """
 import asyncio
 import json
@@ -27,8 +26,7 @@ import json
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.database import async_session
-from app.models import Session as DBSession
-from app.models.user import User
+from app.middleware.auth import get_or_create_clerk_user, verify_clerk_jwt
 
 router = APIRouter()
 
@@ -113,43 +111,20 @@ hub = PresenceHub()
 
 
 async def _authenticate(token: str | None, cookies: dict | None = None):
-    """Validate a session token; return (userId, displayName, avatar) or None.
-
-    Two accepted sources, in order:
-      1. the `token` query parameter (scripted/test clients),
-      2. the mkindayzir_session cookie — the browser cannot read that
-         httpOnly cookie to pass it as a query param, but it DOES send it
-         automatically on same-origin WebSocket handshakes.
-    """
-    candidate = token
-    if not candidate and cookies:
-        candidate = cookies.get("mkindayzir_session")
+    """Validate a Clerk JWT and return (userId, displayName, avatar)."""
+    candidate = token or (cookies or {}).get("__session")
     if not candidate:
         return None
-    from datetime import datetime as _dt, timezone as _tz
-    from sqlalchemy import select as _select
-
-    async with async_session() as db:
-        row = await db.execute(_select(DBSession).where(DBSession.token == candidate))
-        session = row.scalar_one_or_none()
-        if not session:
-            return None
-        expires = session.expiresAt
-        if expires is not None and expires.tzinfo is None:
-            expires = expires.replace(tzinfo=_tz.utc)
-        if expires is not None and expires < _dt.now(_tz.utc):
-            return None
-        urow = await db.execute(_select(User).where(User.id == session.userId))
-        user = urow.scalar_one_or_none()
-        if not user or user.status != "ACTIVE":
-            return None
-        return user.id, user.displayName, user.avatar
+    try:
+        async with async_session() as db:
+            user = await get_or_create_clerk_user(db, verify_clerk_jwt(candidate))
+            return user.id, user.displayName, user.avatar
+    except Exception:
+        return None
 
 
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: str | None = Query(None)):
-    # Browsers can't read the httpOnly session cookie to pass ?token=, but the
-    # cookie rides along on the handshake — accept it as the primary source.
     identity = await _authenticate(token, dict(ws.cookies))
 
     if identity is None:
@@ -203,6 +178,3 @@ async def websocket_endpoint(ws: WebSocket, token: str | None = Query(None)):
     finally:
         await hub.disconnect(user_id, ws)
 
-
-# NOTE: import kept at bottom to avoid a circular import at module load;
-# sqlalchemy is imported lazily inside _authenticate.

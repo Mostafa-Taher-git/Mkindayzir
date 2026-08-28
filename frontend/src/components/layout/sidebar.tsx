@@ -2,6 +2,8 @@ import { useLocation } from "react-router-dom";
 
 import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { WorkspaceSwitcher } from "@/components/organizations/workspace-switcher";
+import { useMyOrg } from "@/hooks/use-workspace";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,17 +36,16 @@ function Sidebar({
   onToggle,
   open,
   onOpenChange,
-  mode,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: string;
 }) {
   const pathname = useLocation().pathname || "";
   const isMobile = useMobile();
   const { user } = useAuth();
+  const { data: myOrg } = useMyOrg();
 
   const displayName = user?.displayName ?? "User";
   const initials = displayName
@@ -94,7 +95,7 @@ function Sidebar({
       </div>
       <nav className="flex-1 space-y-1 px-2 py-2">
         {navItems.map((item) => {
-          if (item.teamOnly && mode === "personal") return null;
+          if (item.teamOnly && !myOrg?.organization) return null;
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <a
@@ -114,7 +115,8 @@ function Sidebar({
           );
         })}
       </nav>
-      <div className="border-t border-outline p-2">
+      <div className="border-t border-outline p-2 space-y-2">
+        <WorkspaceSwitcher />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

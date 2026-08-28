@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
 import { VaultFolder } from "@/types";
+import { getFolderKind, folderKindClass } from "@/lib/folder-kind";
 
 function FolderIconSvg() {
   return (
@@ -83,7 +84,9 @@ export default function VaultPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <FolderIconSvg />
-                        <CardTitle className="text-base group-hover:text-primary transition-colors">{sub.name}</CardTitle>
+                        <CardTitle className="text-base group-hover:text-primary transition-colors">
+                          {sub.name}
+                        </CardTitle>
                         {(sub.children?.length ?? 0) > 0 && (
                           <span className="ml-auto text-[10px] text-muted-foreground">
                             {sub.children!.length} sub

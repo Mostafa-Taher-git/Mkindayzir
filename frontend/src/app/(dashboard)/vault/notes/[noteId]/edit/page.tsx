@@ -20,7 +20,6 @@ export default function EditNotePage() {
       content: string;
       folderId: string | null;
       tagIds: string[];
-      status: string;
     }) => {
       const res = await fetch(`/api/vault/notes/${noteId}`, {
         method: "PATCH",

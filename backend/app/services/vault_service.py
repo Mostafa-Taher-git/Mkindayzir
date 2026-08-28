@@ -12,6 +12,7 @@ from app.models.note_version import NoteVersion
 from app.models.note_feedback import NoteFeedback
 from app.models.internal_link import InternalLink
 from app.models.user import User
+from app.services.workspace_filter import resolve_workspace, stamp_owner
 
 
 TAG_PATTERN = re.compile(r"\[\[([^\[\]\n]{1,80})\]\]")
@@ -165,7 +166,32 @@ class VaultService:
 
     @staticmethod
     async def list_notes(db: AsyncSession, params: dict, user: dict) -> dict:
+        from app.models.organization import OrganizationMember
+
         query = select(VaultNote).where(VaultNote.deletedAt.is_(None))
+
+        workspace = params.get("workspace")
+        if workspace and workspace != "personal":
+            # Org workspace: user must be a member of this org
+            membership = (await db.execute(
+                select(OrganizationMember).where(
+                    OrganizationMember.orgId == workspace,
+                    OrganizationMember.userId == user["id"],
+                )
+            )).scalar_one_or_none()
+            if membership is None:
+                raise ValueError("not a member of this organization")
+            query = query.where(
+                VaultNote.ownerType == "org",
+                VaultNote.ownerOrgId == workspace,
+            )
+        else:
+            # Default / personal: only the user's own personal notes
+            query = query.where(
+                VaultNote.ownerType == "personal",
+                VaultNote.ownerUserId == user["id"],
+            )
+
         if params.get("folderId"):
             query = query.where(VaultNote.folderId == params["folderId"])
         if params.get("status"):
@@ -294,6 +320,13 @@ class VaultService:
             authorId=user["id"],
             meta=str(data.get("metadata") or {}),
         )
+        ws = await resolve_workspace(db, user, data.get("workspace"))
+        await stamp_owner(
+            note,
+            owner_type=ws["ownerType"],
+            owner_user_id=ws["ownerUserId"],
+            owner_org_id=ws["orgId"],
+        )
         db.add(note)
         await db.flush()
         explicit = data.get("tagIds") or []
@@ -418,9 +451,17 @@ class VaultService:
     async def search_notes(db: AsyncSession, query: str, user: dict) -> list[dict]:
         search = f"%{query}%"
         result = await db.execute(
-            select(VaultNote).where(VaultNote.deletedAt.is_(None), or_(VaultNote.title.ilike(search), VaultNote.content.ilike(search)))
+            select(VaultNote)
+            .where(
+                VaultNote.deletedAt.is_(None),
+                or_(VaultNote.title.ilike(search), VaultNote.content.ilike(search)),
+            )
+            .options(
+                joinedload(VaultNote.folder),
+                selectinload(VaultNote.tags).joinedload(NoteTag.tag),
+            )
         )
-        notes = result.scalars().all()
+        notes = result.unique().scalars().all()
         return [VaultService._serialize_note(n) for n in notes]
 
     @staticmethod

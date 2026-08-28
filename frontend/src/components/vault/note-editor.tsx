@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { VaultNote, VaultFolder, Tag, NoteStatus } from "@/types";
+import { VaultNote, VaultFolder, Tag } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface NoteEditorProps {
@@ -16,7 +16,6 @@ interface NoteEditorProps {
     content: string;
     folderId: string | null;
     tagIds: string[];
-    status: NoteStatus;
   }) => Promise<void>;
   saving?: boolean;
 }
@@ -35,17 +34,17 @@ export function NoteEditor({
   const [selectedTagIds, setSelectedTagIds] = React.useState<string[]>(
     note?.tags?.map((t) => t.id) || []
   );
-  const [status, setStatus] = React.useState<NoteStatus>(note?.status || "DRAFT");
 
   const allFolderOptions = React.useMemo(() => {
+    type FolderLike = { id: string; name: string; children?: FolderLike[] };
     const out: { id: string; name: string; depth: number }[] = [];
-    function walk(list: { id: string; name: string; children?: { id: string; name: string; children?: any[] }[] }[], depth: number) {
+    function walk(list: FolderLike[], depth: number) {
       for (const f of list ?? []) {
         out.push({ id: f.id, name: f.name, depth });
         if (f.children?.length) walk(f.children, depth + 1);
       }
     }
-    walk(folders as any, 0);
+    walk(folders as FolderLike[], 0);
     return out;
   }, [folders]);
 
@@ -55,16 +54,13 @@ export function NoteEditor({
     );
   };
 
-  const handleSave = async (publish: boolean) => {
+  const handleSave = async () => {
     if (!onSave) return;
-    const nextStatus: NoteStatus = publish ? "PUBLISHED" : status;
-    if (publish) setStatus("PUBLISHED");
     await onSave({
       title,
       content,
       folderId: folderId === "none" ? null : folderId,
       tagIds: selectedTagIds,
-      status: nextStatus,
     });
   };
 
@@ -78,11 +74,8 @@ export function NoteEditor({
           <Button variant="outline" onClick={() => navigate(-1)}>
             Cancel
           </Button>
-          <Button variant="secondary" onClick={() => handleSave(false)} disabled={saving}>
-            {saving ? "Saving..." : "Save draft"}
-          </Button>
-          <Button onClick={() => handleSave(true)} disabled={saving}>
-            {saving ? "Publishing..." : "Publish"}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
@@ -95,6 +88,9 @@ export function NoteEditor({
       />
 
       <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          Folder
+        </label>
         <select
           value={folderId}
           onChange={(e) => setFolderId(e.target.value)}
@@ -113,16 +109,25 @@ export function NoteEditor({
         <div className="flex flex-wrap gap-2">
           {availableTags.map((tag) => {
             const selected = selectedTagIds.includes(tag.id);
+            const tintStyle = tag.color
+              ? {
+                  backgroundColor: selected ? tag.color : `${tag.color}22`,
+                  color: selected ? "#fff" : tag.color,
+                  borderColor: selected ? tag.color : `${tag.color}55`,
+                }
+              : undefined;
             return (
               <button
                 key={tag.id}
+                type="button"
                 onClick={() => toggleTag(tag.id)}
                 className={cn(
                   "text-xs px-2.5 py-1 rounded-full border transition-colors",
-                  selected
+                  !tintStyle && (selected
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background hover:bg-accent border-input"
+                    : "bg-background hover:bg-accent border-input"),
                 )}
+                style={tintStyle}
               >
                 {tag.name}
               </button>

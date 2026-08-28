@@ -76,22 +76,18 @@ mkindayzir version
 
 ## Database
 
-- **PostgreSQL:** set `DATABASE_URL` in `backend/.env`; schema via `alembic upgrade head` (or the reset script).
-- **PostgreSQL (Team):** run `alembic upgrade head` (or `mkindayzir migrate upgrade`).
-- **Legacy SQLite import:** `mkindayzir migrate-db <sqlite-file>` copies an old SQLite install into PostgreSQL.
+- **PostgreSQL:** set `DATABASE_URL` in `backend/.env`; the application creates and extends its schema at startup.
 
 ## First run
 
 1. Visit http://localhost:3000
 2. Complete the setup wizard / create the admin account.
-3. In Personal mode with `AUTO_LOGIN=true` you are logged in immediately.
+3. With `AUTO_LOGIN=true`, the initial active admin is logged in immediately.
 
 ## Key environment variables
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Essentials:
 
-- `DATABASE_PROVIDER`: `postgres` (only value)
 - `DATABASE_URL`: database connection string
 - `SESSION_SECRET`: 64-char hex string for the session cookie
 - `ENCRYPTION_KEY`: 64-char hex string for AES-256-GCM encryption
-- `MKINDAYZIR_MODE`: `personal` or `team`

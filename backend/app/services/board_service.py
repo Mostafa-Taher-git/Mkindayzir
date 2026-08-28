@@ -71,10 +71,21 @@ class BoardService:
         return [BoardService._serialize(b, starred=b.id in stars) for b in boards]
 
     @staticmethod
-    async def list_all(db: AsyncSession, user: dict) -> List[dict]:
-        boards = (await db.execute(
-            select(Board).where(Board.deletedAt.is_(None)).order_by(Board.position.asc())
-        )).scalars().all()
+    async def list_all(db: AsyncSession, user: dict, workspace: str | None = None) -> List[dict]:
+        from app.services.workspace_filter import (
+            resolve_workspace, personal_owner_filter, org_owner_filter,
+        )
+        from app.models.space import Space
+        from sqlalchemy import and_
+
+        query = select(Board).join(Space, Space.id == Board.spaceId).where(Board.deletedAt.is_(None))
+        ws = await resolve_workspace(db, user, workspace)
+        if ws["ownerType"] == "personal":
+            query = query.where(personal_owner_filter(Space, user["id"]))
+        else:
+            query = query.where(org_owner_filter(Space, ws["orgId"]))
+        query = query.order_by(Board.position.asc())
+        boards = (await db.execute(query)).scalars().all()
         stars = await BoardService._starred_ids(db, user["id"])
         # space names for the switcher / workspace grid
         space_ids = {b.spaceId for b in boards}
