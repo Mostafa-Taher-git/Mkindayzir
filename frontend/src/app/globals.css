@@ -63,6 +63,7 @@
   --hud-glow-crimson: inset 0 0 10px rgba(255, 84, 73, 0.3);
   --hud-glow-gold: inset 0 0 10px rgba(255, 215, 94, 0.25);
   --edge-gradient: linear-gradient(90deg, rgba(150,204,255,0.55), rgba(150,204,255,0));
+  --metal-sheen: linear-gradient(135deg, rgba(150,204,255,0.08) 0%, rgba(150,204,255,0) 35%, rgba(0,0,0,0.35) 100%);
 
   /* Typography */
   --font-display: "Hanken Grotesk", system-ui, sans-serif;
@@ -121,6 +122,7 @@
   --hud-glow-crimson: inset 0 0 10px rgba(255, 84, 73, 0.3);
   --hud-glow-gold: inset 0 0 10px rgba(255, 215, 94, 0.25);
   --edge-gradient: linear-gradient(90deg, rgba(150,204,255,0.55), rgba(150,204,255,0));
+  --metal-sheen: linear-gradient(135deg, rgba(150,204,255,0.08) 0%, rgba(150,204,255,0) 35%, rgba(0,0,0,0.35) 100%);
 
   color-scheme: dark;
 }

@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
+import ForgotPasswordPage from "@/app/(auth)/forgot-password/page";
 import SetupPage from "@/app/(auth)/setup/page";
 
 import DashboardPage from "@/app/(dashboard)/dashboard/page";
@@ -64,6 +65,7 @@ export default function App() {
       {/* Public / auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/setup" element={<SetupPage />} />
 
       {/* Protected dashboard routes */}
