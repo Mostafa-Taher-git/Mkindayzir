@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { VAULT_ROUTES } from "@/lib/constants";
 import { VaultFolder, VaultNote } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,11 @@ import { useToast } from "@/components/ui/toast";
 
 export default function VaultFolderPage() {
   const { folderId } = useParams<{ folderId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tagId = searchParams.get("tag") || undefined;
 
   const { data: folderData } = useQuery<{ folder: VaultFolder }>({
     queryKey: ["vault", "folder", folderId],
@@ -28,9 +30,14 @@ export default function VaultFolderPage() {
   });
 
   const { data: notesData } = useQuery<{ notes: VaultNote[] }>({
-    queryKey: ["vault", "notes", "folder", folderId],
+    queryKey: ["vault", "notes", "folder", folderId, tagId],
     enabled: Boolean(folderId),
-    queryFn: () => api.get<{ notes: VaultNote[] }>(`/api/vault/notes?folderId=${folderId}`),
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      qs.set("folderId", folderId!);
+      if (tagId) qs.set("tagId", tagId);
+      return api.get<{ notes: VaultNote[] }>(`/api/vault/notes?${qs.toString()}`);
+    },
   });
 
   const deleteFolder = useMutation({

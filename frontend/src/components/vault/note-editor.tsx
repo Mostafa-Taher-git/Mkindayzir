@@ -37,7 +37,17 @@ export function NoteEditor({
   );
   const [status, setStatus] = React.useState<NoteStatus>(note?.status || "DRAFT");
 
-  const rootFolders = folders.filter((f) => !f.parentId);
+  const allFolderOptions = React.useMemo(() => {
+    const out: { id: string; name: string; depth: number }[] = [];
+    function walk(list: { id: string; name: string; children?: { id: string; name: string; children?: any[] }[] }[], depth: number) {
+      for (const f of list ?? []) {
+        out.push({ id: f.id, name: f.name, depth });
+        if (f.children?.length) walk(f.children, depth + 1);
+      }
+    }
+    walk(folders as any, 0);
+    return out;
+  }, [folders]);
 
   const toggleTag = (tagId: string) => {
     setSelectedTagIds((prev) =>
@@ -91,9 +101,9 @@ export function NoteEditor({
           className="h-9 rounded-md border bg-transparent px-3 py-2 text-sm"
         >
           <option value="none">No Folder</option>
-          {rootFolders.map((folder) => (
+          {allFolderOptions.map((folder) => (
             <option key={folder.id} value={folder.id}>
-              {folder.name}
+              {"\u2014\u2014".repeat(folder.depth) + (folder.depth > 0 ? " " : "") + folder.name}
             </option>
           ))}
         </select>

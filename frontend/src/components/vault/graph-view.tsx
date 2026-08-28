@@ -75,8 +75,22 @@ export function GraphView({ nodes, links, onNodeClick }: GraphViewProps) {
   const statusColors: Record<string, string> = {
     DRAFT: "#94a3b8",
     PUBLISHED: "#3b82f6",
-    ARCHIVED: "#64748b",
+    ARCHIVED: "#475569",
   };
+
+  const nodeColor = (n: GraphNode): string => {
+    if (n.status === "ARCHIVED") return "#475569";
+    if (!n.folderId) return "#f59e0b";
+    if (n.isSubfolderNote) return "#8b5cf6";
+    return "#3b82f6";
+  };
+
+  const legendItems = [
+    { key: "root", label: "RootFolder", dot: "bg-blue-500" },
+    { key: "sub", label: "SubFolder", dot: "bg-violet-500" },
+    { key: "none", label: "NoFolder", dot: "bg-amber-500" },
+    { key: "arch", label: "Archived", dot: "bg-zinc-700" },
+  ];
 
   return (
     <div className="relative w-full h-[600px] border rounded-lg overflow-hidden bg-muted/20">
@@ -122,7 +136,7 @@ export function GraphView({ nodes, links, onNodeClick }: GraphViewProps) {
               >
                 <circle
                   r={isHovered ? 12 : 8}
-                  fill={statusColors[node.status] || "#94a3b8"}
+                  fill={nodeColor(node)}
                   stroke={isHovered ? "#1e293b" : "none"}
                   strokeWidth={isHovered ? 2 : 0}
                   className="transition-all"
@@ -219,18 +233,12 @@ export function GraphView({ nodes, links, onNodeClick }: GraphViewProps) {
       </div>
 
       <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-md p-2 text-xs space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500" />
-          <span>Published</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-gray-400" />
-          <span>Draft</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-slate-500" />
-          <span>Archived</span>
-        </div>
+        {legendItems.map((item) => (
+          <div key={item.key} className="flex items-center gap-2">
+            <span className={"w-3 h-3 rounded-full " + item.dot} />
+            <span>{item.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -1,17 +1,13 @@
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 
 import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { NOTE_STATUSES, VAULT_ROUTES } from "@/lib/constants";
-import { VaultNote, NoteStatus } from "@/types";
+import { VAULT_ROUTES } from "@/lib/constants";
+import { VaultNote, Tag } from "@/types";
+import { api } from "@/lib/api";
 
 
 interface NoteListProps {
@@ -68,12 +64,6 @@ function NoteCard({ note }: { note: VaultNote }) {
 }
 
 function NoteTableRow({ note }: { note: VaultNote }) {
-  const statusColors: Record<NoteStatus, string> = {
-    DRAFT: "secondary",
-    PUBLISHED: "default",
-    ARCHIVED: "outline",
-  };
-
   return (
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-4 py-3">
@@ -115,43 +105,40 @@ function NoteTableRow({ note }: { note: VaultNote }) {
 }
 
 export function NoteList({ notes, loading = false }: NoteListProps) {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [activeTagId, setActiveTagId] = React.useState<string>("");
   const [viewMode, setViewMode] = React.useState<"grid" | "table">("grid");
-  const [searchQuery, setSearchQuery] = React.useState(
-    searchParams.get("search") || ""
-  );
-  const [debouncedSearch, setDebouncedSearch] = React.useState(searchQuery);
 
-  const currentStatus = searchParams.get("status") as NoteStatus | null;
+  const { data: tagsData } = useQuery<{ tags: Tag[] }>({
+    queryKey: ["vault", "tags"],
+    queryFn: async () => {
+      const res = await api.get<{ tags: Tag[] }>("/api/vault/tags");
+      return res;
+    },
+    staleTime: 30_000,
+  });
+  const tags = tagsData?.tags ?? [];
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  React.useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (debouncedSearch) {
-      params.set("search", debouncedSearch);
-    } else {
-      params.delete("search");
+  const visibleNotes = React.useMemo(() => {
+    let out = notes;
+    if (activeTagId) {
+      out = out.filter((n) => (n.tags ?? []).some((t) => t.id === activeTagId));
     }
-    const qs = params.toString();
-    navigate(qs ? `?${qs}` : window.location.pathname);
-  }, [debouncedSearch, navigate, searchParams]);
-
-  const handleStatusChange = (status: NoteStatus) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (status) {
-      params.set("status", status);
-    } else {
-      params.delete("status");
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      out = out.filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          (n.content ?? "").toLowerCase().includes(q),
+      );
     }
-    const qs = params.toString();
-    navigate(qs ? `?${qs}` : window.location.pathname);
+    return out;
+  }, [notes, activeTagId, searchQuery]);
+
+  const setActiveTag = (id: string) => setActiveTagId(id);
+  const clearFilters = () => {
+    setActiveTagId("");
+    setSearchQuery("");
   };
 
   if (loading) {
@@ -170,34 +157,84 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
     );
   }
 
-  if (notes.length === 0) {
+  if (visibleNotes.length === 0 && !loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-muted-foreground mb-4"
-        >
-          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" x2="8" y1="13" y2="13" />
-          <line x1="16" x2="8" y1="17" y2="17" />
-          <line x1="10" x2="8" y1="9" y2="9" />
-        </svg>
-        <h3 className="text-lg font-semibold mb-1">No notes yet</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Get started by creating your first note.
-        </p>
-        <Link to={VAULT_ROUTES.NEW_NOTE}>
-          <Button>Create Note</Button>
-        </Link>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="max-w-sm"
+            />
+            <select
+              value={activeTagId}
+              onChange={(e) => setActiveTag(e.target.value)}
+              className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
+            >
+              <option value="">All Tags</option>
+              {tags.length === 0 ? (
+                <option value="" disabled>No tags yet</option>
+              ) : (
+                tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setViewMode("grid")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" />
+              </svg>
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setViewMode("table")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18" /><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" />
+              </svg>
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-muted-foreground mb-4"
+          >
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" x2="8" y1="13" y2="13" />
+            <line x1="16" x2="8" y1="17" y2="17" />
+            <line x1="10" x2="8" y1="9" y2="9" />
+          </svg>
+          <h3 className="text-lg font-semibold mb-1">No notes match this filter</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Try a different tag or clear the filter to see all notes.
+          </p>
+          <Button variant="outline" onClick={() => setActiveTag("")}>
+            Clear filter
+          </Button>
+        </div>
       </div>
     );
   }
@@ -212,40 +249,22 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="max-w-sm"
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                {currentStatus ? `Status: ${currentStatus}` : "All Status"}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="ml-1"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleStatusChange("" as any)}>
-                All Status
-              </DropdownMenuItem>
-              {NOTE_STATUSES.map((status) => (
-                <DropdownMenuItem
-                  key={status.value}
-                  onClick={() => handleStatusChange(status.value as NoteStatus)}
-                >
-                  {status.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <select
+              value={activeTagId}
+              onChange={(e) => setActiveTag(e.target.value)}
+              className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
+            >
+              <option value="">All Tags</option>
+              {tags.length === 0 ? (
+                <option value="" disabled>No tags yet</option>
+              ) : (
+                tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))
+              )}
+            </select>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -299,7 +318,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
 
       {viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {notes.map((note) => (
+              {visibleNotes.map((note) => (
             <NoteCard key={note.id} note={note} />
           ))}
         </div>
@@ -323,7 +342,7 @@ export function NoteList({ notes, loading = false }: NoteListProps) {
               </tr>
             </thead>
             <tbody>
-              {notes.map((note) => (
+          {visibleNotes.map((note) => (
                 <NoteTableRow key={note.id} note={note} />
               ))}
             </tbody>

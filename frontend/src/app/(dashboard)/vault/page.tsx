@@ -19,7 +19,7 @@ function FolderIconSvg() {
 export default function VaultPage() {
   const [searchParams] = useSearchParams();
   const folderId = searchParams.get("folder") || undefined;
-  const statusParam = searchParams.get("status") || undefined;
+  const tagId = searchParams.get("tag") || undefined;
   const search = searchParams.get("search") || undefined;
 
   const { data: foldersData } = useQuery<{ folders: VaultFolder[] }>({
@@ -32,11 +32,11 @@ export default function VaultPage() {
   });
 
   const { data: notesData, isLoading } = useQuery<{ notes: any[]; pagination: any }>({
-    queryKey: ["vault", "notes", folderId, statusParam, search],
+    queryKey: ["vault", "notes", folderId, tagId, search],
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (folderId) qs.set("folderId", folderId);
-      if (statusParam) qs.set("status", statusParam);
+      if (tagId) qs.set("tagId", tagId);
       if (search) qs.set("search", search);
       const res = await fetch(`/api/vault/notes?${qs.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch notes");

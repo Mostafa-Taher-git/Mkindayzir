@@ -56,12 +56,16 @@ async def list_notes(
     status: str | None = Query(None),
     authorId: str | None = Query(None),
     search: str | None = Query(None),
+    tagId: str | None = Query(None),
     page: int = Query(1, ge=1),
     perPage: int = Query(20, ge=1, le=100),
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    params = {"folderId": folderId, "status": status, "authorId": authorId, "search": search, "page": page, "perPage": perPage}
+    params = {
+        "folderId": folderId, "status": status, "authorId": authorId,
+        "search": search, "tagId": tagId, "page": page, "perPage": perPage,
+    }
     result = await VaultService.list_notes(db, params, user)
     return {
         "notes": result["items"],

@@ -241,6 +241,9 @@ export type GraphNode = {
   id: string;
   title: string;
   status: NoteStatus;
+  folderId?: string | null;
+  folderName?: string | null;
+  isSubfolderNote?: boolean;
 };
 
 export type GraphLink = {

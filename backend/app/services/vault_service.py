@@ -175,6 +175,11 @@ class VaultService:
         if params.get("search"):
             search = f"%{params['search']}%"
             query = query.where(or_(VaultNote.title.ilike(search), VaultNote.content.ilike(search)))
+        if params.get("tagId"):
+            tag_id = params["tagId"]
+            query = query.where(
+                VaultNote.id.in_(select(NoteTag.noteId).where(NoteTag.tagId == tag_id))
+            )
 
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)
@@ -428,12 +433,45 @@ class VaultService:
 
     @staticmethod
     async def get_graph(db: AsyncSession, user: dict) -> dict:
-        result = await db.execute(select(VaultNote).where(VaultNote.deletedAt.is_(None)))
-        notes = result.scalars().all()
-        nodes = [{"id": n.id, "title": n.title, "slug": n.slug} for n in notes]
+        result = await db.execute(
+            select(VaultNote)
+            .where(VaultNote.deletedAt.is_(None))
+            .options(joinedload(VaultNote.folder))
+        )
+        notes = result.unique().scalars().all()
+        nodes = [
+            {
+                "id": n.id,
+                "title": n.title,
+                "slug": n.slug,
+                "status": n.status,
+                "folderId": n.folderId,
+                "folderName": n.folder.name if n.folder else None,
+                "isSubfolderNote": bool(n.folder and n.folder.parentId),
+            }
+            for n in notes
+        ]
+
+        link_pairs: set[tuple[str, str]] = set()
+
         link_result = await db.execute(select(InternalLink))
-        links_rows = link_result.scalars().all()
-        links = [{"source": l.sourceId, "target": l.targetId} for l in links_rows]
+        for l in link_result.scalars().all():
+            if not l.sourceId or not l.targetId or l.sourceId == l.targetId:
+                continue
+            link_pairs.add(tuple(sorted((l.sourceId, l.targetId))))
+
+        by_folder: dict[str, list[str]] = {}
+        for n in notes:
+            if not n.folderId:
+                continue
+            by_folder.setdefault(n.folderId, []).append(n.id)
+        for ids in by_folder.values():
+            ids = sorted(ids)
+            for i in range(len(ids)):
+                for j in range(i + 1, len(ids)):
+                    link_pairs.add((ids[i], ids[j]))
+
+        links = [{"source": s, "target": t} for s, t in link_pairs]
         return {"nodes": nodes, "links": links}
 
     @staticmethod

@@ -307,3 +307,28 @@
   50% { box-shadow: 0 0 12px 0 rgba(255, 83, 91, 0.45); }
 }
 .animate-pulse-glow { animation: pulseGlow 2.4s ease-in-out infinite; }
+
+/* Native <select> dropdowns: kill the OS-rendered white popup and give it
+   the same dark surface the rest of the UI uses. Applies everywhere a
+   <select> shows up (folder picker, status select, etc.). */
+select {
+  background-color: var(--color-surface, #0b0d12) !important;
+  color: var(--color-foreground, #f5f7fa) !important;
+  -webkit-appearance: menulist-button;
+  appearance: menulist-button;
+}
+select option,
+select optgroup {
+  background-color: var(--color-surface, #0b0d12) !important;
+  color: var(--color-foreground, #f5f7fa) !important;
+}
+select option:checked,
+select option:hover {
+  background-color: var(--color-primary, #5a8cff) !important;
+  color: #ffffff !important;
+}
+select:focus,
+select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary, #5a8cff);
+}
