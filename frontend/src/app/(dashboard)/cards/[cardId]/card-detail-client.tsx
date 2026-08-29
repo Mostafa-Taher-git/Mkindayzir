@@ -25,9 +25,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
   const { data: checklistsData } = useQuery({
     queryKey: ["checklists", card.id],
     queryFn: async () => {
-      const res = await api.get<{ checklists: any[] }>(`/api/cards/${card.id}/checklists`); 
-        cache: "no-store",
-      });
+      const res = await api.get<{ checklists: any[] }>(`/api/cards/${card.id}/checklists`);
       if (!res.ok) return { checklists: [] };
       return res.json();
     },
@@ -41,11 +39,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { title?: string; description?: string }) => {
-      const res = await api.get<{ card: any }>(`/api/cards/${card.id}`); 
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const res = await api.patch(`/api/cards/${card.id}`, data);
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to update card" }));
         throw new Error(error.message);
@@ -60,7 +54,12 @@ function CardDetailClient({ card }: CardDetailClientProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.get<{ card: any }>(`/api/cards/${card.id}`);  method: "DELETE" });
+      const res = await api.delete(`/api/cards/${card.id}`);
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: "Failed to delete card" }));
+        throw new Error(error.message);
+      }
+      return res.json();
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to delete card" }));
         throw new Error(error.message);

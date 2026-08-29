@@ -51,12 +51,7 @@ export default function TicketDetailPage() {
   const handleUpdate = async (updatedFields: Partial<Ticket>) => {
     if (!ticketId) return;
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(updatedFields),
-      });
+      const res = await api.patch(`/api/tickets/${ticketId}`, updatedFields);
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
         queryClient.invalidateQueries({ queryKey: ["tickets"] });
@@ -69,10 +64,7 @@ export default function TicketDetailPage() {
   const handleClose = async () => {
     if (!ticketId) return;
     try {
-      const res = await fetch(`/api/tickets/${ticketId}/close`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await api.post(`/api/tickets/${ticketId}/close`);
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
         queryClient.invalidateQueries({ queryKey: ["tickets"] });
@@ -85,10 +77,7 @@ export default function TicketDetailPage() {
   const handleReopen = async () => {
     if (!ticketId) return;
     try {
-      const res = await fetch(`/api/tickets/${ticketId}/reopen`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await api.post(`/api/tickets/${ticketId}/reopen`);
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
         queryClient.invalidateQueries({ queryKey: ["tickets"] });
@@ -102,10 +91,7 @@ export default function TicketDetailPage() {
     if (!ticketId) return;
     if (!window.confirm("Are you sure you want to delete this ticket?")) return;
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await api.delete(`/api/tickets/${ticketId}`);
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["tickets"] });
         navigate(ROUTES.TICKETS);

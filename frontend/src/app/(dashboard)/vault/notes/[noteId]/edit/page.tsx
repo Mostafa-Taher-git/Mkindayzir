@@ -21,12 +21,7 @@ export default function EditNotePage() {
       folderId: string | null;
       tagIds: string[];
     }) => {
-      const res = await api.get<{ note: any }>(`/api/vault/notes/${noteId}`)
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const res = await api.patch(`/api/vault/notes/${noteId}`, data);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message || "Failed to save note");

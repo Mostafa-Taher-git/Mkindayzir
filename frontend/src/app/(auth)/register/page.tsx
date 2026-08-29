@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
-import { useState, FormEvent } from "react";
-import { useSignUp } from "@clerk/clerk-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, FormEvent, useEffect } from "react";
+import { useSignUp, useAuth } from "@clerk/clerk-react";
 
 function firstClerkMessage(err: unknown, fallback: string): string {
   const e = err as { errors?: Array<{ longMessage?: string; message?: string }>; message?: string };
@@ -17,7 +17,9 @@ const ERROR_CLASS =
   "border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground";
 
 export default function RegisterPage() {
-  const { signUp, isLoaded } = useSignUp();
+  const { signUp, isLoaded, setActive } = useSignUp();
+  const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +28,12 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
+
+  useEffect(() => {
+    if (isSignedIn) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isSignedIn, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -69,11 +77,7 @@ export default function RegisterPage() {
     try {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === "complete") {
-        // Clerk email_code strategy may return createdSessionId as null even
-        // when the session was created on the server.  After verification the
-        // session lives in Clerk's cookies; a full-page reload to /dashboard
-        // triggers Clerk's automatic session recovery — no setActive needed.
-        window.location.href = "/dashboard";
+        setPendingVerification(false);
         return;
       }
       setError("Verification incomplete. Please try again.");

@@ -26,15 +26,11 @@ export default function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard", "stats"],
     queryFn: async () => {
-      const res = await api.get<{ stats: any }>("/api/dashboard/stats");
-      if (res.status === 401) {
-        window.location.href = "/login";
+      try {
+        return await api.get<DashboardStats>("/api/dashboard/stats");
+      } catch (err) {
         return { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };
       }
-      if (!res.ok) {
-        return { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };
-      }
-      return res.json();
     },
   });
 

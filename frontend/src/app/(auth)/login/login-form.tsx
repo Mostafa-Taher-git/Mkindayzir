@@ -31,13 +31,23 @@ export function LoginForm() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!isLoaded || !signIn) return;
+
+    // If Clerk already has an active session, redirect instead of calling
+    // `signIn.create()` — that call throws "You're already signed in.".
+    if (isSignedIn) {
+      navigate(callbackUrl, { replace: true });
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
       const result = await signIn.create({ identifier: email, password });
       if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+        if (result.createdSessionId && setActive) {
+          await setActive({ session: result.createdSessionId });
+        }
         window.location.href = callbackUrl;
         return;
       }

@@ -81,11 +81,7 @@ export default function BoardsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (payload: { spaceId: string; name: string; background?: string }) => {
-      const res = await api.get<{ boards: any[] }>("/api/boards?workspace=personal"); 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await api.post("/api/boards", payload);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? "Failed to create board");

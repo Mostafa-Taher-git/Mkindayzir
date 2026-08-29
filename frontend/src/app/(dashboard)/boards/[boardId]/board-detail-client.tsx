@@ -142,12 +142,9 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const { data: columnsData } = useQuery({
     queryKey: ["columns", board.id],
     queryFn: async () => {
-      const res = await api.get<{ columns: any[] }>(`/api/boards/${board.id}/columns`); 
-        cache: "no-store",
-      });
+      const res = await api.get<{ columns: any[] }>(`/api/boards/${board.id}/columns`);
       if (!res.ok) return { columns: [] };
       const data = await res.json();
-      // tolerate both {columns:[...]} (current) and bare [...] (legacy)
       return { columns: Array.isArray(data) ? data : data.columns ?? [] };
     },
     initialData: { columns: initialColumns },
@@ -156,9 +153,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const { data: cardsData } = useQuery({
     queryKey: ["cards", board.id],
     queryFn: async () => {
-      const res = await api.get<{ cards: any[] }>(`/api/cards?boardId=${board.id}`); 
-        cache: "no-store",
-      });
+      const res = await api.get<{ cards: any[] }>(`/api/cards?boardId=${board.id}`);
       if (!res.ok) return { cards: [] };
       return res.json();
     },
@@ -184,11 +179,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
 
   const moveMutation = useMutation({
     mutationFn: async ({ cardId, columnId }: { cardId: string; columnId: string }) => {
-      await api.post(`/api/cards/${cardId}/move` 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ columnId }),
-      });
+      const res = await api.post(`/api/cards/${cardId}/move`, { columnId });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to move card" }));
         throw new Error(error.message);
