@@ -8,7 +8,7 @@ type Member = {
   id: string;
   orgId: string;
   userId: string;
-  role: "admin" | "manager" | "member" | "viewer";
+  role: "owner" | "admin";
   user: { id: string; displayName: string; email: string };
 };
 

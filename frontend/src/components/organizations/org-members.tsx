@@ -7,7 +7,7 @@ export type Member = {
   id: string;
   orgId: string;
   userId: string;
-  role: "admin" | "manager" | "member" | "viewer";
+  role: "owner" | "admin";
   invitedBy: string | null;
   joinedAt: string;
   user: {
@@ -19,10 +19,8 @@ export type Member = {
 };
 
 const ROLE_OPTIONS = [
+  { value: "owner", label: "Owner" },
   { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "member", label: "Member" },
-  { value: "viewer", label: "Viewer" },
 ];
 
 export function OrgMembers({ orgId, isOwner, myUserId, onLeave, onDelete }: {

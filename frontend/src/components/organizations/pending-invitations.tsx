@@ -44,7 +44,7 @@ export function PendingInvitations() {
           orgId: res.orgId,
           orgName: org.name,
           orgType: org.type,
-          role: res.invitation?.role || "member",
+          role: res.invitation?.role || "admin",
         });
         toast({ title: "Welcome!", description: `You joined ${org.name}.` });
       }
