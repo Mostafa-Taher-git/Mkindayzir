@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
+from app.utils.plan_limits import FREE_MAX_MEMBERS_PER_ORG, FREE_MAX_ORGS
 
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -61,6 +62,13 @@ class OrganizationService:
         if type_ not in ("team", "enterprise"):
             raise ValueError("type must be 'team' or 'enterprise'")
 
+        # Free plan: 1 organization per user (as member). Enforce server-side.
+        existing_orgs = (await db.execute(
+            select(func.count(OrganizationMember.id)).where(OrganizationMember.userId == user["id"])
+        )).scalar_one() or 0
+        if int(existing_orgs) >= FREE_MAX_ORGS:
+            raise ValueError(f"Free plan allows {FREE_MAX_ORGS} organization. Upgrade to create more.")
+
         base_slug = _slugify(slug or name)
         final_slug = base_slug
         i = 1
@@ -76,6 +84,7 @@ class OrganizationService:
             slug=final_slug,
             type=type_,
             ownerId=user["id"],
+            maxMembers=FREE_MAX_MEMBERS_PER_ORG,
         )
         db.add(org)
         await db.flush()

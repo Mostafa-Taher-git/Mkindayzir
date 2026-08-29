@@ -17,7 +17,7 @@ const ERROR_CLASS =
   "border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive-foreground";
 
 export default function RegisterPage() {
-  const { signUp, isLoaded, setActive } = useSignUp();
+  const { signUp, isLoaded } = useSignUp();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +69,10 @@ export default function RegisterPage() {
     try {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+        // Clerk email_code strategy may return createdSessionId as null even
+        // when the session was created on the server.  After verification the
+        // session lives in Clerk's cookies; a full-page reload to /dashboard
+        // triggers Clerk's automatic session recovery — no setActive needed.
         window.location.href = "/dashboard";
         return;
       }

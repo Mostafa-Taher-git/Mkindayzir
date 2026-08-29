@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { useState, FormEvent } from "react";
-import { useSignIn } from "@clerk/clerk-react";
+import { useState, FormEvent, useEffect } from "react";
+import { useSignIn, useAuth } from "@clerk/clerk-react";
 
 function firstClerkMessage(err: unknown, fallback: string): string {
   const e = err as { errors?: Array<{ longMessage?: string; message?: string }>; message?: string };
@@ -10,12 +10,21 @@ function firstClerkMessage(err: unknown, fallback: string): string {
 export function LoginForm() {
   const { signIn, isLoaded, setActive } = useSignIn();
   const navigate = useNavigate();
+  const { isSignedIn } = useAuth(); // detects active Clerk session
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Guard: if user already has an active Clerk session (e.g. from email verification),
+  // skip the login form entirely and go straight to dashboard.
+  useEffect(() => {
+    if (isSignedIn) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isSignedIn, navigate]);
 
   const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
 

@@ -1,12 +1,13 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization, OrganizationMember
 from app.models.invitation import Invitation
 from app.models.user import User
+from app.utils.plan_limits import FREE_MAX_MEMBERS_PER_ORG
 
 
 INVITE_TTL_DAYS = 7
@@ -69,6 +70,16 @@ class InvitationService:
             raise ValueError(f"role must be one of {VALID_ROLES}")
 
         org = await InvitationService._require_admin(db, admin_user, org_id)
+
+        # Free plan: max 5 members per org (including owner). Count current members + pending invites.
+        current_members = (await db.execute(
+            select(func.count(OrganizationMember.id)).where(OrganizationMember.orgId == org_id)
+        )).scalar_one() or 0
+        pending_invites = (await db.execute(
+            select(func.count(Invitation.id)).where(Invitation.orgId == org_id, Invitation.status == "pending")
+        )).scalar_one() or 0
+        if int(current_members) + int(pending_invites) >= FREE_MAX_MEMBERS_PER_ORG:
+            raise ValueError(f"Free plan allows up to {FREE_MAX_MEMBERS_PER_ORG} members per organization. Upgrade to invite more.")
 
         # Revoke any existing pending invite for this email
         existing = (await db.execute(
@@ -155,6 +166,13 @@ class InvitationService:
         user_email = (user.get("email") or "").strip().lower()
         if inv.invitedEmail.lower() != user_email:
             raise PermissionError("this invitation is for a different email")
+
+        # Free plan: re-check capacity at accept time (race-safe)
+        current_members = (await db.execute(
+            select(func.count(OrganizationMember.id)).where(OrganizationMember.orgId == inv.orgId)
+        )).scalar_one() or 0
+        if int(current_members) >= FREE_MAX_MEMBERS_PER_ORG:
+            raise ValueError(f"Free plan allows up to {FREE_MAX_MEMBERS_PER_ORG} members per organization. Upgrade to add more.")
 
         inv.status = "accepted"
         inv.acceptedAt = _now()

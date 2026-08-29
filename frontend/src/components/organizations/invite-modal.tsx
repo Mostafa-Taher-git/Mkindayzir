@@ -48,7 +48,7 @@ export function InviteModal({ orgId, open, onOpenChange }: InviteModalProps) {
       >
         <h2 className="text-lg font-bold">Invite member</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          They'll receive a link to accept. Invitations expire in 7 days.
+          Free plan: up to 5 members (owner included). Invitations expire in 7 days.
         </p>
 
         <div className="mt-4 space-y-3">

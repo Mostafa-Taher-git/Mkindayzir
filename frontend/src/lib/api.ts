@@ -4,6 +4,30 @@ let getClerkToken: (() => Promise<string | null>) | null = null;
 
 export function setClerkTokenGetter(getToken: () => Promise<string | null>) {
   getClerkToken = getToken;
+  // Install global fetch interceptor once — ensures every raw fetch("/api/...") also
+  // carries the Clerk Bearer token. Without this, 50+ legacy fetch() calls 401
+  // and the dashboard redirects back to /login (the "already signed in" loop).
+  if (typeof window !== "undefined" && !(window as unknown as Record<string, unknown>).__mk_fetch_patched) {
+    const origFetch = window.fetch.bind(window);
+    (window as unknown as Record<string, unknown>).__mk_fetch_patched = true;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      const isApi = url.includes("/api/");
+      if (isApi && getClerkToken) {
+        try {
+          const token = await getClerkToken();
+          if (token) {
+            const headers = new Headers(init?.headers || (typeof input !== "string" && !(input instanceof URL) ? (input as Request).headers : undefined));
+            if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+            return origFetch(input, { ...init, headers, credentials: init?.credentials ?? "include" });
+          }
+        } catch {
+          // fall through to unauthenticated fetch
+        }
+      }
+      return origFetch(input, init as RequestInit);
+    };
+  }
 }
 
 async function request<T>(

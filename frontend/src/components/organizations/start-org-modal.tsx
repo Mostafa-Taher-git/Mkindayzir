@@ -62,8 +62,8 @@ export function StartOrgModal({ defaultType, open, onOpenChange, onCreated }: St
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
           {type === "team"
-            ? "Add up to 5 people to your workspace with shared boards and notes."
-            : "Full org with audit logs, custom roles, retention policies and SSO."}
+            ? "Free: 1 org · up to 5 members — shared boards and notes."
+            : "Free: 1 org · up to 5 members — upgrade for audit logs, custom roles and SSO."}
         </p>
 
         <div className="mt-4 space-y-3">
