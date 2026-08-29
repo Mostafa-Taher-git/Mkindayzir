@@ -15,23 +15,47 @@ from app.models.user import User
 security = HTTPBearer(auto_error=False)
 
 
+_jwks_client: jwt.PyJWKClient | None = None
+
+
+def _get_jwks_client() -> jwt.PyJWKClient | None:
+    global _jwks_client
+    if _jwks_client is None and getattr(settings, "CLERK_JWKS_URL", None):
+        _jwks_client = jwt.PyJWKClient(settings.CLERK_JWKS_URL, cache_keys=True)
+    return _jwks_client
+
+
 def verify_clerk_jwt(token: str) -> dict:
     """Verify a Clerk-issued RS256 JWT and return its claims."""
-    public_key = settings.CLERK_JWT_PUBLIC_KEY.strip()
-    if not public_key:
-        raise HTTPException(status_code=503, detail="Clerk JWT verification is not configured")
+    public_key = settings.CLERK_JWT_PUBLIC_KEY.strip() if settings.CLERK_JWT_PUBLIC_KEY else ""
     try:
-        return jwt.decode(
-            token,
-            public_key,
-            algorithms=["RS256"],
-            options={"verify_aud": False, "verify_iss": True},
-            issuer=settings.CLERK_FRONTEND_API,
-        )
+        if public_key:
+            return jwt.decode(
+                token,
+                public_key,
+                algorithms=["RS256"],
+                options={"verify_aud": False, "verify_iss": True},
+                issuer=settings.CLERK_FRONTEND_API,
+            )
+        jwks_client = _get_jwks_client()
+        if jwks_client:
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                options={"verify_aud": False, "verify_iss": True},
+                issuer=settings.CLERK_FRONTEND_API,
+            )
+        raise HTTPException(status_code=503, detail="Clerk JWT verification is not configured")
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status_code=401, detail="Token expired") from exc
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid Clerk token") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail=f"JWT verification error: {str(exc)}") from exc
 
 
 async def _any_user_exists(db: AsyncSession) -> bool:
@@ -61,13 +85,30 @@ async def get_or_create_clerk_user(db: AsyncSession, claims: dict) -> User:
     first_name = str(claims.get("first_name") or "")
     last_name = str(claims.get("last_name") or "")
     display_name = f"{first_name} {last_name}".strip() or email.split("@", 1)[0]
+    avatar = claims.get("image_url")
+
+    # Link existing user by email if pre-created
+    existing = await db.scalar(
+        select(User).where(User.email == email)
+    )
+    if existing:
+        existing.clerkId = clerk_id
+        if display_name and (not existing.displayName or existing.displayName == "Admin"):
+            existing.displayName = display_name
+        if avatar and not existing.avatar:
+            existing.avatar = avatar
+        existing.lastActiveAt = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(existing)
+        return existing
+
     user = User(
         id=uuid.uuid4().hex,
         clerkId=clerk_id,
         email=email,
         passwordHash="CLERK_MANAGED",
         displayName=display_name,
-        avatar=claims.get("image_url"),
+        avatar=avatar,
         role="ADMIN" if not await _any_user_exists(db) else "MEMBER",
         status="ACTIVE",
         lastActiveAt=datetime.now(timezone.utc),

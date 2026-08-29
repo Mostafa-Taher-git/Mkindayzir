@@ -67,6 +67,15 @@ async def _handle_user_created(db: AsyncSession, data: dict) -> None:
     clerk_id, email, display_name, avatar = _profile(data)
     if not clerk_id or await db.scalar(select(User.id).where(User.clerkId == clerk_id)):
         return
+    existing = await db.scalar(select(User).where(User.email == email))
+    if existing:
+        existing.clerkId = clerk_id
+        if display_name:
+            existing.displayName = display_name
+        if avatar:
+            existing.avatar = avatar
+        await db.commit()
+        return
     db.add(User(
         id=uuid.uuid4().hex,
         clerkId=clerk_id,
