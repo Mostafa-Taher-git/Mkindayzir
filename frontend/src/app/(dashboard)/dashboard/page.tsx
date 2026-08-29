@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/constants";
 import { Link } from "react-router-dom";
+import { api } from "@/lib/api";
 
 interface DashboardStats {
   projectCount: number;
@@ -25,7 +26,7 @@ export default function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard", "stats"],
     queryFn: async () => {
-      const res = await fetch("/api/dashboard/stats", { credentials: "include" });
+      const res = await api.get<{ stats: any }>("/api/dashboard/stats");
       if (res.status === 401) {
         window.location.href = "/login";
         return { projectCount: 0, workItemCount: 0, ticketCount: 0, ticketsAwaitingResponse: 0, recentActivities: [] };

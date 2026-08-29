@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ROUTES, VISIBILITIES } from "@/lib/constants";
 import { Board } from "@/types";
 import { SpaceForm } from "@/components/spaces/space-form";
+import { api } from "@/lib/api";
 
 export default function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -15,7 +16,7 @@ export default function SpaceDetailPage() {
     queryKey: ["space", spaceId],
     enabled: Boolean(spaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/spaces/${spaceId}`, { credentials: "include" });
+      const res = await api.get<{ space: any }>(`/api/spaces/${spaceId}`);
       if (!res.ok) throw new Error("Failed to fetch space");
       return res.json();
     },
@@ -25,7 +26,7 @@ export default function SpaceDetailPage() {
     queryKey: ["boards", "bySpace", spaceId],
     enabled: Boolean(spaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/boards?spaceId=${spaceId}`, { credentials: "include" });
+      const res = await api.get<{ boards: any[] }>(`/api/boards?spaceId=${spaceId}`);
       if (!res.ok) throw new Error("Failed to fetch boards");
       return res.json();
     },
@@ -35,7 +36,7 @@ export default function SpaceDetailPage() {
     queryKey: ["space", spaceId, "members"],
     enabled: Boolean(spaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/spaces/${spaceId}/members`, { credentials: "include" });
+      const res = await api.get<{ members: any[] }>(`/api/spaces/${spaceId}/members`);
       if (!res.ok) return { members: [] };
       return res.json();
     },

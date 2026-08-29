@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProjectActions } from "@/components/projects/project-actions";
 import { ROUTES } from "@/lib/constants";
+import { api } from "@/lib/api";
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -15,7 +16,7 @@ export default function ProjectDetailPage() {
     queryKey: ["project", projectId],
     enabled: Boolean(projectId),
     queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectId}`, { credentials: "include" });
+      const res = await api.get<{ project: any }>(`/api/projects/${projectId}`);
       if (!res.ok) throw new Error("Failed to fetch project");
       return res.json();
     },

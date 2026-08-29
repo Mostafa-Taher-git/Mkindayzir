@@ -20,7 +20,7 @@ export default function NewNotePage() {
       folderId: string | null;
       tagIds: string[];
     }) => {
-      const res = await fetch("/api/vault/notes", {
+      const res = await api.post<{ note: any }>("/api/vault/notes",
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

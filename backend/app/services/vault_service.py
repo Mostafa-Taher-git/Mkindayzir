@@ -310,6 +310,22 @@ class VaultService:
     @staticmethod
     async def create_note(db: AsyncSession, data: dict, user: dict) -> dict:
         base_slug = data.get("slug") or data["title"].lower().replace(" ", "-")
+        ws = await resolve_workspace(db, user, data.get("workspace"))
+        # Enforce personal vault note cap (org vault unlimited)
+        if ws["ownerType"] == "personal":
+            from app.utils.plan_limits import FREE_MAX_NOTES_PERSONAL
+            total = (await db.execute(
+                select(func.count(VaultNote.id)).where(
+                    VaultNote.ownerType == "personal",
+                    VaultNote.ownerUserId == user["id"],
+                    VaultNote.deletedAt.is_(None),
+                )
+            )).scalar_one() or 0
+            if int(total) >= FREE_MAX_NOTES_PERSONAL:
+                raise ValueError(
+                    f"Personal vault limit: {FREE_MAX_NOTES_PERSONAL}/{FREE_MAX_NOTES_PERSONAL} notes used. "
+                    "Create or switch to an organization vault for more notes."
+                )
         note = VaultNote(
             id=uuid.uuid4().hex,
             folderId=data.get("folderId"),
@@ -320,7 +336,6 @@ class VaultService:
             authorId=user["id"],
             meta=str(data.get("metadata") or {}),
         )
-        ws = await resolve_workspace(db, user, data.get("workspace"))
         await stamp_owner(
             note,
             owner_type=ws["ownerType"],

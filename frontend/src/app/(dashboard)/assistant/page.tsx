@@ -1,12 +1,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
+import { api } from "@/lib/api";
 
 export default function AssistantPage() {
   const { data, isLoading } = useQuery<{ conversations: any[] }>({
     queryKey: ["assistant", "conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
+      const res = await api.get<{ conversations: any[] }>("/api/assistant/conversations");
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },

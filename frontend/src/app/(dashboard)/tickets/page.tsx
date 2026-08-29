@@ -4,6 +4,7 @@ import { TicketList } from "@/components/tickets/ticket-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TicketsResponse, TicketStats } from "@/types/ticket";
 import { Clock, AlertTriangle, CheckCircle2, MessageSquare, Ticket as TicketIcon } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function TicketsPage() {
   const [search, setSearch] = useState("");
@@ -27,7 +28,7 @@ export default function TicketsPage() {
       params.append("page", String(page));
       params.append("perPage", String(perPage));
 
-      const res = await fetch(`/api/tickets?${params.toString()}`, { credentials: "include" });
+      const res = await api.get<{ tickets: any[] }>(`/api/tickets?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch tickets");
       return res.json();
     },
@@ -37,7 +38,7 @@ export default function TicketsPage() {
   const { data: statsData } = useQuery<TicketStats>({
     queryKey: ["tickets", "stats"],
     queryFn: async () => {
-      const res = await fetch("/api/tickets/stats", { credentials: "include" });
+      const res = await api.get<{ stats: any }>("/api/tickets/stats");
       if (!res.ok) throw new Error("Failed to fetch ticket stats");
       return res.json();
     },

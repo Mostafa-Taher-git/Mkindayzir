@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { AssistantLayout } from "@/components/assistant/assistant-layout";
+import { api } from "@/lib/api";
 
 export default function ConversationPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -9,7 +10,7 @@ export default function ConversationPage() {
   const { data, isLoading } = useQuery<{ conversations: any[] }>({
     queryKey: ["assistant", "conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
+      const res = await api.get<{ conversations: any[] }>("/api/assistant/conversations");
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },

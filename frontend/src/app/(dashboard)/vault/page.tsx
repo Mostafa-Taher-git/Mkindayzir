@@ -8,6 +8,7 @@ import { VaultSidebar } from "@/components/vault/vault-sidebar";
 import { NoteList } from "@/components/vault/note-list";
 import { VaultFolder } from "@/types";
 import { getFolderKind, folderKindClass } from "@/lib/folder-kind";
+import { api } from "@/lib/api";
 
 function FolderIconSvg() {
   return (
@@ -125,4 +126,3 @@ function findFolder(folders: VaultFolder[], id: string): VaultFolder | null {
   }
   return null;
 }
-

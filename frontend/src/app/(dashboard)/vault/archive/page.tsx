@@ -16,6 +16,7 @@ import {
 } from "@/hooks/use-archive";
 import { cn } from "@/lib/utils";
 import type { VaultFolder } from "@/types";
+import { api } from "@/lib/api";
 
 export default function VaultArchivePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,7 +38,7 @@ export default function VaultArchivePage() {
 
   const { data: foldersData } = useQuery<{ folders: VaultFolder[] }>({
     queryKey: ["vault", "folders"],
-    queryFn: () => fetch("/api/vault/folders", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => api.get<{ folders: any[] }>("/api/vault/folders"),
   });
   const noteFolders = foldersData?.folders ?? [];
 

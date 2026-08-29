@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { ROUTES } from "@/lib/constants";
 import {
+import { api } from "@/lib/api";
   ArrowLeft,
   MessageSquare,
   Lock,
@@ -40,7 +41,7 @@ export default function TicketDetailPage() {
     queryKey: ["ticket", ticketId],
     queryFn: async () => {
       if (!ticketId) throw new Error("No ticket ID");
-      const res = await fetch(`/api/tickets/${ticketId}`, { credentials: "include" });
+      const res = await api.get<{ ticket: any }>(`/api/tickets/${ticketId}`);
       if (!res.ok) throw new Error("Ticket not found");
       return res.json();
     },

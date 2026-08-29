@@ -8,12 +8,13 @@ import { WorkloadTable } from "@/components/features/reports/workload-table";
 import { VelocityTable } from "@/components/features/reports/velocity-table";
 import { TrendsChart } from "@/components/features/reports/trends-chart";
 import { DashboardSummary, WorkloadGroup, VelocityGroup, TrendDay } from "@/types";
+import { api } from "@/lib/api";
 
 function useReport<T>(type: string) {
   return useQuery({
     queryKey: ["reports", type],
     queryFn: async () => {
-      const res = await fetch(`/api/reports?type=${type}`, { credentials: "include" });
+      const res = await api.get<{ reports: any[] }>(`/api/reports?type=${type}`);
       if (!res.ok) throw new Error("Failed to fetch report");
       const json = await res.json();
       return json.data as T;
@@ -31,7 +32,7 @@ function ReportsPage() {
 
   const handleExport = async () => {
     try {
-      const res = await fetch("/api/reports/export", { credentials: "include" });
+      const res = await api.get<{ url: string }>("/api/reports/export");
       if (!res.ok) throw new Error("Failed to export CSV");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

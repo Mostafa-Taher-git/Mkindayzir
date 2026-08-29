@@ -21,7 +21,7 @@ export default function EditNotePage() {
       folderId: string | null;
       tagIds: string[];
     }) => {
-      const res = await fetch(`/api/vault/notes/${noteId}`, {
+      const res = await api.get<{ note: any }>(`/api/vault/notes/${noteId}`)
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

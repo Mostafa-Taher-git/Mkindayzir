@@ -1,6 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { CardDetailClient } from "./card-detail-client";
 
@@ -11,7 +12,7 @@ export default function CardDetailPage() {
     queryKey: ["card", cardId],
     enabled: Boolean(cardId),
     queryFn: async () => {
-      const res = await fetch(`/api/cards/${cardId}`, { credentials: "include" });
+      const res = await api.get<{ card: any }>(`/api/cards/${cardId}`);
       if (!res.ok) throw new Error("Failed to fetch card");
       return res.json();
     },

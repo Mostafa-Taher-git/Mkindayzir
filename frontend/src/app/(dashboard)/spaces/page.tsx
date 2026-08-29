@@ -5,12 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES, VISIBILITIES } from "@/lib/constants";
 import { Link } from "react-router-dom";
+import { api } from "@/lib/api";
 
 export default function SpacesPage() {
   const { data, isLoading } = useQuery<{ spaces: any[] }>({
     queryKey: ["spaces"],
     queryFn: async () => {
-      const res = await fetch("/api/spaces", { credentials: "include" });
+      const res = await api.get<{ spaces: any[] }>("/api/spaces");
       if (!res.ok) throw new Error("Failed to fetch spaces");
       return res.json();
     },

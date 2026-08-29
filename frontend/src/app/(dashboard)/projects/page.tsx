@@ -5,12 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 import { Link } from "react-router-dom";
+import { api } from "@/lib/api";
 
 export default function ProjectsPage() {
   const { data, isLoading } = useQuery<{ projects: any[] }>({
     queryKey: ["projects"],
     queryFn: async () => {
-      const res = await fetch("/api/projects", { credentials: "include" });
+      const res = await api.get<{ projects: any[] }>("/api/projects");
       if (!res.ok) throw new Error("Failed to fetch projects");
       return res.json();
     },

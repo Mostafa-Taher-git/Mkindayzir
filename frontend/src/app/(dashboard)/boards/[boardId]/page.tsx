@@ -1,6 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { BoardDetailClient } from "./board-detail-client";
@@ -13,7 +14,7 @@ export default function BoardDetailPage() {
     queryKey: ["board", boardId],
     enabled: Boolean(boardId),
     queryFn: async () => {
-      const res = await fetch(`/api/boards/${boardId}`, { credentials: "include" });
+      const res = await api.get<{ board: any }>(`/api/boards/${boardId}`);
       if (!res.ok) throw new Error("Failed to fetch board");
       return res.json();
     },
@@ -23,7 +24,7 @@ export default function BoardDetailPage() {
     queryKey: ["board", boardId, "columns"],
     enabled: Boolean(boardId),
     queryFn: async () => {
-      const res = await fetch(`/api/boards/${boardId}/columns`, { credentials: "include" });
+      const res = await api.get<{ columns: any[] }>(`/api/boards/${boardId}/columns`);
       if (!res.ok) throw new Error("Failed to fetch columns");
       const data = await res.json();
       return { columns: Array.isArray(data) ? data : data.columns ?? [] };
@@ -34,7 +35,7 @@ export default function BoardDetailPage() {
     queryKey: ["board", boardId, "cards"],
     enabled: Boolean(boardId),
     queryFn: async () => {
-      const res = await fetch(`/api/cards?boardId=${boardId}`, { credentials: "include" });
+      const res = await api.get<{ cards: any[] }>(`/api/cards?boardId=${boardId}`);
       if (!res.ok) return { cards: [] };
       return res.json();
     },

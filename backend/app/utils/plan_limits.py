@@ -8,7 +8,8 @@ All tiers have all app features; Enterprise gets extra future features.
 """
 
 # --- Free ---
-FREE_MAX_ORGS = 1  # max orgs a Free user can belong to (owner or member)
+FREE_MAX_ORGS = 1
+FREE_MAX_NOTES_PERSONAL = 5  # max notes in personal vault  # max orgs a Free user can belong to (owner or member)
 FREE_MAX_MEMBERS_PER_ORG = 5  # max members inside one Free org (including owner)
 FREE_MAX_BOARDS_PERSONAL = 5  # max boards in personal workspace
 FREE_PLAN_NAME = "free"

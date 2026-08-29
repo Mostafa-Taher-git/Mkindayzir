@@ -25,7 +25,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
   const { data: checklistsData } = useQuery({
     queryKey: ["checklists", card.id],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${card.id}/checklists`, {credentials: "include", 
+      const res = await api.get<{ checklists: any[] }>(`/api/cards/${card.id}/checklists`); 
         cache: "no-store",
       });
       if (!res.ok) return { checklists: [] };
@@ -41,7 +41,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { title?: string; description?: string }) => {
-      const res = await fetch(`/api/cards/${card.id}`, {credentials: "include", 
+      const res = await api.get<{ card: any }>(`/api/cards/${card.id}`); 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -60,7 +60,7 @@ function CardDetailClient({ card }: CardDetailClientProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/cards/${card.id}`, {credentials: "include",  method: "DELETE" });
+      const res = await api.get<{ card: any }>(`/api/cards/${card.id}`);  method: "DELETE" });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to delete card" }));
         throw new Error(error.message);
@@ -194,7 +194,7 @@ function ActivityLog({ cardId }: { cardId: string }) {
   const { data } = useQuery({
     queryKey: ["activity", cardId],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards/${cardId}/activity`, {credentials: "include", 
+      const res = await api.get<{ activity: any[] }>(`/api/cards/${cardId}/activity`); 
         cache: "no-store",
       });
       if (!res.ok) return { activities: [] };

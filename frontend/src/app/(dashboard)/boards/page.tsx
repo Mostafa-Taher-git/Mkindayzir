@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { ROUTES } from "@/lib/constants";
+import { api } from "@/lib/api";
 
 // Board background presets — Mecha palette (deep space + steel + accent tones)
 const BACKGROUND_PRESETS = [
@@ -40,7 +41,7 @@ export default function BoardsPage() {
   const { data: boardsData, isLoading: boardsLoading } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
-      const res = await fetch("/api/boards", { credentials: "include" });
+      const res = await api.get<{ boards: any[] }>("/api/boards?workspace=" + (typeof workspace !== "undefined" ? workspace : ""));
       if (!res.ok) throw new Error("Failed to fetch boards");
       return res.json() as Promise<{ boards: any[] }>;
     },
@@ -49,7 +50,7 @@ export default function BoardsPage() {
   const { data: spacesData } = useQuery({
     queryKey: ["spaces"],
     queryFn: async () => {
-      const res = await fetch("/api/spaces", { credentials: "include" });
+      const res = await api.get<{ spaces: any[] }>("/api/spaces?workspace=personal");
       if (!res.ok) throw new Error("Failed to fetch spaces");
       return res.json() as Promise<{ spaces: any[] }>;
     },
@@ -80,7 +81,7 @@ export default function BoardsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (payload: { spaceId: string; name: string; background?: string }) => {
-      const res = await fetch("/api/boards", {credentials: "include", 
+      const res = await api.get<{ boards: any[] }>("/api/boards?workspace=personal"); 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

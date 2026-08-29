@@ -33,6 +33,7 @@ import { ROUTES } from "@/lib/constants";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceIndicator } from "@/components/shared/presence-indicator";
+import { api } from "@/lib/api";
 
 interface BoardDetailClientProps {
   board: Board;
@@ -123,7 +124,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const boardQ = useQuery({
     queryKey: ["board", boardProp.id],
     queryFn: async () => {
-      const res = await fetch(`/api/boards/${boardProp.id}`, { credentials: "include", cache: "no-store" });
+      const res = await api.get<{ board: any }>(`/api/boards/${boardProp.id}`);
       if (!res.ok) return { board: boardProp };
       return res.json();
     },
@@ -141,7 +142,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const { data: columnsData } = useQuery({
     queryKey: ["columns", board.id],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/boards/${board.id}/columns`, {credentials: "include", 
+      const res = await api.get<{ columns: any[] }>(`/api/boards/${board.id}/columns`); 
         cache: "no-store",
       });
       if (!res.ok) return { columns: [] };
@@ -155,7 +156,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
   const { data: cardsData } = useQuery({
     queryKey: ["cards", board.id],
     queryFn: async () => {
-      const res = await fetch(`${""}/api/cards?boardId=${board.id}`, {credentials: "include", 
+      const res = await api.get<{ cards: any[] }>(`/api/cards?boardId=${board.id}`); 
         cache: "no-store",
       });
       if (!res.ok) return { cards: [] };
@@ -183,7 +184,7 @@ function BoardDetailClient({ board: boardProp, columns: initialColumns, cards: i
 
   const moveMutation = useMutation({
     mutationFn: async ({ cardId, columnId }: { cardId: string; columnId: string }) => {
-      const res = await fetch(`/api/cards/${cardId}/move`, {credentials: "include", 
+      await api.post(`/api/cards/${cardId}/move` 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ columnId }),

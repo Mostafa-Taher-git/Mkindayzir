@@ -9,6 +9,7 @@ import { GuideList } from "@/components/features/guides/guide-list";
 import { GuideDetail } from "@/components/features/guides/guide-detail";
 import { hasPermission, PERMISSIONS, ROLES } from "@/lib/rbac";
 import { Guide } from "@/types";
+import { api } from "@/lib/api";
 
 function GuidesPage() {
   const { user } = useAuth();
@@ -20,7 +21,7 @@ function GuidesPage() {
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
-      const res = await fetch(`/api/guides?${qs.toString()}`, { credentials: "include" });
+      const res = await api.get<{ guides: any[] }>(`/api/guides?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch guides");
       return res.json() as Promise<{ guides: Guide[] }>;
     },

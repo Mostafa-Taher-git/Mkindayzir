@@ -57,7 +57,7 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    fetch("/api/auth/session", { credentials: "include" })
+    api.get<{ data: any }>("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
         const u = data.data || data.user;
@@ -68,7 +68,7 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    fetch("/api/assistant/settings", { credentials: "include" })
+    api.get<{ provider: string; model: string; apiKeyConfigured: boolean }>("/api/assistant/settings")
       .then((r) => r.json())
       .then((data) => {
         if (data.provider) setAiProvider(data.provider);
@@ -83,7 +83,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/settings", {credentials: "include", 
+      const res = await api.patch<{ success: boolean }>("/api/settings", 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName }),

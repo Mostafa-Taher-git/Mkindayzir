@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { api } from "@/lib/api";
 
 const VISIBILITY_OPTIONS = [
   { value: "PRIVATE", label: "Private" },
@@ -38,7 +39,7 @@ function NewProjectPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await fetch("/api/projects", {credentials: "include", 
+      const res = await api.post<{ project: any }>("/api/projects", formData); 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
