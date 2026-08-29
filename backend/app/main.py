@@ -142,20 +142,10 @@ async def lifespan(app: FastAPI):
             "END $$;"
         )
         await conn.exec_driver_sql(
-            "DO $$ BEGIN "
-            "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_project_key_personal') THEN "
-            "ALTER TABLE projects ADD CONSTRAINT uq_project_key_personal UNIQUE (\"key\") "
-            "WHERE \"ownerType\" = 'personal'; "
-            "END IF; "
-            "END $$;"
+            'CREATE UNIQUE INDEX IF NOT EXISTS "uq_project_key_personal" ON projects ("key") WHERE "ownerType" = \'personal\''
         )
         await conn.exec_driver_sql(
-            "DO $$ BEGIN "
-            "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_project_key_org') THEN "
-            "ALTER TABLE projects ADD CONSTRAINT uq_project_key_org UNIQUE (\"key\") "
-            "WHERE \"ownerType\" = 'org'; "
-            "END IF; "
-            "END $$;"
+            'CREATE UNIQUE INDEX IF NOT EXISTS "uq_project_key_org" ON projects ("key") WHERE "ownerType" = \'org\''
         )
 
     yield
