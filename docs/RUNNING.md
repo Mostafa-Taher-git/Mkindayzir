@@ -1,6 +1,6 @@
 # Running Mkindayzir (Quick Reference)
 
-Mkindayzir is a single FastAPI process that serves the API (`/api/*`) and the built React SPA on **port 3000** in production. Full details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Mkindayzir is a single FastAPI process that serves the API (`/api/*`) and the built React SPA on **port 8000** in production. Full details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ Mkindayzir is a single FastAPI process that serves the API (`/api/*`) and the bu
 
 ```bash
 pip install mkindayzir
-mkindayzir start                 # http://localhost:3000 (API + SPA)
+mkindayzir start                 # http://localhost:8000 (API + SPA)
 ```
 
 First run opens the setup wizard to create the admin user.
@@ -22,7 +22,7 @@ First run opens the setup wizard to create the admin user.
 ```bash
 docker compose -f docker/docker-compose.yml up -d
 bash docker/init.sh              # migrations + admin user
-# App: http://localhost:3000  (put :3000 behind your reverse proxy / TLS)
+# App: http://localhost:8000  (put :8000 behind your reverse proxy / TLS)
 ```
 
 For Team mode with PostgreSQL:
@@ -56,16 +56,16 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 pnpm install                        # repo root (workspace)
-pnpm --dir frontend dev            # http://localhost:3000, proxies /api -> :8000
+pnpm --dir frontend dev            # http://localhost:5173, proxies /api -> :8000
 ```
 
-- App: http://localhost:3000
+- App: http://localhost:5173
 - API docs: http://localhost:8000/docs
 
 ## Common CLI commands
 
 ```bash
-mkindayzir start                                   # production server (API + SPA) on :3000
+mkindayzir start                                   # production server (API + SPA) on :8000
 mkindayzir setup admin --email ... --password ...  # create admin
 mkindayzir migrate upgrade                          # Alembic migrations
 mkindayzir backup create                           # backup DB + uploads
@@ -80,7 +80,7 @@ mkindayzir version
 
 ## First run
 
-1. Visit http://localhost:3000
+1. Visit http://localhost:8000
 2. Complete the setup wizard / create the admin account.
 3. With `AUTO_LOGIN=true`, the initial active admin is logged in immediately.
 

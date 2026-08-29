@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>About — Mkindayzir</title>
-  <meta name="description" content="Why Mkindayzir exists: a self-hosted, local-first Work OS that puts you back in control of your operations data." />
+  <meta name="description" content="Why Mkindayzir exists: a hosted Work OS for teams who want full control without the infrastructure burden." />
   <link rel="icon" href="MKINDAYZIR_logo.jpg" />
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
@@ -80,27 +80,27 @@
   <section class="hero">
     <div class="wrap">
       <div class="label">About</div>
-      <h1>Your operations,<br><span class="accent">your server.</span></h1>
-      <p>Mkindayzir is a self-hosted, local-first Work OS built for people who refuse to rent their own data back from someone else's cloud.</p>
-      <div class="pull">"If it leaves your network, it's no longer yours."</div>
+      <h1>Your operations,<br><span class="accent">your team.</span></h1>
+      <p>Mkindayzir is a hosted Work OS built for teams that want full control of their data without the burden of server management, Docker, or infrastructure.</p>
+      <div class="pull">"If you can't install it, you should be able to sign up for it."</div>
     </div>
   </section>
 
   <section class="prose">
     <div class="wrap">
       <h2>Why we built it</h2>
-      <p>Most "work" software is a beautiful cage: smooth interfaces, helpful automations, and a bill that grows with your team. The cost isn't only money — it's custody. Your projects, your knowledge, your decisions, and your customers' data all live on someone else's hardware, behind someone else's terms.</p>
-      <p>Mkindayzir flips the model. It runs on a machine you control — a laptop, a NAS, a spare server. The interface is the same, but the data never leaves the building unless you explicitly send it.</p>
+      <p>Most "work" software has two extremes: a beautiful cage (cloud SaaS with lock-in and opaque data practices) or a DIY burden (self-hosted tools that demand server management, backups, and uptime guarantees). Neither is ideal for teams that just want to get work done.</p>
+      <p>Mkindayzir sits in the middle. It's a hosted platform on <span class="mono">app.mkindayzir.com</span> where you sign up and start working in minutes — but the same codebase powers self-hosted deployments for Enterprise customers who need it. You control the data, we manage the infrastructure.</p>
 
       <h2>What we believe</h2>
       <div class="principles">
-        <div class="pcard"><div class="n">01</div><h3>Local-first</h3><p>Your data is stored on your disk, on hardware you control — not rented server time.</p></div>
-        <div class="pcard"><div class="n">02</div><h3>Yours to leave</h3><p>No lock-in. Export everything. Move hosts. Shut it down. It's your machine.</p></div>
-        <div class="pcard"><div class="n">03</div><h3>Quiet by default</h3><p>No dark patterns, no upsells inside the product. Just the tool.</p></div>
+        <div class="pcard"><div class="n">01</div><h3>Hosted &amp; Accessible</h3><p>Sign up, log in, start working. No servers to configure, no Docker to install.</p></div>
+        <div class="pcard"><div class="n">02</div><h3>Your Data</h3><p>Your organization's data is yours. Export it, move it, shut it down — we don't lock you in.</p></div>
+        <div class="pcard"><div class="n">03</div><h3>Quiet by Default</h3><p>No dark patterns, no upsells inside the product. Just the tool.</p></div>
       </div>
 
       <h2>How it's made</h2>
-      <p>Mkindayzir is a single self-hosted process: a Python <strong>FastAPI</strong> backend serving both the REST API and the built React/Vite console on one port. Data lives in PostgreSQL 16 — the same engine powers every mode, from a single-user install to a full team. The AI layer is a small companion service that talks to your provider of choice — your API key is encrypted at rest with AES-256-GCM and never logged.</p>
+      <p>Mkindayzir is a hosted platform on <span class="mono">app.mkindayzir.com</span>, built with the same codebase that powers self-hosted Enterprise deployments. FastAPI serves the REST API and the built React/Vite console. Data lives in PostgreSQL 16 — the same engine runs for every customer on SaaS and for every self-hosted Enterprise install. The AI layer is a companion service that talks to your provider of choice — your API key is encrypted at rest with AES-256-GCM and never logged.</p>
       <ul>
         <li>FastAPI (Python 3.11+) — async REST API, RBAC, session auth</li>
         <li>React + Vite console — served by the same process in production</li>
@@ -113,9 +113,9 @@
       <p>Email verification codes and an in-app safe updater are designed and scheduled — see the Roadmap page for exactly how updates will protect your data.</p>
 
       <h2>Who it's for</h2>
-      <p>Individuals who want a calm, private workspace. Teams who need shared boards and a vault without surrendering data. Companies with compliance needs who must keep operations on-premises. If you value control over convenience, Mkindayzir is built for you.</p>
+      <p>Teams who want a calm, private workspace without infrastructure overhead. Companies that need SaaS convenience but must keep operations data under their control. If you value simplicity and data ownership over DIY server management, Mkindayzir is built for you. Enterprise customers who need self-hosted deployments are still welcome — just ask.</p>
 
-      <div class="pull" style="margin-top:36px">Start alone. Grow to a team. Expand to the enterprise. Same interface, same data model.</div>
+      <div class="pull" style="margin-top:36px">Sign up. Log in. Start working.</div>
     </div>
   </section>
 
@@ -129,7 +129,7 @@
         <a href="/about.html">About</a>
         <a href="/login">Console</a>
       </nav>
-      <div class="copy">© <span id="yr"></span> Mkindayzir · Local-first Work OS</div>
+      <div class="copy">© <span id="yr"></span> Mkindayzir · SaaS Work OS</div>
     </div>
   </footer>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>

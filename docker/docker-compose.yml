@@ -2,7 +2,7 @@
 # Mkindayzir — canonical single-process compose
 #
 # One `app` service builds the root Dockerfile (FastAPI + built Vite SPA) and
-# publishes a single port 3000. PostgreSQL 16 is the database for every mode
+# publishes a single port 8000. PostgreSQL 16 is the database for every mode
 # and runs as a companion service on the `db` network alias.
 #
 # Usage:
@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     image: mkindayzir:latest
     ports:
-      - "3000:3000"
+      - "8000:8000"
     environment:
       - DATA_DIR=/app/data
       - FRONTEND_DIR=/app/dist
@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

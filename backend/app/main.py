@@ -173,7 +173,7 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
 _allowed_origins = list(dict.fromkeys([
     *os.environ.get(
-        "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        "ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
     ).split(","),
     config_settings.CLERK_FRONTEND_API,
 ]))

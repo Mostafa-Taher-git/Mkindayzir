@@ -9,7 +9,7 @@ Mkindayzir is a self-hosted, local-first Work OS that unifies project management
 - **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+) — async REST API, SQLAlchemy 2.0 (async), Alembic migrations, console CLI (`mkindayzir`, built with Click).
 - **Database**: PostgreSQL 16+ (asyncpg) — the only supported engine, in every mode.
 - **Frontend**: [Vite](https://vitejs.dev/) + React (SPA at the project root) — React Router, TanStack Query (React Query), Zustand, Tailwind CSS.
-- **Static serving**: In production the FastAPI process also serves the built SPA (`dist/`) and a SPA catch-all, so a single process handles API + UI on port `3000`.
+- **Static serving**: In production the FastAPI process also serves the built SPA (`dist/`) and a SPA catch-all, so a single process handles API + UI on port `8000`.
 - **Auth & security**: Session cookie (`mkindayzir_session`), AES-256-GCM encryption for sensitive fields (API keys, etc.).
 
 ## Quick Start
@@ -18,10 +18,10 @@ Mkindayzir is a self-hosted, local-first Work OS that unifies project management
 
 ```bash
 pip install mkindayzir
-mkindayzir start            # serves API + built frontend on http://localhost:3000
+mkindayzir start            # serves API + built frontend on http://localhost:8000
 ```
 
-Open **http://localhost:3000**. On first run, the setup wizard creates the admin account.
+Open **http://localhost:8000**. On first run, the setup wizard creates the admin account.
 
 ### Docker (single container)
 
@@ -30,7 +30,7 @@ docker compose -f docker/docker-compose.yml up -d
 bash docker/init.sh         # runs migrations + creates the admin user
 ```
 
-The app is then available on **http://localhost:3000** (put it behind your reverse proxy / TLS terminator).
+The app is then available on **http://localhost:8000** (put it behind your reverse proxy / TLS terminator).
 
 > Local development (Vite dev server + API): see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 

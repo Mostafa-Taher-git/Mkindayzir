@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     encryption_key: str = ""
-    nextjs_url: str = "http://localhost:3000"
+    nextjs_url: str = "http://localhost:8000"
     default_ai_provider: str = "openrouter"
     default_ai_model: str = "anthropic/claude-sonnet-4-20250514"
     ai_rate_limit: int = 20  # requests per minute per user

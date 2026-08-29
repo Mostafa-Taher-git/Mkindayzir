@@ -151,4 +151,43 @@ The shape language is **Strictly Geometric**.
 - **Status Chips:** Rectangular with JetBrains Mono text. Use Crimson for "Critical," Gold for "Priority," and Steel Blue for "In Progress."
 - **Cards/Panels:** Semi-transparent background with a visible 1px Titanium frame. Top-left corners of cards may feature a small "Tech ID" tag in monospaced font.
 - **Progress Bars:** Segmented bars (reminiscent of power levels) rather than smooth continuous fills.
-- **Data Tables:** Heavy horizontal lines, no vertical lines. Hovering over a row should trigger a Steel Blue "scan line" effect.
+|- **Data Tables:** Heavy horizontal lines, no vertical lines. Hovering over a row should trigger a Steel Blue "scan line" effect.
+
+## Product Roadmap
+
+> **North Star:** Mkindayzir ships as a **hosted SaaS** on `app.mkindayzir.com`. Users create accounts and log in — no install, no self-hosting, no Docker. Everything runs in our cloud infrastructure.
+
+### SaaS v1 (Current Sprint — MVP)
+
+| Phase | What ships | Status |
+|-------|-----------|--------|
+| Multi-org workspaces | Recursive copy, onboarding flag, org switcher, workspace scoping | ✅ Done |
+| Clerk auth | Full login/signup/password-reset via Clerk hooks, no prebuilt UI | ✅ Done |
+| User onboarding | `users.onboarded` BOOLEAN gate, wizard for first org creation | ✅ Done |
+| Team invite system | Email invites, pending invitations, accept/decline flow | In progress |
+| SaaS landing | `app.mkindayzir.com` with pricing, feature comparison, auth redirects | Planned |
+| Multi-tenant billing | Stripe subscription tiers (Free / Pro / Enterprise), per-seat pricing | Planned |
+
+### SaaS v2 (Post-MVP — Growth)
+
+| Phase | What ships |
+|-------|-----------|
+| Customer Portal SPA | `portal.yourdomain.com` — external customers submit support tickets |
+| Public Knowledge Base | Public-facing help center with search and feedback voting |
+| Inbound Email Dispatcher | Email-to-ticket auto-routing (SendGrid / Mailgun webhooks) |
+| Automated SLA Engine | Multi-tier SLA targets, breach warnings, escalation rules |
+| Enterprise SSO | SAML 2.0 / OIDC via Clerk (Google Workspace, Entra ID, Okta) |
+| Immutable Audit Vault | Append-only cryptographic audit logging for SOC 2 readiness |
+| AI Auto-Triage | On-premise or private LLM for ticket categorization, priority estimation, reply drafts |
+| Webhooks & ChatOps | Slack, Discord, Teams, GitHub integration with HMAC verification |
+| Offline PWA | Installable Progressive Web App with IndexedDB cache and push notifications |
+
+### Deployment Model
+
+| | Self-hosted (legacy) | **SaaS (target)** |
+|---|---|---|
+| Access | Users install Docker, configure PostgreSQL, run `mkindayzir start` | Users go to `app.mkindayzir.com` and sign up |
+| Infrastructure | Customer-managed server, customer-managed backups | Single cloud deployment, automated backups, auto-scaling |
+| Multi-tenancy | One installation = one organization | Single binary, database row-level tenant isolation |
+| Billing | License key or free | Stripe subscription tiers (Free / Pro / Enterprise) |
+| Updates | Manual `mkindayzir migrate upgrade` + binary update | Zero-downtime rolling deployments, auto DB migrations |

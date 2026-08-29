@@ -2,7 +2,7 @@
 
 ## High-level overview
 
-Mkindayzir is a **single-process** application: one FastAPI process serves the REST API **and** the compiled React SPA. There is no separate Node/Next.js server and no custom WebSocket server. In production the process listens on **port 3000**; in development it runs as two processes (FastAPI `:8000` + Vite `:3000`).
+Mkindayzir is a **single-process** application: one FastAPI process serves the REST API **and** the compiled React SPA. There is no separate Node/Next.js server and no custom WebSocket server. In production the process listens on **port 8000**; in development it runs as two processes (FastAPI `:8000` + Vite `:5173`).
 
 ```
 +-------------------------------------------------------------------+
@@ -18,7 +18,7 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 +----------------------------------+--------------------------------+
                                    | HTTP(S)  /api/*
 +----------------------------------v--------------------------------+
-|                     FastAPI process (port 3000)                   |
+|                       FastAPI process (port 8000)                   |
 |  +------------------------------------------------------------+   |
 |  |  Routers (/api/*)                                          |  |
 |  |  auth, setup, projects, work_items, iterations,            |  |
@@ -73,16 +73,16 @@ Mkindayzir is a **single-process** application: one FastAPI process serves the R
 
 ## Static serving of the SPA
 
-`app/main.py` resolves the frontend directory from `FRONTEND_DIR` (env) and falls back to `<project root>/dist`. When present it mounts `/assets` and serves `index.html` for all unmatched routes (after the `/api` routers). In development `dist/` is absent, so the API works standalone and the SPA is served by Vite on `:3000`.
+`app/main.py` resolves the frontend directory from `FRONTEND_DIR` (env) and falls back to `<project root>/dist`. When present it mounts `/assets` and serves `index.html` for all unmatched routes (after the `/api` routers). In development `dist/` is absent, so the API works standalone and the SPA is served by Vite on `:5173`.
 
 ## Development (two processes)
 
 | Process | Command | Port | Role |
 |---------|---------|------|------|
 | API | `uvicorn app.main:app --reload --port 8000` | 8000 | REST API |
-| SPA | `pnpm dev` (Vite, proxies `/api` -> 8000) | 3000 | React dev server |
+| SPA | `pnpm dev` (Vite, proxies `/api` -> 8000) | 5173 | React dev server |
 
-The browser always talks to `:3000`; Vite forwards `/api/*` to the FastAPI backend.
+The browser always talks to `:8000`; Vite forwards `/api/*` to the FastAPI backend.
 
 ## Security
 

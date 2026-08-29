@@ -127,7 +127,7 @@ class AIService:
             "Content-Type": "application/json",
         }
         if provider == "openrouter":
-            headers["HTTP-Referer"] = "http://localhost:3000"
+            headers["HTTP-Referer"] = "http://localhost:8000"
             headers["X-Title"] = "Mkindayzir"
 
         payload = {

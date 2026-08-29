@@ -33,7 +33,7 @@
 
 ## 1. High-Level Overview
 
-Mkindayzir is a full-stack application with a **Vite + React SPA** frontend and a **FastAPI** backend. In production, FastAPI serves both the REST API and the built SPA from a single process on port 3000.
+Mkindayzir is a full-stack application with a **Vite + React SPA** frontend and a **FastAPI** backend. In production, FastAPI serves both the REST API and the built SPA from a single process on port 8000.
 
 ```
 +-------------------------------------------------------------------+
@@ -163,7 +163,7 @@ mkindayzir/
 
 | File | Responsibility |
 |------|----------------|
-| `vite.config.ts` | Configures Vite dev server on port 3000, proxies `/api` to `http://localhost:8000`, build outDir `dist`, React plugin. |
+| `vite.config.ts` | Configures Vite dev server on port 5173, proxies `/api` to `http://localhost:8000`, build outDir `dist`, React plugin. |
 | `backend/app/main.py` | FastAPI application entry point. Creates app, registers routers, mounts middleware, serves static SPA from `dist/` in production. |
 | `src/main.tsx` | React entry point, BrowserRouter + Providers + App. |
 | `src/App.tsx` | React Router DOM v6 client-side routes. |
@@ -173,7 +173,7 @@ mkindayzir/
 ## 4. Request Flow
 
 ### Development
-1. Browser requests `http://localhost:3000`.
+1. Browser requests `http://localhost:8000`.
 2. Vite dev server serves the React SPA and HMR.
 3. Client-side React Router handles navigation.
 4. API requests to `/api/*` are proxied by Vite to `http://localhost:8000`.
@@ -181,7 +181,7 @@ mkindayzir/
 6. JSON response returned to client.
 
 ### Production
-1. Browser requests `http://localhost:3000`.
+1. Browser requests `http://localhost:8000`.
 2. FastAPI serves the built SPA from `dist/` (static assets + `index.html` catch-all).
 3. Client-side React Router handles navigation.
 4. API requests to `/api/*` hit FastAPI routers directly.
@@ -434,7 +434,7 @@ The offline layer stores mutations in IndexedDB and replays them via the API cli
 | `src/config/defaults.ts` | DEFAULT_WORKFLOW and DEFAULT_BOARD_TEMPLATES. |
 | `src/config/navigation.ts` | Navigation items. |
 | `src/config/permissions.ts` | Re-exports PERMISSIONS, ROLES. |
-| `src/lib/api.ts` | Generic fetch wrapper using `import.meta.env.VITE_API_URL ?? ""`. In dev with Vite proxy, this is empty string so requests go to same origin (`:3000/api/...`). |
+| `src/lib/api.ts` | Generic fetch wrapper using `import.meta.env.VITE_API_URL ?? ""`. In dev with Vite proxy, this is empty string so requests go to same origin (`:8000/api/...`). |
 | `src/lib/optimistic.ts` | Optimistic update helpers. |
 
 ---
@@ -455,8 +455,8 @@ The offline layer stores mutations in IndexedDB and replays them via the API cli
 
 | File | Responsibility |
 |------|----------------|
-| `Dockerfile` | Multi-stage: Node builds Vite SPA (dist/), Python runs FastAPI serving API + static SPA on port 3000. |
-| `docker/docker-compose.yml` | Single `app` service on port 3000, optional `postgres` under `team` profile. |
+| `Dockerfile` | Multi-stage: Node builds Vite SPA (dist/), Python runs FastAPI serving API + static SPA on port 8000. |
+| `docker/docker-compose.yml` | Single `app` service on port 8000, optional `postgres` under `team` profile. |
 | `backend/pyproject.toml` | Python dependencies (FastAPI, Uvicorn, SQLAlchemy, Alembic, etc.). |
 | `package.json` | Scripts: dev, build, lint, format, test. |
 
@@ -479,14 +479,14 @@ Frontend: Vitest + Playwright. Backend: pytest in `backend/pyproject.toml` optio
 
 ## 20. Key Architecture Decisions
 
-1. **Vite + React SPA**: Frontend is a Vite-built React SPA served statically by FastAPI in production on port 3000.
-2. **Single-Process Production**: FastAPI serves both `/api/*` REST API and the built SPA from `dist/` on port 3000. No separate Node process.
-3. **Two-Process Development**: FastAPI on `:8000` and Vite dev server on `:3000`. Vite proxies `/api` to `:8000`.
+1. **Vite + React SPA**: Frontend is a Vite-built React SPA served statically by FastAPI in production on port 8000.
+2. **Single-Process Production**: FastAPI serves both `/api/*` REST API and the built SPA from `dist/` on port 8000. No separate Node process.
+3. **Two-Process Development**: FastAPI on `:8000` and Vite dev server on `:5173`. Vite proxies `/api` to `:8000`.
 4. **Client-Side Routing**: React Router DOM v6 in `src/App.tsx`. No server-side routing.
 5. **SPA Catch-All**: `backend/app/main.py` serves `dist/index.html` for unmatched routes in production.
-6. **API Client**: `src/lib/api.ts` uses `import.meta.env.VITE_API_URL ?? ""` for base URL. In dev with Vite proxy, this is empty string so requests go to same origin (`:3000/api/...`).
-7. **CORS**: Configured in `backend/app/main.py` via `ALLOWED_ORIGINS` env var (default: `http://localhost:3000,http://127.0.0.1:3000`).
-8. **Docker**: Root `Dockerfile` is multi-stage: Node builds frontend, Python runs FastAPI. `docker/docker-compose.yml` defines `app` service on port 3000, optional `postgres` under `team` profile.
+6. **API Client**: `src/lib/api.ts` uses `import.meta.env.VITE_API_URL ?? ""` for base URL. In dev with Vite proxy, this is empty string so requests go to same origin (`:8000/api/...`).
+7. **CORS**: Configured in `backend/app/main.py` via `ALLOWED_ORIGINS` env var (default: `http://localhost:8000,http://127.0.0.1:8000`).
+8. **Docker**: Root `Dockerfile` is multi-stage: Node builds frontend, Python runs FastAPI. `docker/docker-compose.yml` defines `app` service on port 8000, optional `postgres` under `team` profile.
 9. **Service Layer Pattern**: All business logic in `backend/app/services/`. FastAPI routers are thin wrappers.
 10. **SQLAlchemy 2.0 + Alembic**: Replaces Prisma for the backend. Async-first ORM with migration version control.
 11. **Local-First Offline**: Dexie-based IndexedDB with sync engine (unchanged from previous architecture).

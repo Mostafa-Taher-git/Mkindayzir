@@ -2,7 +2,7 @@
 # Mkindayzir — single-process production image
 #
 # Stage 1 builds the Vite React SPA (frontend/) -> frontend/dist/
-# Stage 2 runs FastAPI which serves /api/* AND the static dist/ on :3000
+# Stage 2 runs FastAPI which serves /api/* AND the static dist/ on :8000
 # (via the `mkindayzir` console script + FRONTEND_DIR).
 # =============================================================================
 
@@ -48,8 +48,8 @@ COPY --from=frontend-build /app/dist /app/dist
 # FastAPI mounts this dir to serve the SPA; default when unset is <root>/dist.
 ENV FRONTEND_DIR=/app/dist
 
-EXPOSE 3000
+EXPOSE 8000
 
 # alembic.ini lives in backend/, so run migrations from there, then start.
 WORKDIR /app/backend
-CMD ["sh", "-c", "alembic upgrade head && mkindayzir start --host 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "alembic upgrade head && mkindayzir start --host 0.0.0.0 --port 8000"]

@@ -25,7 +25,7 @@ def seed_demo(force):
 
 @cli.command()
 @click.option("--host", default="0.0.0.0", help="Bind host.")
-@click.option("--port", default=3000, type=int, help="Bind port (production serves PORT 3000).")
+@click.option("--port", default=8000, type=int, help="Bind port (production serves port 8000).")
 @click.option("--reload", is_flag=True, help="Enable auto-reload (dev only).")
 def start(host, port, reload):
     """Launch the Mkindayzir server (API + built frontend in production)."""

@@ -6,8 +6,8 @@ All configuration is via environment variables. The backend reads these from the
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3000` | Port the FastAPI process binds in production (API + SPA). |
-| `BASE_URL` | `http://localhost:3000` | Public base URL of the app. |
+| `PORT` | `8000` | Port the FastAPI process binds in production (API + SPA). |
+| `BASE_URL` | `http://localhost:8000` | Public base URL of the app. |
 | `AUTO_LOGIN` | `false` | Auto-login for Personal Mode (single user). |
 | `FRONTEND_DIR` | `<project root>/dist` | Optional override of the directory serving the built SPA. |
 | `DATA_DIR` | `./data` | Uploads and backups directory. |
@@ -27,7 +27,7 @@ All configuration is via environment variables. The backend reads these from the
 | `ENCRYPTION_KEY` | (auto-generated if absent) | 32-byte key (hex) for AES-256-GCM encryption of sensitive fields. |
 | `SESSION_MAX_AGE` | `86400` | Session expiry in seconds (24h). |
 | `BCRYPT_ROUNDS` | `12` | Bcrypt cost factor for password hashing. |
-| `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated list of allowed origins for CORS. |
+| `ALLOWED_ORIGINS` | `http://localhost:8000,http://127.0.0.1:8000` | Comma-separated list of allowed origins for CORS. |
 
 ## File storage
 

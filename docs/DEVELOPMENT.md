@@ -1,6 +1,6 @@
 # Development Guide
 
-Mkindayzir is a pnpm monorepo: `frontend/` (Vite + React SPA) and `backend/` (FastAPI). In development two processes run: the FastAPI API on `:8000` and the Vite dev server on `:3000` (which proxies `/api` -> `:8000`). In production a single FastAPI process serves both the API and the built SPA on `:3000`.
+Mkindayzir is a pnpm monorepo: `frontend/` (Vite + React SPA) and `backend/` (FastAPI). In development two processes run: the FastAPI API on `:8000` and the Vite dev server on `:5173` (which proxies `/api` -> `:8000`). In production a single FastAPI process serves both the API and the built SPA on `:8000`.
 
 ## Prerequisites
 
@@ -29,10 +29,10 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 pnpm install                       # from the repo root (workspace: frontend/)
-pnpm --dir frontend dev            # Vite dev server on :3000, proxies /api -> :8000
+pnpm --dir frontend dev            # Vite dev server on :5173, proxies /api -> :8000
 ```
 
-- App: http://localhost:3000
+- App: http://localhost:5173
 
 The Vite dev proxy is configured in `frontend/vite.config.ts` (`server.proxy["/api"] -> http://localhost:8000`), so all `fetch("/api/...")` calls from the SPA reach the FastAPI backend during development.
 

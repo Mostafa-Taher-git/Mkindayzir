@@ -13,7 +13,7 @@ docker compose -f docker/docker-compose.yml exec app mkindayzir setup admin --em
 echo ""
 echo "============================================"
 echo "  Mkindayzir is ready!"
-echo "  URL: http://localhost:3000"
+echo "  URL: http://localhost:8000"
 echo "  Email: admin@localhost"
 echo "  Password: admin"
 echo "============================================"

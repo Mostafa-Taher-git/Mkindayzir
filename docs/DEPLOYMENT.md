@@ -1,17 +1,17 @@
 # Deployment Guide
 
-Mkindayzir runs as a **single FastAPI process** that serves both the REST API (under `/api/*`) and the built React SPA (`dist/`) on port **3000** in production. There are three supported deployment methods.
+Mkindayzir runs as a **single FastAPI process** that serves both the REST API (under `/api/*`) and the built React SPA (`dist/`) on port **8000** in production. There are three supported deployment methods.
 
-> In production, put the `:3000` listener behind your own reverse proxy / TLS terminator (nginx, Caddy, Traefik, etc.). The app itself does not terminate TLS.
+> In production, put the `:8000` listener behind your own reverse proxy / TLS terminator (nginx, Caddy, Traefik, etc.). The app itself does not terminate TLS.
 
 ## Method 1 — `pip install` (Personal, no Docker)
 
 ```bash
 pip install mkindayzir
-mkindayzir start                   # serves http://localhost:3000
+mkindayzir start                   # serves http://localhost:8000
 ```
 
-On first start, `mkindayzir start` runs `alembic upgrade head` automatically and then launches the server. Open http://localhost:3000 and complete the setup wizard to create the admin account. Backups and restores use the CLI:
+On first start, `mkindayzir start` runs `alembic upgrade head` automatically and then launches the server. Open http://localhost:8000 and complete the setup wizard to create the admin account. Backups and restores use the CLI:
 
 ```bash
 mkindayzir backup create
@@ -50,7 +50,7 @@ docker compose -f docker/docker-compose.yml up -d
 bash docker/init.sh                # migrations + admin user creation
 ```
 
-The compose file defines a single `app` service on port `3000`. An optional `postgres` service is enabled under the `team` profile.
+The compose file defines a single `app` service on port `8000`. An optional `postgres` service is enabled under the `team` profile.
 
 ### Team mode
 
@@ -64,7 +64,7 @@ When using the `team` profile, point `DATABASE_URL` at the `postgres` service. S
 ## Operations
 
 ```bash
-mkindayzir start                   # start (API + SPA) on :3000
+mkindayzir start                   # start (API + SPA) on :8000
 mkindayzir migrate upgrade         # apply Alembic migrations
 mkindayzir backup create           # backup DB + uploads to a tarball
 mkindayzir backup restore <file> --force
