@@ -4,10 +4,8 @@ import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 
 const ROLES = [
+  { value: "owner", label: "Owner" },
   { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "member", label: "Member" },
-  { value: "viewer", label: "Viewer" },
 ];
 
 interface InviteModalProps {
@@ -20,14 +18,14 @@ export function InviteModal({ orgId, open, onOpenChange }: InviteModalProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("member");
+  const [role, setRole] = useState("admin");
 
   const invite = useMutation({
     mutationFn: () => api.post<{ invitation: any }>("/api/invitations", { orgId, email, role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invitations", "org", orgId] });
       setEmail("");
-      setRole("member");
+      setRole("admin");
       toast({ title: "Invitation sent", description: `Invite sent to ${email}.` });
       onOpenChange(false);
     },
@@ -48,7 +46,7 @@ export function InviteModal({ orgId, open, onOpenChange }: InviteModalProps) {
       >
         <h2 className="text-lg font-bold">Invite member</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          Free plan: up to 5 members (owner included). Invitations expire in 7 days.
+          Free: up to 5 members · Pro: unlimited · Enterprise: unlimited — Invites expire in 7 days.
         </p>
 
         <div className="mt-4 space-y-3">

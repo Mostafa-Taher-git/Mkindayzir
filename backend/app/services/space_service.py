@@ -45,6 +45,14 @@ class SpaceService:
 
     @staticmethod
     async def create(db: AsyncSession, data: dict, user: dict) -> dict:
+        from app.utils.plan_limits import FREE_MAX_BOARDS_PERSONAL
+        from app.services.workspace_filter import resolve_workspace, personal_owner_filter
+        ws0 = await resolve_workspace(db, user, data.get("workspace"))
+        if ws0["ownerType"] == "personal":
+            q = select(func.count()).select_from(Space).where(Space.deletedAt.is_(None)).where(personal_owner_filter(Space, user["id"]))
+            total = (await db.execute(q)).scalar_one()
+            if total >= FREE_MAX_BOARDS_PERSONAL:
+                raise ValueError(f"Personal workspace limit: {FREE_MAX_BOARDS_PERSONAL}/{FREE_MAX_BOARDS_PERSONAL} spaces used. Create or switch to an organization workspace for more.")
         space = Space(
             id=uuid.uuid4().hex,
             name=data["name"],

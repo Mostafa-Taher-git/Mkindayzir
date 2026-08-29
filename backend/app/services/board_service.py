@@ -97,6 +97,18 @@ class BoardService:
 
     @staticmethod
     async def create(db: AsyncSession, data: dict, user: dict) -> dict:
+        # Enforce personal workspace board cap (org boards unlimited)
+        from app.services.workspace_filter import resolve_workspace, personal_owner_filter
+        from app.models.space import Space
+        from app.utils.plan_limits import FREE_MAX_BOARDS_PERSONAL
+        ws = await resolve_workspace(db, user, data.get("workspace"))
+        if ws["ownerType"] == "personal":
+            # count personal boards via Space join
+            from sqlalchemy import and_
+            q = select(func.count()).select_from(Board).join(Space, Space.id == Board.spaceId).where(Board.deletedAt.is_(None)).where(personal_owner_filter(Space, user["id"]))
+            total = (await db.execute(q)).scalar_one()
+            if total >= FREE_MAX_BOARDS_PERSONAL:
+                raise ValueError(f"Personal workspace limit: {FREE_MAX_BOARDS_PERSONAL}/{FREE_MAX_BOARDS_PERSONAL} boards used. Create or switch to an organization workspace for more boards.")
         board = Board(
             id=uuid.uuid4().hex,
             spaceId=data["spaceId"],

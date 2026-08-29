@@ -93,13 +93,13 @@ class OrganizationService:
             id=uuid.uuid4().hex,
             orgId=org.id,
             userId=user["id"],
-            role="admin",
+            role="owner",
             invitedBy=user["id"],
         )
         db.add(member)
         await db.commit()
         await db.refresh(org)
-        return _serialize_org(org, member_count=1, role="admin")
+        return _serialize_org(org, member_count=1, role="owner")
 
     @staticmethod
     async def get_mine(db: AsyncSession, user: dict) -> dict:
@@ -181,12 +181,12 @@ class OrganizationService:
             raise ValueError("organization not found")
         if org.ownerId == user["id"]:
             raise ValueError("transfer ownership before leaving")
-        if m.role == "admin":
+        if m.role in ("owner", "admin"):
             from sqlalchemy import func
             admin_count = (await db.execute(
                 select(func.count(OrganizationMember.id)).where(
                     OrganizationMember.orgId == org.id,
-                    OrganizationMember.role == "admin",
+                    OrganizationMember.role.in_(["owner", "admin"]),
                 )
             )).scalar_one() or 0
             if admin_count <= 1:
@@ -220,7 +220,7 @@ class OrganizationService:
         )).scalar_one_or_none()
         if new_owner_m is None:
             raise ValueError("new owner must be a member of the organization")
-        if new_owner_m.role != "admin":
+        if new_owner_m.role not in ("owner", "admin"):
             raise ValueError("new owner must already be an admin")
         org.ownerId = new_owner_id
         await db.commit()
@@ -238,7 +238,7 @@ class OrganizationService:
                 OrganizationMember.userId == user["id"],
             )
         )).scalar_one_or_none()
-        if m is None or m.role != "admin":
+        if m is None or m.role not in ("owner", "admin"):
             raise PermissionError("not an admin of this organization")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)
@@ -261,7 +261,7 @@ class OrganizationService:
 
     @staticmethod
     async def update_member_role(db: AsyncSession, user: dict, org_id: str, target_user_id: str, new_role: str) -> dict:
-        if new_role not in ("admin", "manager", "member", "viewer"):
+        if new_role not in ("owner", "admin"):
             raise ValueError("invalid role")
         m = (await db.execute(
             select(OrganizationMember).where(
@@ -269,7 +269,7 @@ class OrganizationService:
                 OrganizationMember.userId == user["id"],
             )
         )).scalar_one_or_none()
-        if m is None or m.role != "admin":
+        if m is None or m.role not in ("owner", "admin"):
             raise PermissionError("only admins can change roles")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)
@@ -286,12 +286,12 @@ class OrganizationService:
         )).scalar_one_or_none()
         if target is None:
             raise ValueError("user is not a member")
-        if target.role == "admin" and new_role != "admin":
+        if target.role in ("owner", "admin") and new_role not in ("owner", "admin"):
             from sqlalchemy import func
             admin_count = (await db.execute(
                 select(func.count(OrganizationMember.id)).where(
                     OrganizationMember.orgId == org_id,
-                    OrganizationMember.role == "admin",
+                    OrganizationMember.role.in_(["owner", "admin"]),
                 )
             )).scalar_one() or 0
             if admin_count <= 1:
@@ -337,7 +337,7 @@ class OrganizationService:
                 OrganizationMember.userId == admin_user["id"],
             )
         )).scalar_one_or_none()
-        if m is None or m.role != "admin":
+        if m is None or m.role not in ("owner", "admin"):
             raise PermissionError("only admins can transition organization type")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)

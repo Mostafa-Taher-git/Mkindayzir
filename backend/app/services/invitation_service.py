@@ -11,7 +11,7 @@ from app.utils.plan_limits import FREE_MAX_MEMBERS_PER_ORG
 
 
 INVITE_TTL_DAYS = 7
-VALID_ROLES = ("admin", "manager", "member", "viewer")
+VALID_ROLES = ("owner", "admin")
 
 
 def _now() -> datetime:
@@ -52,7 +52,7 @@ class InvitationService:
                 OrganizationMember.userId == user["id"],
             )
         )).scalar_one_or_none()
-        if m is None or m.role != "admin":
+        if m is None or m.role not in ("owner", "admin"):
             raise PermissionError("only admins can manage invitations")
         org = (await db.execute(
             select(Organization).where(Organization.id == org_id)
@@ -173,6 +173,16 @@ class InvitationService:
         )).scalar_one() or 0
         if int(current_members) >= FREE_MAX_MEMBERS_PER_ORG:
             raise ValueError(f"Free plan allows up to {FREE_MAX_MEMBERS_PER_ORG} members per organization. Upgrade to add more.")
+
+        # Free plan: 1 org total per user — must leave current org before joining another
+        from app.utils.plan_limits import FREE_MAX_ORGS
+        already = (await db.execute(select(func.count(OrganizationMember.id)).where(OrganizationMember.userId == user["id"]))).scalar_one() or 0
+        # if already in an org and it's not this one, block (Free = 1)
+        if int(already) >= FREE_MAX_ORGS:
+            # check if already a member of this org (re-accept edge)
+            in_this = (await db.execute(select(OrganizationMember).where(OrganizationMember.orgId == inv.orgId, OrganizationMember.userId == user["id"]))).scalar_one_or_none()
+            if in_this is None:
+                raise ValueError("Free plan: you can belong to only 1 organization. Leave your current organization before joining another, or upgrade to Pro (up to 5 orgs).")
 
         inv.status = "accepted"
         inv.acceptedAt = _now()

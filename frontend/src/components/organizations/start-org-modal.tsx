@@ -35,7 +35,7 @@ export function StartOrgModal({ defaultType, open, onOpenChange, onCreated }: St
         orgType: res.organization.type,
         role: res.organization.role,
       });
-      toast({ title: "Organization created", description: `You are now an admin of ${res.organization.name}.` });
+      toast({ title: "Organization created", description: `You are the Owner of ${res.organization.name}. You can copy anything from personal to here — Free: invite up to 5 members (Pro: unlimited, up to 5 orgs).` });
       setName("");
       onOpenChange(false);
       onCreated?.(res.organization.id);
