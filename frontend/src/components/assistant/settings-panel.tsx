@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ProviderType } from "@/types";
+import { api } from "@/lib/api";
 
 const providers: { value: ProviderType; label: string }[] = [
   { value: "openrouter", label: "OpenRouter" },
@@ -35,7 +36,7 @@ function SettingsPanel({
   const { data: settings, isLoading } = useQuery<Settings>({
     queryKey: ["assistant", "settings"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/settings", { credentials: "include" });
+      const res = await api.get<Settings>("/api/assistant/settings");
       if (!res.ok) throw new Error("Failed to fetch settings");
       return (await res.json()) as Settings;
     },
@@ -58,11 +59,7 @@ function SettingsPanel({
       if (provider === "custom" && customBaseUrl) {
         body.customBaseUrl = customBaseUrl;
       }
-      const res = await fetch("/api/assistant/settings", {credentials: "include", 
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await api.patch("/api/assistant/settings", body);
       if (!res.ok) throw new Error("Failed to save settings");
       return res.json();
     },
@@ -88,11 +85,7 @@ function SettingsPanel({
       const body: Record<string, unknown> = { provider, model };
       if (apiKey) body.apiKey = apiKey;
       if (provider === "custom" && customBaseUrl) body.customBaseUrl = customBaseUrl;
-      const res = await fetch("/api/assistant/settings", {credentials: "include", 
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await api.patch("/api/assistant/settings", body);
       if (!res.ok) throw new Error("Connection test failed");
       toast({
         title: "Connection successful",

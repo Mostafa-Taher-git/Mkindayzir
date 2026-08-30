@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { ROUTES } from "@/lib/constants";
 import {
-import { api } from "@/lib/api";
   ArrowLeft,
   MessageSquare,
   Lock,
@@ -26,6 +25,7 @@ import { api } from "@/lib/api";
   Send,
   Loader2,
 } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function TicketDetailPage() {
   const { ticketId } = useParams<{ ticketId: string }>();

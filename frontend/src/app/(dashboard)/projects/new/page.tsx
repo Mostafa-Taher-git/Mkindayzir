@@ -39,13 +39,9 @@ function NewProjectPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await api.post<{ project: any }>("/api/projects", formData); 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
-        }),
+      const res = await api.post<{ project: any }>("/api/projects", {
+        ...data,
+        workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Failed to create project" }));

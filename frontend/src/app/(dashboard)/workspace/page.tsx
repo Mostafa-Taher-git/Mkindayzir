@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ROUTES, BOARD_BACKGROUNDS } from "@/lib/constants";
+import { api } from "@/lib/api";
 
 type Space = { id: string; name: string; description?: string | null; visibility?: string };
 type BoardItem = {
@@ -32,15 +33,6 @@ type BoardItem = {
   starred?: boolean;
   spaceName?: string | null;
 };
-
-async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { credentials: "include", cache: "no-store", ...init });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err?.error?.message || err?.message || "Request failed");
-  }
-  return res.json();
-}
 
 export default function WorkspacePage() {
   const navigate = useNavigate();
@@ -58,15 +50,15 @@ export default function WorkspacePage() {
   // ---------- data ----------
   const spacesQ = useQuery({
     queryKey: ["spaces"],
-    queryFn: () => jfetch<{ spaces: Space[] }>("/api/spaces"),
+    queryFn: () => api.get<{ spaces: Space[] }>("/api/spaces"),
   });
   const boardsQ = useQuery({
     queryKey: ["boards"],
-    queryFn: () => jfetch<{ boards: BoardItem[] }>("/api/boards"),
+    queryFn: () => api.get<{ boards: BoardItem[] }>("/api/boards"),
   });
   const projectsQ = useQuery({
     queryKey: ["projects"],
-    queryFn: () => jfetch<{ projects: Array<{ id: string; name: string; key: string }> }>("/api/projects"),
+    queryFn: () => api.get<{ projects: Array<{ id: string; name: string; key: string }> }>("/api/projects"),
   });
 
   const spaces = spacesQ.data?.spaces ?? [];
@@ -94,11 +86,7 @@ export default function WorkspacePage() {
 
   const createSpace = useMutation({
     mutationFn: () =>
-      jfetch("/api/spaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newSpaceName }),
-      }),
+      api.post("/api/spaces", { name: newSpaceName }),
     onSuccess: (data: any) => {
       invalidateAll();
       setShowNewSpace(false);
@@ -109,11 +97,7 @@ export default function WorkspacePage() {
 
   const createBoard = useMutation({
     mutationFn: () =>
-      jfetch("/api/boards", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId: selectedSpaceId, name: newBoardName, background: newBoardBg }),
-      }),
+      api.post("/api/boards", { spaceId: selectedSpaceId, name: newBoardName, background: newBoardBg }),
     onSuccess: (data: any) => {
       invalidateAll();
       setShowNewBoard(false);
@@ -124,17 +108,13 @@ export default function WorkspacePage() {
 
   const toggleStar = useMutation({
     mutationFn: ({ id, starred }: { id: string; starred: boolean }) =>
-      jfetch(`/api/boards/${id}/star`, { method: starred ? "POST" : "DELETE" }),
+      api.post(`/api/boards/${id}/star`, { method: starred ? "POST" : "DELETE" }),
     onSuccess: invalidateAll,
   });
 
   const linkProject = useMutation({
     mutationFn: (projectId: string) =>
-      jfetch(`/api/spaces/${selectedSpaceId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
-      }),
+      api.patch(`/api/spaces/${selectedSpaceId}`, { projectId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["spaces"] });
       setLinkProjectOpen(false);

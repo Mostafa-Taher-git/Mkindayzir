@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, FormEvent, useEffect } from "react";
-import { useSignUp, useAuth } from "@clerk/clerk-react";
+import { useSignUp, useSignIn, useAuth } from "@clerk/clerk-react";
 
 function firstClerkMessage(err: unknown, fallback: string): string {
   const e = err as { errors?: Array<{ longMessage?: string; message?: string }>; message?: string };
@@ -18,6 +18,7 @@ const ERROR_CLASS =
 
 export default function RegisterPage() {
   const { signUp, isLoaded, setActive } = useSignUp();
+  const { signIn } = useSignIn();
   const { isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -71,16 +72,43 @@ export default function RegisterPage() {
 
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !signUp) return;
+    if (!isLoaded) return;
     setError(null);
     setLoading(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({ code });
-      if (result.status === "complete") {
-        setPendingVerification(false);
+      if (result.status !== "complete") {
+        setError("Verification incomplete. Please restart sign-up.");
         return;
       }
-      setError("Verification incomplete. Please try again.");
+      // Activate the post-verification session if Clerk provided one. If
+      // `setActive` rejects (some dev instances refuse to activate a session
+      // created via the signup path), fall through to signing in with the
+      // same credentials to obtain a clean signin-style session.
+      let activated = false;
+      if (result.createdSessionId && setActive) {
+        try {
+          await setActive({ session: result.createdSessionId });
+          activated = true;
+        } catch {
+          activated = false;
+        }
+      }
+      if (!activated) {
+        // Sign in with the same credentials. Clerk maps this to the existing
+        // user and issues a fresh, signin-style session that activates
+        // correctly. The signup session is replaced.
+        const signInResult = await signIn.create({ identifier: email, password });
+        if (signInResult.status === "complete" && signInResult.createdSessionId && setActive) {
+          await setActive({ session: signInResult.createdSessionId });
+        } else {
+          setError("Account created but sign-in could not be completed. Please try the sign-in page.");
+          return;
+        }
+      }
+      // Do NOT do a full reload (window.location.href). The useEffect above
+      // watching isSignedIn will navigate to /dashboard once Clerk hydrates
+      // the session. A reload races Clerk and causes the ProtectedRoute bounce.
     } catch (err) {
       setError(firstClerkMessage(err, "Invalid verification code"));
     } finally {

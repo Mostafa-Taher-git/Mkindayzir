@@ -20,14 +20,9 @@ export default function NewNotePage() {
       folderId: string | null;
       tagIds: string[];
     }) => {
-      const res = await api.post<{ note: any }>("/api/vault/notes",
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
-        }),
+      const res = await api.post<{ note: any }>("/api/vault/notes", {
+        ...data,
+        workspace: activeWorkspace.type === "org" ? activeWorkspace.orgId : "personal",
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

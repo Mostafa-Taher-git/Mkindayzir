@@ -48,8 +48,8 @@ export function LoginForm() {
         if (result.createdSessionId && setActive) {
           await setActive({ session: result.createdSessionId });
         }
-        window.location.href = callbackUrl;
-        return;
+        // Let the useEffect watching isSignedIn handle navigation to avoid
+        // racing Clerk's hydration. A full reload can cause ProtectedRoute bounce.
       }
       setError("Additional verification required. Please check your email.");
     } catch (err) {

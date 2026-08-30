@@ -83,11 +83,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await api.patch<{ success: boolean }>("/api/settings", 
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName }),
-      });
+      const res = await api.patch<{ success: boolean }>("/api/settings", { displayName });
       if (res.ok) setMessage({ text: "Profile saved!", type: "success" });
       else setMessage({ text: "Failed to save profile.", type: "error" });
     } catch {
@@ -97,32 +93,28 @@ export default function SettingsPage() {
   };
 
   const saveAiSettings = async () => {
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/assistant/settings", {credentials: "include", 
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      setSaving(true);
+      setMessage(null);
+      try {
+        const res = await api.patch("/api/assistant/settings", {
           provider: aiProvider || undefined,
           apiKey: aiApiKey || undefined,
           model: aiModel || undefined,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setApiKeyConfigured(Boolean(data.apiKeyConfigured));
-        setAiApiKey("");
-        setMessage({ text: "AI settings saved!", type: "success" });
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setMessage({ text: data?.error?.message || "Failed to save AI settings.", type: "error" });
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setApiKeyConfigured(Boolean(data.apiKeyConfigured));
+          setAiApiKey("");
+          setMessage({ text: "AI settings saved!", type: "success" });
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setMessage({ text: data?.error?.message || "Failed to save AI settings.", type: "error" });
+        }
+      } catch {
+        setMessage({ text: "Error saving AI settings.", type: "error" });
       }
-    } catch {
-      setMessage({ text: "Error saving AI settings.", type: "error" });
-    }
-    setSaving(false);
-  };
+      setSaving(false);
+    };
 
 
   return (

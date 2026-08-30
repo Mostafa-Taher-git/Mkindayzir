@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Conversation } from "@/types";
+import { api } from "@/lib/api";
 
 function formatDate(dateString: string) {
   const date = new Date(dateString);
@@ -33,7 +34,7 @@ function ConversationList({
   const { data } = useQuery({
     queryKey: ["assistant", "conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/assistant/conversations", { credentials: "include" });
+      const res = await api.get<{ conversations: Conversation[] }>("/api/assistant/conversations");
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json() as Promise<{ conversations: Conversation[] }>;
     },
@@ -42,9 +43,7 @@ function ConversationList({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/assistant/conversations/${id}`, {credentials: "include", 
-        method: "DELETE",
-      });
+      const res = await api.delete(`/api/assistant/conversations/${id}`);
       if (!res.ok) throw new Error("Failed to delete conversation");
       return res.json();
     },
@@ -54,11 +53,7 @@ function ConversationList({
   });
 
   const handleNewChat = async () => {
-    const res = await fetch("/api/assistant/conversations", {credentials: "include", 
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: selectedModel || undefined }),
-    });
+    const res = await api.post("/api/assistant/conversations", { model: selectedModel || undefined });
     if (!res.ok) throw new Error("Failed to create conversation");
     const data = await res.json() as { conversation: Conversation };
     queryClient.invalidateQueries({ queryKey: ["assistant", "conversations"] });

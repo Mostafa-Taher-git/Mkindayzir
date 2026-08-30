@@ -9,13 +9,14 @@ import { MessageBubble, TypingIndicator } from "@/components/assistant/message-b
 import { ModelSelector } from "@/components/assistant/model-selector";
 import { ROUTES } from "@/lib/constants";
 import type { Message } from "@/types";
+import { api } from "@/lib/api";
 
 function useConversationMessages(conversationId: string | null) {
   return useQuery({
     queryKey: ["assistant", "messages", conversationId],
     queryFn: async () => {
       if (!conversationId) return [];
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, { credentials: "include" });
+      const res = await api.get<{ messages: Message[] }>(`/api/assistant/conversations/${conversationId}`);
       if (!res.ok) throw new Error("Failed to fetch messages");
       const data = await res.json() as { messages: Message[] };
       return data.messages ?? [];
@@ -39,7 +40,7 @@ function ChatInterface({
 
   // Load the user's default model from settings
   React.useEffect(() => {
-    fetch("/api/assistant/settings", { credentials: "include" })
+    api.get<{ model: string }>("/api/assistant/settings")
       .then((r) => r.json())
       .then((data) => {
         if (data.model && !selectedModel) {

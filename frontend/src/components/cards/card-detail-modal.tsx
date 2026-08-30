@@ -98,7 +98,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
   });
 
   const deleteComment = useMutation({
-    mutationFn: (id: string) => jfetch(`/api/cards/${cardId}/comments/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => api.delete("/api/cards/${cardId}/comments/${id}"),
     onSuccess: refresh,
   });
 
@@ -119,7 +119,7 @@ export function CardDetailModal({ cardId, boardId, columns, onClose, onUpdate }:
   });
 
   const archive = useMutation({
-    mutationFn: () => jfetch(`/api/cards/${cardId}`, { method: "DELETE" }),
+    mutationFn: () => api.delete("/api/cards/${cardId}"),
     onSuccess: () => { refresh(); onClose(); },
   });
 

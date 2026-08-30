@@ -193,9 +193,7 @@ function ActivityLog({ cardId }: { cardId: string }) {
   const { data } = useQuery({
     queryKey: ["activity", cardId],
     queryFn: async () => {
-      const res = await api.get<{ activity: any[] }>(`/api/cards/${cardId}/activity`); 
-        cache: "no-store",
-      });
+      const res = await api.get<{ activity: any[] }>(`/api/cards/${cardId}/activity`);
       if (!res.ok) return { activities: [] };
       return res.json();
     },
