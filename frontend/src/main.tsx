@@ -30,7 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       afterSignOutUrl="/"
     >
       <ClerkTokenBridge />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Providers>
           <App />
         </Providers>
