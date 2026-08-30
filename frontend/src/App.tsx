@@ -59,9 +59,28 @@ function DashboardRoute({ children }: { children: ReactNode }) {
   return <DashboardLayout>{children}</DashboardLayout>;
 }
 
+function RootGate() {
+  const { isSignedIn, isLoaded } = useAuth();
+  if (!isLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center font-mono uppercase tracking-wider text-muted-foreground">
+        Initializing console...
+      </div>
+    );
+  }
+  if (isSignedIn) return <Navigate to="/dashboard" replace />;
+  // Not signed in: show landing page. On dev (5173) vite serves public/landing.html
+  // directly; on prod (8000) FastAPI serves it at /. Use a hard navigation so the
+  // static file is fetched, not intercepted by the SPA catch-all.
+  if (typeof window !== "undefined") window.location.replace("/landing.html");
+  return null;
+}
+
 export default function App() {
   return (
     <Routes>
+      {/* Landing — root is marketing, not a redirect to /dashboard */}
+      <Route path="/" element={<RootGate />} />
       {/* Public / auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
