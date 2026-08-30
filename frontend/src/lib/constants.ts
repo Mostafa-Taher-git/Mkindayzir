@@ -10,6 +10,7 @@ export const ROUTES = {
   PROJECTS: "/projects",
   SPACES: "/spaces",
   BOARDS: "/boards",
+  STORMS: "/storms",
   VAULT: "/vault",
   ASSISTANT: "/assistant",
   GUIDES: "/guides",

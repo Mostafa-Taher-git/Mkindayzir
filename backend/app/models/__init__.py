@@ -47,3 +47,5 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.invitation import Invitation
 from app.models.data_transfer import DataTransfer
 from app.models.org_transition import OrgTransition
+from app.models.storm import Storm
+from app.models.storm_link import StormLink

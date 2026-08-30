@@ -39,6 +39,8 @@ import GuidesPage from "@/app/(dashboard)/guides/page";
 import ReportsPage from "@/app/(dashboard)/reports/page";
 import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
+import StormsPage from "@/app/(dashboard)/storms/page";
+import StormWhiteboardPage from "@/app/(dashboard)/storms/[stormId]/page";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
@@ -395,6 +397,24 @@ export default function App() {
             <DashboardRoute>
               <SettingsPage />
             </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storms"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute>
+              <StormsPage />
+            </DashboardRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storms/:stormId"
+        element={
+          <ProtectedRoute>
+            <StormWhiteboardPage />
           </ProtectedRoute>
         }
       />

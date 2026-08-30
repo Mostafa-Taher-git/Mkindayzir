@@ -15,7 +15,7 @@ from app.routers import (
     workflows, labels, spaces, boards, columns, cards, checklists,
     vault, assistant, settings, reports, guides, search, uploads, admin, system, dashboard,
     tickets, ws, board_backgrounds, card_comments, users, archive,
-    organizations, invitations, transfers, clerk_webhook,
+    organizations, invitations, transfers, clerk_webhook, storms,
 )
 
 
@@ -184,7 +184,7 @@ for router in [
     reports.router, guides.router, search.router, uploads.router, admin.router, system.router,
     dashboard.router, tickets.router, ws.router, board_backgrounds.router,
     card_comments.router, users.router, archive.router,
-    organizations.router, invitations.router, transfers.router, clerk_webhook.router,
+    organizations.router, invitations.router, transfers.router, clerk_webhook.router, storms.router,
 ]:
     app.include_router(router)
 
