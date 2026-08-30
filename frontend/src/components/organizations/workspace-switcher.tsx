@@ -63,7 +63,7 @@ export function WorkspaceSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[200px] rounded-md border border-outline bg-surface shadow-lg p-1">
+        <div className="absolute z-50 left-full top-0 ml-2 w-64 rounded-md border border-outline bg-surface shadow-lg p-1">
           <SwitcherItem
             active={active.type === "personal"}
             onClick={() => setActive({ type: "personal" })}
