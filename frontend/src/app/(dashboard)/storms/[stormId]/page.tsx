@@ -12,6 +12,21 @@ const STORAGE_KEY = "storm-whiteboard-";
 
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
+// Decide grid/text default color based on background luminance so the canvas
+// remains readable on white, paper, dark, or any custom bg.
+function isLightBg(hex: string) {
+  if (!hex || !hex.startsWith("#")) return true;
+  const h = hex.length === 4
+    ? "#" + hex.slice(1).split("").map((c: string) => c + c).join("")
+    : hex;
+  const r = parseInt(h.slice(1, 3), 16) || 255;
+  const g = parseInt(h.slice(3, 5), 16) || 255;
+  const b = parseInt(h.slice(5, 7), 16) || 255;
+  // perceptual luminance
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6;
+}
+
 function sketchyPath(x1:number,y1:number,x2:number,y2:number){
   const dx=x2-x1, dy=y2-y1, dist=Math.hypot(dx,dy);
   const off = Math.min(6, dist*0.04);
@@ -42,6 +57,7 @@ export default function StormWhiteboardPage(){
   const [textDraft, setTextDraft] = React.useState("");
   const [searchHash, setSearchHash] = React.useState("");
   const [showLib, setShowLib] = React.useState(true);
+  const [bgColor, setBgColor] = React.useState<string>("#fffef8");
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -67,10 +83,11 @@ export default function StormWhiteboardPage(){
   React.useEffect(()=>{
     if(wbData && !hasLoaded){
       setElements(wbData.elements || []);
+      if(wbData.appState?.background) setBgColor(wbData.appState.background);
       setHasLoaded(true);
       const saved = localStorage.getItem(STORAGE_KEY+stormId);
       if(saved){
-        try{ const p=JSON.parse(saved); if(p.elements) setElements(p.elements);}catch{}
+        try{ const p=JSON.parse(saved); if(p.elements) setElements(p.elements); if(p.appState?.background) setBgColor(p.appState.background);}catch{}
       }
     }
   },[wbData, hasLoaded, stormId]);
@@ -79,12 +96,12 @@ export default function StormWhiteboardPage(){
   React.useEffect(()=>{
     if(!hasLoaded) return;
     const t=setTimeout(async()=>{
-      const payload={elements, appState:{pan, scale}, files:{}};
+      const payload={elements, appState:{pan, scale, background: bgColor}, files:{}};
       localStorage.setItem(STORAGE_KEY+stormId, JSON.stringify(payload));
       try{ await api.put(`/api/storms/${stormId}/whiteboard`, payload);}catch{}
     }, 800);
     return ()=>clearTimeout(t);
-  },[elements, pan, scale, hasLoaded, stormId]);
+  },[elements, pan, scale, bgColor, hasLoaded, stormId]);
 
   const pushHistory = (next: any[])=>{
     setHistory(h=> [...h.slice(-99), elements]);
@@ -149,12 +166,17 @@ export default function StormWhiteboardPage(){
     if(tool==="text"){
       const world = screenToWorld(e.clientX, e.clientY);
       const id = uid();
-      const text = prompt("Text (Arabic supported — type RTL, click ok):", "") || "";
-      if(!text) return;
-      // detect # reference
-      const newEl={id, type:"text", x:world.x, y:world.y, w: 200, h: 32, text, stroke, fill:"transparent", strokeWidth, fontSize:18, dir: /[\u0600-\u06FF]/.test(text) ? "rtl" : "ltr"};
+      // Inline editable text — like Excalidraw: create empty element, then open a
+      // canvas-positioned textarea for multiline + Arabic typing. No window.prompt.
+      const newEl = {
+        id, type:"text", x:world.x, y:world.y, w: 200, h: 32,
+        text: "", stroke, fill:"transparent", strokeWidth, fontSize:20,
+        dir: "ltr",
+      };
       pushHistory([...elements, newEl]);
       setSelectedId(id);
+      setEditingTextId(id);
+      setTextDraft("");
       return;
     }
     if(tool==="image"){
@@ -383,40 +405,32 @@ export default function StormWhiteboardPage(){
       const parts = String(el.text).split(/(#\([^\)]+\))/g);
       return (
         <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
-          <foreignObject width={Math.max(120, el.w)} height={Math.max(28, el.h)} >
+          <foreignObject width={Math.max(160, el.w)} height={Math.max(40, el.h)} >
             <div
               dir={el.dir||"auto"}
               style={{
                 fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
-                fontSize: el.fontSize||18,
+                fontSize: el.fontSize||20,
                 lineHeight: 1.2,
                 color: el.stroke,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
-                cursor: "text",
+                cursor: editingTextId===el.id ? "text" : "pointer",
                 padding: 4,
                 minWidth: 80,
               }}
-              onDoubleClick={()=>{
-                const nv = prompt("Edit text:", el.text);
-                if(nv!==null){
-                  const upd = elements.map(e=> e.id===el.id ? {...e, text: nv, dir: /[\u0600-\u06FF]/.test(nv)?"rtl":"ltr"}:e);
-                  setElements(upd);
-                  setHistory(h=> [...h, elements]);
-                }
-              }}
+              onDoubleClick={()=>{ setEditingTextId(el.id); setTextDraft(el.text||""); }}
             >
               {parts.map((p,i)=>{
                 if(p.startsWith("#(") && p.endsWith(")")){
                   const name=p.slice(2,-1);
                   return <span key={i} onClick={(e)=>{ e.stopPropagation(); const found=(searchData as any)?.storms?.find((s:Storm)=> s.name===name) || elements.find(x=> x.text===name); if(found?.id) navigate(`/storms/${found.id}`); else alert(`Storm "${name}" not found — create it in Storms graph.`); }} style={{color:"hsl(var(--primary))", textDecoration:"underline", cursor:"pointer", fontWeight:700}}>#{name}</span>;
                 }
-                // also detect #word without parens
                 return <span key={i}>{p}</span>;
               })}
             </div>
           </foreignObject>
-          {isSelected && <rect x={-2} y={-2} width={Math.max(120, el.w)+4} height={Math.max(28, el.h)+4} fill="none" stroke={selStroke} strokeDasharray="6 6"/>}
+          {isSelected && <rect x={-2} y={-2} width={Math.max(160, el.w)+4} height={Math.max(40, el.h)+4} fill="none" stroke={selStroke} strokeDasharray="6 6"/>}
         </g>
       );
     }
@@ -520,6 +534,21 @@ export default function StormWhiteboardPage(){
             <label className="flex items-center gap-1 text-xs">Stroke<input type="color" value={stroke} onChange={e=> setStroke(e.target.value)} className="h-7 w-7 p-0 border rounded" /></label>
             <label className="flex items-center gap-1 text-xs">Fill<input type="color" value={fill==="transparent"?"#ffffff":fill} onChange={e=> setFill(e.target.value)} className="h-7 w-7 p-0 border rounded" /><button onClick={()=> setFill("transparent")} className="text-xs underline">none</button></label>
             <label className="flex items-center gap-1 text-xs">Width<input type="range" min={1} max={8} value={strokeWidth} onChange={e=> setStrokeWidth(parseInt(e.target.value))} /></label>
+            <div className="h-6 w-px bg-border mx-1" />
+            <label className="flex items-center gap-1 text-xs">BG<input type="color" value={bgColor} onChange={e=> setBgColor(e.target.value)} className="h-7 w-7 p-0 border rounded" /></label>
+            <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+              {[
+                {c:"#fffef8", n:"Paper"},
+                {c:"#ffffff", n:"White"},
+                {c:"#0e0e0f", n:"Dark"},
+                {c:"#fde68a", n:"Yellow"},
+                {c:"#bae6fd", n:"Blue"},
+                {c:"#fbcfe8", n:"Pink"},
+                {c:"#bbf7d0", n:"Green"},
+              ].map(sw=>(
+                <button key={sw.c} onClick={()=> setBgColor(sw.c)} title={sw.n} className="h-6 w-6 rounded border" style={{background: sw.c, borderColor: bgColor===sw.c ? "hsl(var(--primary))" : "rgba(0,0,0,0.2)"}} />
+              ))}
+            </div>
             <div className="ml-auto flex items-center gap-1">
               <Button variant="outline" size="sm" onClick={duplicateSelected} disabled={!selectedId}>Duplicate</Button>
               <Button variant="destructive" size="sm" onClick={deleteSelected} disabled={!selectedId}>Delete</Button>
@@ -547,7 +576,8 @@ export default function StormWhiteboardPage(){
 
           <div
             ref={containerRef}
-            className="flex-1 relative overflow-hidden bg-[#fffef8] dark:bg-[#1a1a1c] select-none"
+            className="flex-1 relative overflow-hidden select-none"
+            style={{ background: bgColor }}
             onMouseDown={handleSvgMouseDown}
             onMouseMove={handleSvgMouseMove}
             onMouseUp={handleSvgMouseUp}
@@ -568,12 +598,12 @@ export default function StormWhiteboardPage(){
                 </filter>
               </defs>
               <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
-                {/* grid */}
-                <g opacity={0.08}>
+                {/* grid — color computed from background so it stays visible on white/dark/paper */}
+                <g opacity={0.18} stroke={isLightBg(bgColor) ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.45)"}>
                   {Array.from({length: 80}).map((_,i)=> (
                     <g key={i}>
-                      <line x1={i*80-2000} y1={-2000} x2={i*80-2000} y2={4000} stroke="currentColor" strokeWidth={0.5} />
-                      <line x1={-2000} y1={i*80-2000} x2={4000} y2={i*80-2000} stroke="currentColor" strokeWidth={0.5} />
+                      <line x1={i*80-2000} y1={-2000} x2={i*80-2000} y2={4000} strokeWidth={0.5} />
+                      <line x1={-2000} y1={i*80-2000} x2={4000} y2={i*80-2000} strokeWidth={0.5} />
                     </g>
                   ))}
                 </g>
@@ -593,11 +623,61 @@ export default function StormWhiteboardPage(){
           </div>
 
           <div className="flex items-center gap-2 px-3 py-1.5 border-t bg-surface text-xs font-mono text-muted-foreground">
-            <span>Pan: Space+drag or Hand tool • Zoom: Ctrl+Wheel • Undo: Ctrl+Z</span>
+            <span>Pan: Space+drag or Hand tool • Zoom: Ctrl+Wheel • Undo: Ctrl+Z • Double-click text to edit</span>
             <span className="ml-auto">{elements.length} elements</span>
           </div>
         </div>
       </div>
+
+      {/* Inline text editor — overlaid on canvas at element position, scaled with pan/zoom */}
+      {editingTextId && (() => {
+        const el = elements.find((e:any)=>e.id===editingTextId);
+        if(!el) return null;
+        const fontSize = (el.fontSize||20) * scale;
+        const left = el.x * scale + pan.x;
+        const top = el.y * scale + pan.y;
+        const w = Math.max(180, el.w) * scale;
+        return (
+          <textarea
+            autoFocus
+            value={textDraft}
+            onChange={(e)=>{
+              const v = e.target.value;
+              setTextDraft(v);
+              const isRtl = /[\u0600-\u06FF]/.test(v);
+              // auto-grow height
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+              setElements((prev:any[])=> prev.map((x:any)=> x.id===editingTextId ? {...x, text: v, dir: isRtl?"rtl":"ltr"}:x));
+            }}
+            onBlur={()=>{
+              setElements((prev:any[])=> prev.map((x:any)=> x.id===editingTextId ? {...x, text: textDraft, dir: /[\u0600-\u06FF]/.test(textDraft)?"rtl":"ltr"}:x));
+              setEditingTextId(null);
+              setTextDraft("");
+            }}
+            onKeyDown={(e)=>{
+              if(e.key === "Escape"){
+                e.preventDefault();
+                setEditingTextId(null);
+                setTextDraft("");
+              } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){
+                e.preventDefault();
+                (e.target as HTMLTextAreaElement).blur();
+              }
+            }}
+            placeholder="Type here — Enter for new line, Esc to finish…"
+            dir="auto"
+            className="absolute bg-transparent outline-none resize-none overflow-hidden border-2 border-dashed border-primary rounded p-1 z-30"
+            style={{
+              left, top, width: w, minHeight: fontSize*1.4+8,
+              fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
+              fontSize,
+              lineHeight: 1.2,
+              color: el.stroke,
+            }}
+          />
+        );
+      })()}
 
       {renameOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
