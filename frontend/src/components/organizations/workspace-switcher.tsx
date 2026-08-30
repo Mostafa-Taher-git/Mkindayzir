@@ -56,9 +56,9 @@ export function WorkspaceSwitcher() {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={cn("ml-auto shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          className="ml-auto shrink-0 text-muted-foreground"
         >
-          <path d="m6 9 6 6 6-6" />
+          <path d="m9 18 6-6-6-6" />
         </svg>
       </button>
 
