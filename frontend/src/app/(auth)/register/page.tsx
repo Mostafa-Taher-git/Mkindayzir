@@ -22,6 +22,7 @@ export default function RegisterPage() {
   const { isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -55,12 +56,14 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await signUp.create({
+      const payload: Record<string, unknown> = {
         emailAddress: email,
         password,
         firstName: firstName || displayName,
         lastName,
-      });
+      };
+      if (username.trim()) payload.username = username.trim();
+      await signUp.create(payload);
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err) {
@@ -106,9 +109,9 @@ export default function RegisterPage() {
           return;
         }
       }
-      // Do NOT do a full reload (window.location.href). The useEffect above
-      // watching isSignedIn will navigate to /dashboard once Clerk hydrates
-      // the session. A reload races Clerk and causes the ProtectedRoute bounce.
+      navigate("/dashboard", { replace: true });
+      // Also rely on useEffect watching isSignedIn as fallback — do NOT do a full reload
+      // (window.location.href) which races Clerk hydration and causes ProtectedRoute bounce.
     } catch (err) {
       setError(firstClerkMessage(err, "Invalid verification code"));
     } finally {
@@ -162,6 +165,10 @@ export default function RegisterPage() {
           <div>
             <label htmlFor="email" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">Email</label>
             <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_CLASS} required />
+          </div>
+          <div>
+            <label htmlFor="username" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">Username <span className="normal-case text-muted-foreground">(if required)</span></label>
+            <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={FIELD_CLASS} placeholder="e.g. mostafa_taher" />
           </div>
           <div>
             <label htmlFor="displayName" className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider">Display Name</label>

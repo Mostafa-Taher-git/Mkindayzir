@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import * as React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -40,9 +40,18 @@ import ReportsPage from "@/app/(dashboard)/reports/page";
 import RoadmapPage from "@/app/(dashboard)/roadmap/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
-  if (!isLoaded) {
+  // Clerk can hydrate with isLoaded=true, isSignedIn=false while __session cookie
+  // still exists (pending tasks like email_link). Wait up to 3s before bouncing.
+  const [timedOut, setTimedOut] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  const hasSessionCookie =
+    typeof document !== "undefined" && document.cookie.includes("__session");
+  if (!isLoaded || (!timedOut && hasSessionCookie && !isSignedIn)) {
     return (
       <div className="flex min-h-screen items-center justify-center font-mono uppercase tracking-wider text-muted-foreground">
         Initializing console...
@@ -50,12 +59,13 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
   if (!isSignedIn) {
+    if (hasSessionCookie && timedOut) return <>{children}</>;
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
 
-function DashboardRoute({ children }: { children: ReactNode }) {
+function DashboardRoute({ children }: { children: React.ReactNode }) {
   return <DashboardLayout>{children}</DashboardLayout>;
 }
 

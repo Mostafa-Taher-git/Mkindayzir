@@ -12,6 +12,9 @@ export function setClerkTokenGetter(getToken: () => Promise<string | null>) {
     (window as unknown as Record<string, unknown>).__mk_fetch_patched = true;
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      // Don't intercept Clerk's own requests — getToken() triggers a clerk refresh
+      // fetch which would re-enter here and loop 100+ times.
+      if (url.includes("clerk")) return origFetch(input, init as RequestInit);
       const isApi = url.includes("/api/");
       if (isApi && getClerkToken) {
         try {

@@ -34,7 +34,12 @@ export function LoginForm() {
 
     // If Clerk already has an active session, redirect instead of calling
     // `signIn.create()` — that call throws "You're already signed in.".
-    if (isSignedIn) {
+    const alreadySigned =
+      isSignedIn ||
+      (typeof window !== "undefined" &&
+        ((window as unknown as { Clerk?: { session?: unknown } }).Clerk?.session ||
+          document.cookie.includes("__session")));
+    if (alreadySigned) {
       navigate(callbackUrl, { replace: true });
       return;
     }
@@ -53,7 +58,12 @@ export function LoginForm() {
       }
       setError("Additional verification required. Please check your email.");
     } catch (err) {
-      setError(firstClerkMessage(err, "Invalid email or password"));
+      const msg = firstClerkMessage(err, "Invalid email or password");
+      if (msg.toLowerCase().includes("already signed")) {
+        navigate(callbackUrl, { replace: true });
+        return;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -151,11 +161,11 @@ export function LoginForm() {
                 htmlFor="email"
                 className="mb-2 block text-sm font-medium font-mono uppercase tracking-wider"
               >
-                Email
+                Email or Username
               </label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full border-2 border-outline bg-surface px-3 py-2 font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
