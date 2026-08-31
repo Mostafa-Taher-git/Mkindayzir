@@ -46,6 +46,7 @@ export default function StormsPage() {
   const [scale, setScale] = React.useState(1);
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0, panX: 0, panY: 0 });
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [dragging, setDragging] = React.useState<null | { id: string; startX: number; startY: number; orig: Map<string, { x: number; y: number }>; group: string[] }>(null);
   const [linkDrag, setLinkDrag] = React.useState<null | { fromId: string; fromCorner: number; curX: number; curY: number }>(null);
   const [renameId, setRenameId] = React.useState<string | null>(null);
@@ -259,6 +260,7 @@ export default function StormsPage() {
     // only pan if clicking background (not a storm)
     const target = e.target as HTMLElement;
     if (target.closest("[data-storm-node]") || target.closest("[data-circle]") || target.closest("[data-link]")) return;
+    setSelectedId(null);
     setIsPanning(true);
     setPanStart({ x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y });
   };
@@ -376,10 +378,12 @@ export default function StormsPage() {
 
   const handleNodeClick = (storm: Storm, e: React.MouseEvent) => {
     // if was dragging, ignore click
-    if (dragging) return;
-    // if clicked circle, ignore
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-circle]")) return;
+    if ((dragging as any)?._dx || (dragging as any)?._dy) return;
+    // 1st click selects, 2nd click on same selected opens
+    if (selectedId !== storm.id) {
+      setSelectedId(storm.id);
+      return;
+    }
     navigate(`/storms/${storm.id}`);
   };
 
@@ -456,16 +460,23 @@ export default function StormsPage() {
           className="absolute inset-0"
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: "0 0" }}
         >
+          {/* center marker — shows map mid (0,0) */}
+          <div className="absolute pointer-events-none" style={{ left: 0, top: 0, width: 0, height: 0 }}>
+            <div className="absolute rounded-full border-2 border-dashed border-[#ff535b]/70" style={{ left: -22, top: -22, width: 44, height: 44, boxShadow: "0 0 10px rgba(255,83,91,0.45)" }} />
+            <div className="absolute w-px h-6 bg-[#ff535b]/40" style={{ left: 0, top: -12 }} />
+            <div className="absolute w-6 h-px bg-[#ff535b]/40" style={{ left: -12, top: 0 }} />
+            <div className="absolute w-2 h-2 rounded-full bg-[#ff535b]" style={{ left: -4, top: -4, boxShadow: "0 0 8px rgba(255,83,91,0.8)" }} />
+          </div>
           {/* storm nodes */}
           {renderStorms.map((s) => (
             <div
               key={s.id}
               data-storm-node
               onMouseDown={(e) => startNodeDrag(e, s)}
-              onDoubleClick={(e) => handleNodeClick(s, e)}
-              className="absolute group flex items-center justify-center bg-[#092a3a] border-2 border-[#001522] hover:border-[#ff535b] cursor-pointer"
-              style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12, boxShadow: "3px 3px 0 0 rgba(0,21,34,1), 0 0 12px rgba(255,83,91,0.45)" }}
-              title={s.name + " — double-click to open"}
+              onClick={(e) => handleNodeClick(s, e)}
+              className={`absolute group flex items-center justify-center bg-[#092a3a] border-2 cursor-pointer ${selectedId === s.id ? "border-[#ff535b]" : "border-[#001522] hover:border-[#ff535b]"}`}
+              style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12, boxShadow: selectedId === s.id ? "3px 3px 0 0 rgba(0,21,34,1), 0 0 14px rgba(255,83,91,0.65)" : "3px 3px 0 0 rgba(0,21,34,1), 0 0 12px rgba(255,83,91,0.45)" }}
+              title={selectedId === s.id ? s.name + " — click again to open" : s.name + " — click to select"}
             >
               {/* hand-drawn border wobble via outline offset */}
               <span className="px-3 text-sm font-medium font-mono text-center leading-tight truncate w-[92%] select-none text-[#c7e7ff]" dir="auto">
