@@ -171,13 +171,26 @@ export default function StormWhiteboardPage(){
       return;
     }
     if(tool==="text"){
+      // Click creates a text element and immediately opens the inline editor at
+      // the click point. The element's w is 0 (auto-width) — the editor's
+      // textarea starts at MIN_W * scale and auto-sizes as the user types.
       const world = screenToWorld(e.clientX, e.clientY);
       const id = uid();
-      // Inline editable text — like Excalidraw: create empty element, then open a
-      // canvas-positioned textarea for multiline + Arabic typing. No window.prompt.
       const newEl = {
-        id, type:"text", x:world.x, y:world.y, w: 200, h: 32,
-        text: "", stroke, fill:"transparent", strokeWidth, fontSize:20,
+        id, type: "text",
+        x: world.x, y: world.y,
+        w: 0, h: 0, // auto-fit
+        text: "",
+        fontSize: 20,
+        fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
+        lineHeight: 1.2,
+        textAlign: "left",
+        fontWeight: "normal",
+        fontStyle: "normal",
+        color: stroke,
+        backgroundColor: "transparent",
+        angle: 0,
+        opacity: 100,
         dir: "ltr",
       };
       pushHistory([...elements, newEl]);
@@ -471,49 +484,204 @@ export default function StormWhiteboardPage(){
       );
     }
     if(el.type==="text"){
-      // detect # references: #(name) or #name
-      const parts = String(el.text).split(/(#\([^\)]+\))/g);
-      return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
-          <foreignObject width={Math.max(160, el.w)} height={Math.max(40, el.h)} >
-            <div
-              dir={el.dir||"auto"}
-              style={{
-                fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
-                fontSize: el.fontSize||20,
-                lineHeight: 1.2,
-                color: el.stroke,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                cursor: editingTextId===el.id ? "text" : "pointer",
-                padding: 4,
-                minWidth: 80,
+      // Compute auto-fit width/height if not set (w=0 means auto-grow).
+      // Use canvas 2D measureText for accurate metrics.
+      const fontSize = el.fontSize || 20;
+      const lineHeight = el.lineHeight || 1.2;
+      const fontWeight = el.fontWeight || "normal";
+      const fontStyle = el.fontStyle || "normal";
+      const textAlign = el.textAlign || "left";
+      const color = el.color || "#111827";
+      const fontFamily = el.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui";
+      const lines = String(el.text || "").split(/\r?\n/);
+      // Measure the longest line at the actual font; default to char-width estimate if canvas not ready.
+      const measureCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      let maxLineW = 0;
+      let lineH = 0;
+      if(measureCanvas){
+        const ctx = measureCanvas.getContext("2d");
+        if(ctx){
+          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+          lineH = Math.ceil(fontSize * lineHeight);
+          for(const ln of lines){
+            const w = ctx.measureText(ln || " ").width;
+            if(w > maxLineW) maxLineW = w;
+          }
+        }
+      }
+      if(!lineH){
+        // Fallback estimate
+        lineH = Math.ceil(fontSize * 1.2);
+        maxLineW = Math.max(...lines.map(l => l.length * fontSize * 0.6), 0);
+      }
+      const padX = 4, padY = 4;
+      const MIN_W = 40; // minimum visible width when empty
+      const measuredW = lines.length === 1 && lines[0] === "" ? MIN_W : Math.max(MIN_W, Math.ceil(maxLineW) + padX*2);
+      const measuredH = Math.max(lineH, lines.length * lineH) + padY*2;
+      // The element's stored w/h may be 0 (auto). Use measured values.
+      const w = el.w && el.w > 0 ? el.w : measuredW;
+      const h = el.h && el.h > 0 ? el.h : measuredH;
+      const isEditing = editingTextId === el.id;
+      // The selection box should hug the actual text dimensions.
+      const parts = String(el.text || "").split(/(#\([^\)]+\))/g);
+      // For #(name) tokens, render clickable pills
+      const renderTextContent = () => parts.map((p, i) => {
+        if(p.startsWith("#(") && p.endsWith(")")){
+          const name = p.slice(2, -1);
+          return (
+            <span
+              key={i}
+              onMouseDown={(ev)=>{ ev.stopPropagation(); }}
+              onClick={(ev)=>{
+                ev.stopPropagation();
+                const found = (searchData as any)?.storms?.find((s: Storm) => s.name === name)
+                  || elements.find(x => x.type === "text" && x.text === name);
+                if(found?.id) navigate(`/storms/${found.id}`);
+                else alert(`Storm "${name}" not found — create it in Storms graph.`);
               }}
-              onMouseDown={(e)=> e.stopPropagation()}
-              onClick={(e)=>{
+              style={{ color: "hsl(var(--primary))", textDecoration: "underline", cursor: "pointer", fontWeight: 700 }}
+            >#{name}</span>
+          );
+        }
+        return <span key={i}>{p}</span>;
+      });
+      return (
+        <g
+          key={el.id}
+          data-el-id={el.id}
+          transform={`translate(${el.x},${el.y})${el.angle ? ` rotate(${el.angle} ${w/2} ${h/2})` : ""}`}
+        >
+          <foreignObject width={w} height={h}>
+            {/* Real textarea for both editing and read-only view. The styling is identical
+                in both states so the layout never jumps. Editing toggles readOnly + onChange. */}
+            <textarea
+              readOnly={!isEditing}
+              value={el.text || ""}
+              data-text-id={el.id}
+              ref={(node) => {
+                if(node && isEditing){
+                  // Focus the textarea as soon as it mounts in edit mode and place the caret at the click point.
+                  requestAnimationFrame(() => {
+                    node.focus();
+                    const text = node.value;
+                    // Approximate caret at clicked position by mapping y-offset within the box to a line index.
+                    // We don't know click position from the node, so default to the end of the text.
+                    try { node.setSelectionRange(text.length, text.length); } catch {}
+                  });
+                }
+              }}
+              onMouseDown={(e) => { e.stopPropagation(); }}
+              onClick={(e) => {
                 e.stopPropagation();
-                // Single-click on a text element: select AND immediately enter edit mode (one click to start typing).
+                // Click on text in any tool: select + enter edit mode (one click to start typing).
                 setSelectedId(el.id);
                 setEditingTextId(el.id);
                 setTextDraft(el.text || "");
               }}
-              onDoubleClick={(e)=>{
+              onDoubleClick={(e) => {
                 e.stopPropagation();
-                // Double-click also opens the editor (idempotent).
+                setSelectedId(el.id);
                 setEditingTextId(el.id);
                 setTextDraft(el.text || "");
               }}
-            >
-              {parts.map((p,i)=>{
-                if(p.startsWith("#(") && p.endsWith(")")){
-                  const name=p.slice(2,-1);
-                  return <span key={i} onClick={(e)=>{ e.stopPropagation(); const found=(searchData as any)?.storms?.find((s:Storm)=> s.name===name) || elements.find(x=> x.text===name); if(found?.id) navigate(`/storms/${found.id}`); else alert(`Storm "${name}" not found — create it in Storms graph.`); }} style={{color:"hsl(var(--primary))", textDecoration:"underline", cursor:"pointer", fontWeight:700}}>#{name}</span>;
+              onFocus={(e) => {
+                // Place caret at the click position when entering edit mode by double-click.
+                if(isEditing){
+                  const target = e.target as HTMLTextAreaElement;
+                  try{
+                    const pos = target.value.length; // approximation; detailed caret requires per-line measure
+                    requestAnimationFrame(() => { target.setSelectionRange(pos, pos); });
+                  } catch{}
                 }
-                return <span key={i}>{p}</span>;
-              })}
-            </div>
+              }}
+              onChange={(e) => {
+                const v = e.target.value;
+                const isRtl = /[\u0600-\u06FF]/.test(v);
+                // Auto-grow: store the new w/h so the rendered text and editor stay in sync.
+                const newLines = v.split(/\r?\n/);
+                let newMaxW = 0;
+                const ctx2 = measureCanvas?.getContext("2d");
+                if(ctx2){
+                  ctx2.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+                  for(const ln of newLines){
+                    const wm = ctx2.measureText(ln || " ").width;
+                    if(wm > newMaxW) newMaxW = wm;
+                  }
+                } else {
+                  newMaxW = Math.max(...newLines.map(l => l.length * fontSize * 0.6), MIN_W);
+                }
+                const newW = el.w > 0 ? el.w : Math.max(MIN_W, Math.ceil(newMaxW) + padX*2);
+                const newH = Math.max(lineH, newLines.length * lineH) + padY*2;
+                setElements((prev: any[]) => prev.map((x: any) => x.id === el.id
+                  ? { ...x, text: v, dir: isRtl ? "rtl" : "ltr", w: newW, h: newH }
+                  : x));
+                setTextDraft(v);
+              }}
+              onKeyDown={(e) => {
+                if(!isEditing) return;
+                if(e.key === "Escape"){
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+                // Normal keys (Backspace, arrows, Ctrl+A/C/V, etc.) work natively.
+              }}
+              onBlur={() => {
+                if(!isEditing) return;
+                // Commit and finish. Delete the element if text is empty.
+                const final = textDraft || el.text || "";
+                if(final.trim() === ""){
+                  setElements((prev: any[]) => prev.filter((x: any) => x.id !== el.id));
+                } else {
+                  // Already saved in onChange; just sync textDraft.
+                  setTextDraft(final);
+                }
+                setEditingTextId(null);
+                setTextDraft("");
+              }}
+              dir={el.dir || "auto"}
+              spellCheck={false}
+              className={isEditing
+                ? "block w-full h-full outline-none resize-none overflow-hidden"
+                : "block w-full h-full outline-none resize-none overflow-hidden pointer-events-none"}
+              style={{
+                fontFamily,
+                fontSize: `${fontSize}px`,
+                lineHeight,
+                fontWeight,
+                fontStyle,
+                textAlign,
+                color,
+                background: el.backgroundColor && el.backgroundColor !== "transparent" ? el.backgroundColor : "transparent",
+                padding: `${padY}px ${padX}px`,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
+                cursor: isEditing ? "text" : "pointer",
+                border: isEditing ? "2px solid hsl(var(--primary))" : "none",
+                borderRadius: isEditing ? 4 : 0,
+              }}
+            />
           </foreignObject>
-          {isSelected && <rect x={-2} y={-2} width={Math.max(160, el.w)+4} height={Math.max(40, el.h)+4} fill="none" stroke={selStroke} strokeDasharray="6 6"/>}
+          {/* Hidden text content for #reference clicks — only when not editing */}
+          {!isEditing && <foreignObject width={w} height={h} style={{position:"absolute", left:0, top:0, pointerEvents:"none"}}>
+            <div style={{position:"absolute", left:0, top:0, width:0, height:0, overflow:"hidden"}}>
+              {renderTextContent()}
+            </div>
+          </foreignObject>}
+          {/* Selection box (hugs the actual measured bounds) */}
+          {isSelected && !isEditing && (
+            <rect
+              x={-2} y={-2}
+              width={w+4} height={h+4}
+              fill="none"
+              stroke={selStroke}
+              strokeDasharray="6 6"
+              pointerEvents="none"
+            />
+          )}
         </g>
       );
     }
@@ -716,67 +884,6 @@ export default function StormWhiteboardPage(){
               </div>
             </div>
           </div>
-
-      {/* Inline text editor — overlaid on canvas at element position, scaled with pan/zoom */}
-      {editingTextId && (() => {
-        const el = elements.find((e:any)=>e.id===editingTextId);
-        if(!el) return null;
-        const fontSize = (el.fontSize||20) * scale;
-        const left = el.x * scale + pan.x;
-        const top = el.y * scale + pan.y;
-        const baseW = Math.max(180, el.w);
-        // Auto-fit width to the longest line in the current draft, capped at 720px world units.
-        const lines = (textDraft || "").split(/\r?\n/);
-        const longest = lines.reduce((m, ln) => Math.max(m, ln.length), 0);
-        const charW = (el.fontSize || 20) * 0.6;
-        const fitW = Math.min(720, Math.max(baseW, Math.ceil(longest * charW) + 24));
-        const w = fitW * scale;
-        return (
-          <textarea
-            // Capture-phase mouseDown so the canvas mousedown handler can't steal
-            // focus or finish the edit while the user is typing.
-            onMouseDown={(e)=>{ e.stopPropagation(); }}
-            onClick={(e)=>{ e.stopPropagation(); }}
-            onFocus={(e)=>{ /* make sure the caret is visible */ requestAnimationFrame(()=>{ e.target.select(); }); }}
-            ref={(node)=>{ if(node){ node.focus(); node.setSelectionRange(node.value.length, node.value.length); } }}
-            value={textDraft}
-            onChange={(e)=>{
-              const v = e.target.value;
-              setTextDraft(v);
-              const isRtl = /[\u0600-\u06FF]/.test(v);
-              // auto-grow height
-              e.target.style.height = "auto";
-              e.target.style.height = e.target.scrollHeight + "px";
-              setElements((prev:any[])=> prev.map((x:any)=> x.id===editingTextId ? {...x, text: v, dir: isRtl?"rtl":"ltr"}:x));
-            }}
-            onBlur={()=>{
-              setElements((prev:any[])=> prev.map((x:any)=> x.id===editingTextId ? {...x, text: textDraft, dir: /[\u0600-\u06FF]/.test(textDraft)?"rtl":"ltr"}:x));
-              setEditingTextId(null);
-              setTextDraft("");
-            }}
-            onKeyDown={(e)=>{
-              if(e.key === "Escape"){
-                e.preventDefault();
-                setEditingTextId(null);
-                setTextDraft("");
-              } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){
-                e.preventDefault();
-                (e.target as HTMLTextAreaElement).blur();
-              }
-            }}
-            placeholder="Type here — Enter for new line, Esc to finish…"
-            dir="auto"
-            className="absolute bg-white text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 outline-none resize-none overflow-hidden border-2 border-primary rounded p-1 z-30 shadow-xl"
-            style={{
-              left, top, width: w, minHeight: fontSize*1.4+8,
-              fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
-              fontSize,
-              lineHeight: 1.2,
-              color: el.stroke,
-            }}
-          />
-        );
-      })()}
 
       {renameOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
