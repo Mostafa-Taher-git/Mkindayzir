@@ -65,12 +65,11 @@ export default function StormWhiteboardPage(){
     if (!text) return null;
     const idx = text.lastIndexOf("#");
     if (idx === -1) return null;
-    // after # — allow "#", "#(", "#(Na", "#Name"
+    // after # — allow "#", "#(", "#(Na", "#Name", "# "
     const after = text.slice(idx + 1);
-    if (after.length > 0 && /^[^\w\u0600-\u06FF(]/.test(after)) return null; // "#" followed by space/punct → ignore
     // strip leading "(" if "#("
     const q = after.startsWith("(") ? after.slice(1) : after;
-    // take up to ")" or space or newline
+    // take up to ")" or newline
     const m = q.split(/[)\n]/)[0].split(/\s/)[0];
     return m; // may be "" → show all
   }
