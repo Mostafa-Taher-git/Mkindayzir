@@ -60,6 +60,20 @@ export default function StormWhiteboardPage(){
   const [textDraft, setTextDraft] = React.useState("");
   const [searchHash, setSearchHash] = React.useState("");
   const [searchFocused, setSearchFocused] = React.useState(false);
+  // inline # query derived from editing text (shows under the box you type in)
+  function getInlineHashQuery(text: string | undefined): string | null {
+    if (!text) return null;
+    const idx = text.lastIndexOf("#");
+    if (idx === -1) return null;
+    // after # — allow "#", "#(", "#(Na", "#Name"
+    const after = text.slice(idx + 1);
+    if (after.length > 0 && /^[^\w\u0600-\u06FF(]/.test(after)) return null; // "#" followed by space/punct → ignore
+    // strip leading "(" if "#("
+    const q = after.startsWith("(") ? after.slice(1) : after;
+    // take up to ")" or space or newline
+    const m = q.split(/[)\n]/)[0].split(/\s/)[0];
+    return m; // may be "" → show all
+  }
   const [bgColor, setBgColor] = React.useState<string>("#fffef8");
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -416,6 +430,18 @@ export default function StormWhiteboardPage(){
       return r as any;
     },
     enabled: true,
+  });
+  // inline # query: when typing "#..." inside a text box, show list under that box
+  const inlineEditingText = React.useMemo(()=> elements.find((e:any)=> e.id===editingTextId)?.text as string|undefined, [elements, editingTextId]);
+  const inlineHashQ = React.useMemo(()=> getInlineHashQuery(inlineEditingText), [inlineEditingText]);
+  const { data: inlineSearchData } = useQuery({
+    queryKey: ["storm-search-inline", wsParam, inlineHashQ ?? ""],
+    queryFn: async()=>{
+      const q = inlineHashQ ?? "";
+      const r=await api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(q)}&workspace=${wsParam}`);
+      return r as any;
+    },
+    enabled: inlineHashQ !== null,
   });
 
   // All storms in workspace for # pill resolution (clickable links) — include archived
@@ -1013,6 +1039,7 @@ export default function StormWhiteboardPage(){
             const left = el.x * scale + pan.x;
             const top = el.y * scale + pan.y;
             return (
+              <>
               <textarea
                 autoFocus
                 ref={(node) => {
@@ -1078,6 +1105,43 @@ export default function StormWhiteboardPage(){
                   border: "1.5px dashed hsl(var(--primary))",
                 }}
               />
+              {/* inline # list — appears under the box you type "#" in */}
+              {inlineHashQ !== null && (inlineSearchData as any)?.storms?.length > 0 && (
+                <div
+                  className="absolute z-40 bg-white dark:bg-zinc-900 border-2 border-zinc-900 rounded-lg shadow-[4px_4px_0_0_rgba(0,0,0,1)] max-h-48 overflow-auto w-56"
+                  style={{ left, top: top + hPx + 6 }}
+                  onMouseDown={(e)=> e.preventDefault()}
+                >
+                  {(inlineSearchData as any).storms.slice(0,10).map((s:Storm)=> (
+                    <button
+                      key={s.id}
+                      className="block w-full text-left px-3 py-1.5 hover:bg-accent text-xs font-mono truncate"
+                      onMouseDown={(e)=> { e.preventDefault(); e.stopPropagation();
+                        // insert "#(name)" replacing the last "#..." in this text
+                        const cur = el.text || "";
+                        const idx = cur.lastIndexOf("#");
+                        const before = idx !== -1 ? cur.slice(0, idx) : cur;
+                        const inserted = `#(${s.name})`;
+                        const after = "";
+                        const newText = before + inserted + after;
+                        // update element text and size
+                        const lines = newText.split(/\r?\n/);
+                        let newMaxW = 0;
+                        const c = document.createElement("canvas");
+                        const ctx = c.getContext("2d");
+                        if(ctx){ ctx.font = `${el.fontStyle||"normal"} ${el.fontWeight||"normal"} ${(el.fontSize||20)}px ${fontFamily}`; for(const ln of lines){ const w=ctx.measureText(ln||" ").width; if(w>newMaxW) newMaxW=w; } }
+                        const newW = Math.max(MIN_W, Math.ceil(newMaxW)+8);
+                        const newH = lines.length * lineH + 8;
+                        setElements((prev:any[])=> prev.map((x:any)=> x.id===el.id ? {...x, text:newText, w:newW, h:newH} : x));
+                        setTextDraft(newText);
+                      }}
+                    >
+                      {s.name} {(s as any).isArchived ? "· archived" : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
             );
           })()}
           </div>
