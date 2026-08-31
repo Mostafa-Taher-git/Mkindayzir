@@ -144,12 +144,14 @@ export default function StormWhiteboardPage(){
       return;
     }
     if(tool==="select"){
-      // check if clicked on element
-      const el = (target.closest("[data-el-id]") as HTMLElement|null);
-      if(el){
-        const id = el.getAttribute("data-el-id");
+      // Excalidraw select: click empty → deselect, click element → select,
+      // drag element → move, drag empty → box-select, double-click text → edit
+      const hit = (target.closest("[data-el-id]") as HTMLElement|null);
+      if(hit){
+        const id = hit.getAttribute("data-el-id")!;
+        // If user double-clicked a text element, the <text> onDoubleClick will handle edit;
+        // mousedown just selects and prepares move — don't consume double-click.
         setSelectedId(id);
-        // start drag move
         const world = screenToWorld(e.clientX, e.clientY);
         const found = elements.find(x=>x.id===id);
         if(found){
@@ -157,9 +159,12 @@ export default function StormWhiteboardPage(){
         }
         return;
       } else {
+        // Start box-selection drag (Excalidraw marquee)
+        const world = screenToWorld(e.clientX, e.clientY);
         setSelectedId(null);
+        setDrawing({ type:"selection", x: world.x, y: world.y, w: 0, h: 0 });
+        return;
       }
-      return;
     }
     if(tool==="eraser"){
       const el = (target.closest("[data-el-id]") as HTMLElement|null);
@@ -171,15 +176,27 @@ export default function StormWhiteboardPage(){
       return;
     }
     if(tool==="text"){
-      // Click creates a text element and immediately opens the inline editor at
-      // the click point. The element's w is 0 (auto-width) — the editor's
-      // textarea starts at MIN_W * scale and auto-sizes as the user types.
+      // Excalidraw T: click empty → new text at click, click existing text → edit it
+      const hit = (target.closest("[data-el-id]") as HTMLElement|null);
+      if(hit){
+        const hid = hit.getAttribute("data-el-id");
+        const found:any = elements.find((x:any)=> x.id===hid && x.type==="text");
+        if(found){
+          setSelectedId(hid);
+          setEditingTextId(hid);
+          setTextDraft(found.text||"");
+          return;
+        }
+        // Hit a non-text element while in T tool — Excalidraw ignores it (don't create)
+        return;
+      }
+      // Empty background → create new text at world point and focus immediately
       const world = screenToWorld(e.clientX, e.clientY);
       const id = uid();
       const newEl = {
         id, type: "text",
         x: world.x, y: world.y,
-        w: 0, h: 0, // auto-fit
+        w: 120, h: 28,
         text: "",
         fontSize: 20,
         fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
@@ -193,10 +210,13 @@ export default function StormWhiteboardPage(){
         opacity: 100,
         dir: "ltr",
       };
-      pushHistory([...elements, newEl]);
+      // Use functional updates to avoid stale closure when rapidly creating
+      setHistory(h=> [...h.slice(-99), elements]);
+      setRedoStack([]);
+      setElements(prev=> [...prev, newEl]);
       setSelectedId(id);
-      setEditingTextId(id);
-      setTextDraft("");
+      // Defer editing focus to next tick so DOM mounts first — Excalidraw does same
+      setTimeout(()=> { setEditingTextId(id); setTextDraft(""); }, 0);
       return;
     }
     if(tool==="image"){
@@ -221,6 +241,13 @@ export default function StormWhiteboardPage(){
     }
     if(!drawing) return;
     const world = screenToWorld(e.clientX, e.clientY);
+    if(drawing.type==="selection"){
+      // Excalidraw marquee: normalize so w/h positive, x/y is top-left
+      const w = world.x - drawing.x;
+      const h = world.y - drawing.y;
+      setDrawing((d:any)=> ({...d, w: Math.abs(w), h: Math.abs(h), x: w<0? world.x : d.x, y: h<0? world.y : d.y }));
+      return;
+    }
     if(drawing.type==="move"){
       const found = elements.find((x:any)=>x.id===drawing.id);
       if(!found) return;
@@ -251,6 +278,29 @@ export default function StormWhiteboardPage(){
   const handleSvgMouseUp = ()=>{
     if(isPanning){ setIsPanning(false); return; }
     if(!drawing) return;
+    if(drawing.type==="selection"){
+      // Select elements fully/partially inside marquee — Excalidraw behaviour
+      if(drawing.w < 4 && drawing.h < 4){
+        setDrawing(null);
+        return;
+      }
+      const sx = drawing.x, sy = drawing.y, ex = drawing.x + drawing.w, ey = drawing.y + drawing.h;
+      // For now single-select the first intersecting (Excalidraw selects all intersecting)
+      // Collect all intersecting for future multi-select
+      const hitIds = elements.filter((el:any)=>{
+        const elx = el.x ?? 0, ely = el.y ?? 0, elw = el.w ?? 0, elh = el.h ?? 0;
+        // text with w/h 0 still has measured bounds, but we treat as hit if point inside
+        const x2 = el.type==="arrow"||el.type==="line" ? Math.max(el.x, el.x2??el.x) : elx+Math.max(elw,10);
+        const y2 = el.type==="arrow"||el.type==="line" ? Math.max(el.y, el.y2??el.y) : ely+Math.max(elh,10);
+        const x1 = el.type==="arrow"||el.type==="line" ? Math.min(el.x, el.x2??el.x) : elx;
+        const y1 = el.type==="arrow"||el.type==="line" ? Math.min(el.y, el.y2??el.y) : ely;
+        return !(x2 < sx || x1 > ex || y2 < sy || y1 > ey);
+      }).map((el:any)=> el.id);
+      if(hitIds.length===1) setSelectedId(hitIds[0]);
+      else if(hitIds.length>1) setSelectedId(hitIds[0]); // TODO multi-select
+      setDrawing(null);
+      return;
+    }
     if(drawing.type==="move"){
       // push history for move
       setHistory(h=> [...h.slice(-99), elements]);
@@ -377,19 +427,49 @@ export default function StormWhiteboardPage(){
     onSuccess: ()=> navigate("/storms"),
   });
 
+  // Update a single text element's properties (font, color, alignment, etc).
+  // W is auto-recalculated based on the new font so the visible text box stays in sync.
+  const updateTextEl = (id: string, patch: any) => {
+    setElements((prev: any[]) => prev.map((x: any) => {
+      if(x.id !== id) return x;
+      const merged = { ...x, ...patch };
+      // Recompute w/h if font properties changed
+      if(patch.fontSize !== undefined || patch.fontFamily !== undefined || patch.fontWeight !== undefined || patch.fontStyle !== undefined || patch.text !== undefined){
+        try{
+          const c = document.createElement("canvas");
+          const ctx = c.getContext("2d");
+          if(ctx){
+            const fs = merged.fontSize || 20;
+            const lh = Math.ceil(fs * (merged.lineHeight || 1.2));
+            const lines = String(merged.text || "").split(/\r?\n/);
+            ctx.font = `${merged.fontStyle || "normal"} ${merged.fontWeight || "normal"} ${fs}px ${merged.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui"}`;
+            let maxW = 0;
+            for(const ln of lines){ const w = ctx.measureText(ln || " ").width; if(w > maxW) maxW = w; }
+            merged.w = Math.max(40, Math.ceil(maxW) + 8);
+            merged.h = Math.max(lh, lines.length * lh) + 8;
+          }
+        }catch{}
+      }
+      return merged;
+    }));
+  };
+
+  // Convenience: when a text element is selected, pull its properties to the panel.
+  const selectedTextEl = selectedId ? elements.find((e:any)=> e.id === selectedId && e.type === "text") : null;
+
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [renameVal, setRenameVal] = React.useState("");
 
   React.useEffect(()=>{ if(stormData?.name) setRenameVal(stormData.name); },[stormData?.name]);
 
-  // Keyboard shortcuts: standard whiteboard UX.
-  // 1=select, 2=hand, 3=pen, 4=rect, 5=ellipse, 6=diamond, 7=arrow, 8=line, 9=text, 0=eraser
-  // V=select, H=hand, P=pen, R=rect, O=ellipse, D=diamond, A=arrow, L=line, T=text, E=eraser
-  // Ctrl/Cmd+Z=undo, Ctrl/Cmd+Shift+Z / Ctrl+Y=redo, Ctrl/Cmd+D=duplicate, Delete/Backspace=delete
+  // Keyboard shortcuts: only 2-key combos + system keys.
+  // Kept: Ctrl/Cmd+Z=undo, Ctrl/Cmd+Shift+Z / Ctrl+Y=redo, Ctrl/Cmd+D=duplicate, Delete/Backspace=delete
   // Hold Space = pan from any tool. Esc = release current action.
+  // Single-key tool switches (V,H,P,R,O,D,A,L,T,E, 1-0) removed per request — use the toolbar.
   const [spaceHeld, setSpaceHeld] = React.useState(false);
   React.useEffect(()=>{
     const isFormFocus = () => {
+      if(editingTextId) return true;
       const el = document.activeElement as HTMLElement | null;
       if(!el) return false;
       const tag = el.tagName;
@@ -418,15 +498,26 @@ export default function StormWhiteboardPage(){
         setTool("select");
         return;
       }
-      const keyMap: Record<string, any> = { "1":"select","v":"select","2":"hand","h":"hand","3":"pen","p":"pen","4":"rect","r":"rect","5":"ellipse","o":"ellipse","6":"diamond","d":"diamond","7":"arrow","a":"arrow","8":"line","l":"line","9":"text","t":"text","0":"eraser","e":"eraser" };
-      const next = keyMap[e.key.toLowerCase()];
-      if(next){ setTool(next); }
     };
     const onKeyUp = (e: KeyboardEvent) => { if(e.code === "Space") setSpaceHeld(false); };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); };
   }, [selectedId, editingTextId, spaceHeld, undo, redo, duplicateSelected, deleteSelected]);
+
+  // Ensure new text's textarea gets focus immediately (Excalidraw behaviour)
+  // Even if React batches setState, this guarantees the next tick focuses.
+  React.useEffect(()=>{
+    if(!editingTextId) return;
+    const t = setTimeout(()=>{
+      const ta = document.querySelector('textarea[placeholder="Type something\u2026"]') as HTMLTextAreaElement | null;
+      if(ta){
+        ta.focus();
+        try{ const l=ta.value.length; ta.setSelectionRange(l,l);}catch{}
+      }
+    }, 0);
+    return ()=> clearTimeout(t);
+  }, [editingTextId]);
 
   // while editing a text element, hide the rendered text under the editor
   const renderElement = (el:any, hideIfEditing = false)=>{
@@ -484,20 +575,19 @@ export default function StormWhiteboardPage(){
       );
     }
     if(el.type==="text"){
-      // Compute auto-fit width/height if not set (w=0 means auto-grow).
-      // Use canvas 2D measureText for accurate metrics.
+      // View layer: SVG <text> element — always visible, scales with the canvas.
+      // Edit layer: a separate HTML <textarea> overlay (rendered outside the SVG) is used when editing.
       const fontSize = el.fontSize || 20;
       const lineHeight = el.lineHeight || 1.2;
       const fontWeight = el.fontWeight || "normal";
       const fontStyle = el.fontStyle || "normal";
       const textAlign = el.textAlign || "left";
       const color = el.color || "#111827";
-      const fontFamily = el.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui";
+      const fontFamily = (el.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui").replace(/^"|"$/g, "");
       const lines = String(el.text || "").split(/\r?\n/);
-      // Measure the longest line at the actual font; default to char-width estimate if canvas not ready.
+      // Measure the longest line
       const measureCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
-      let maxLineW = 0;
-      let lineH = 0;
+      let maxLineW = 0, lineH = 0;
       if(measureCanvas){
         const ctx = measureCanvas.getContext("2d");
         if(ctx){
@@ -510,167 +600,77 @@ export default function StormWhiteboardPage(){
         }
       }
       if(!lineH){
-        // Fallback estimate
         lineH = Math.ceil(fontSize * 1.2);
         maxLineW = Math.max(...lines.map(l => l.length * fontSize * 0.6), 0);
       }
       const padX = 4, padY = 4;
-      const MIN_W = 40; // minimum visible width when empty
-      const measuredW = lines.length === 1 && lines[0] === "" ? MIN_W : Math.max(MIN_W, Math.ceil(maxLineW) + padX*2);
+      const MIN_W = 40;
+      const measuredW = (lines.length === 1 && lines[0] === "") ? MIN_W : Math.max(MIN_W, Math.ceil(maxLineW) + padX*2);
       const measuredH = Math.max(lineH, lines.length * lineH) + padY*2;
-      // The element's stored w/h may be 0 (auto). Use measured values.
       const w = el.w && el.w > 0 ? el.w : measuredW;
       const h = el.h && el.h > 0 ? el.h : measuredH;
       const isEditing = editingTextId === el.id;
-      // The selection box should hug the actual text dimensions.
+      // anchorX based on textAlign
+      const anchorX = textAlign === "center" ? w/2 : textAlign === "right" ? w : padX;
+      const anchorTransform = textAlign === "center" ? "middle" : textAlign === "right" ? "end" : "start";
+      // detect # references for clickable pills (only when not editing)
       const parts = String(el.text || "").split(/(#\([^\)]+\))/g);
-      // For #(name) tokens, render clickable pills
-      const renderTextContent = () => parts.map((p, i) => {
-        if(p.startsWith("#(") && p.endsWith(")")){
-          const name = p.slice(2, -1);
-          return (
-            <span
-              key={i}
-              onMouseDown={(ev)=>{ ev.stopPropagation(); }}
-              onClick={(ev)=>{
-                ev.stopPropagation();
-                const found = (searchData as any)?.storms?.find((s: Storm) => s.name === name)
-                  || elements.find(x => x.type === "text" && x.text === name);
-                if(found?.id) navigate(`/storms/${found.id}`);
-                else alert(`Storm "${name}" not found — create it in Storms graph.`);
-              }}
-              style={{ color: "hsl(var(--primary))", textDecoration: "underline", cursor: "pointer", fontWeight: 700 }}
-            >#{name}</span>
-          );
-        }
-        return <span key={i}>{p}</span>;
-      });
       return (
         <g
           key={el.id}
           data-el-id={el.id}
           transform={`translate(${el.x},${el.y})${el.angle ? ` rotate(${el.angle} ${w/2} ${h/2})` : ""}`}
         >
-          <foreignObject width={w} height={h}>
-            {/* Real textarea for both editing and read-only view. The styling is identical
-                in both states so the layout never jumps. Editing toggles readOnly + onChange. */}
-            <textarea
-              readOnly={!isEditing}
-              value={el.text || ""}
-              data-text-id={el.id}
-              ref={(node) => {
-                if(node && isEditing){
-                  // Focus the textarea as soon as it mounts in edit mode and place the caret at the click point.
-                  requestAnimationFrame(() => {
-                    node.focus();
-                    const text = node.value;
-                    // Approximate caret at clicked position by mapping y-offset within the box to a line index.
-                    // We don't know click position from the node, so default to the end of the text.
-                    try { node.setSelectionRange(text.length, text.length); } catch {}
-                  });
-                }
-              }}
-              onMouseDown={(e) => { e.stopPropagation(); }}
-              onClick={(e) => {
-                e.stopPropagation();
-                // Click on text in any tool: select + enter edit mode (one click to start typing).
-                setSelectedId(el.id);
-                setEditingTextId(el.id);
-                setTextDraft(el.text || "");
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setSelectedId(el.id);
-                setEditingTextId(el.id);
-                setTextDraft(el.text || "");
-              }}
-              onFocus={(e) => {
-                // Place caret at the click position when entering edit mode by double-click.
-                if(isEditing){
-                  const target = e.target as HTMLTextAreaElement;
-                  try{
-                    const pos = target.value.length; // approximation; detailed caret requires per-line measure
-                    requestAnimationFrame(() => { target.setSelectionRange(pos, pos); });
-                  } catch{}
-                }
-              }}
-              onChange={(e) => {
-                const v = e.target.value;
-                const isRtl = /[\u0600-\u06FF]/.test(v);
-                // Auto-grow: store the new w/h so the rendered text and editor stay in sync.
-                const newLines = v.split(/\r?\n/);
-                let newMaxW = 0;
-                const ctx2 = measureCanvas?.getContext("2d");
-                if(ctx2){
-                  ctx2.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
-                  for(const ln of newLines){
-                    const wm = ctx2.measureText(ln || " ").width;
-                    if(wm > newMaxW) newMaxW = wm;
+          {/* Background fill behind the text (only when set) */}
+          {el.backgroundColor && el.backgroundColor !== "transparent" && (
+            <rect x={0} y={0} width={w} height={h} fill={el.backgroundColor} rx={2} />
+          )}
+          {/* Render each line as its own <text> so multi-line is exact. */}
+          {lines.map((ln, i) => {
+            // Split this line for # pills
+            const lineParts = ln.split(/(#\([^\)]+\))/g);
+            return (
+              <text
+                key={i}
+                x={anchorX}
+                y={padY + lineH * (i + 0.8)} // approximate baseline
+                fontSize={fontSize}
+                fontFamily={fontFamily}
+                fontWeight={fontWeight}
+                fontStyle={fontStyle}
+                textAnchor={anchorTransform}
+                fill={color}
+                style={{ userSelect: isEditing ? "none" : "text", cursor: tool==="text" ? "text" : "default" }}
+                onDoubleClick={(e) => {
+                  // Excalidraw: double-click text in select tool → edit
+                  e.stopPropagation();
+                  setSelectedId(el.id);
+                  setEditingTextId(el.id);
+                  setTextDraft(el.text || "");
+                }}
+              >
+                {lineParts.map((p, j) => {
+                  if(p.startsWith("#(") && p.endsWith(")")){
+                    const name = p.slice(2, -1);
+                    return (
+                      <tspan
+                        key={j}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const found = (searchData as any)?.storms?.find((s: Storm) => s.name === name)
+                            || elements.find(x => x.type === "text" && x.text === name);
+                          if(found?.id) navigate(`/storms/${found.id}`);
+                          else alert(`Storm "${name}" not found — create it in Storms graph.`);
+                        }}
+                        style={{ textDecoration: "underline", cursor: "pointer", fill: "hsl(var(--primary))", fontWeight: 700 }}
+                      >#{name}</tspan>
+                    );
                   }
-                } else {
-                  newMaxW = Math.max(...newLines.map(l => l.length * fontSize * 0.6), MIN_W);
-                }
-                const newW = el.w > 0 ? el.w : Math.max(MIN_W, Math.ceil(newMaxW) + padX*2);
-                const newH = Math.max(lineH, newLines.length * lineH) + padY*2;
-                setElements((prev: any[]) => prev.map((x: any) => x.id === el.id
-                  ? { ...x, text: v, dir: isRtl ? "rtl" : "ltr", w: newW, h: newH }
-                  : x));
-                setTextDraft(v);
-              }}
-              onKeyDown={(e) => {
-                if(!isEditing) return;
-                if(e.key === "Escape"){
-                  e.preventDefault();
-                  (e.target as HTMLTextAreaElement).blur();
-                } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){
-                  e.preventDefault();
-                  (e.target as HTMLTextAreaElement).blur();
-                }
-                // Normal keys (Backspace, arrows, Ctrl+A/C/V, etc.) work natively.
-              }}
-              onBlur={() => {
-                if(!isEditing) return;
-                // Commit and finish. Delete the element if text is empty.
-                const final = textDraft || el.text || "";
-                if(final.trim() === ""){
-                  setElements((prev: any[]) => prev.filter((x: any) => x.id !== el.id));
-                } else {
-                  // Already saved in onChange; just sync textDraft.
-                  setTextDraft(final);
-                }
-                setEditingTextId(null);
-                setTextDraft("");
-              }}
-              dir={el.dir || "auto"}
-              spellCheck={false}
-              className={isEditing
-                ? "block w-full h-full outline-none resize-none overflow-hidden"
-                : "block w-full h-full outline-none resize-none overflow-hidden pointer-events-none"}
-              style={{
-                fontFamily,
-                fontSize: `${fontSize}px`,
-                lineHeight,
-                fontWeight,
-                fontStyle,
-                textAlign,
-                color,
-                background: el.backgroundColor && el.backgroundColor !== "transparent" ? el.backgroundColor : "transparent",
-                padding: `${padY}px ${padX}px`,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-                cursor: isEditing ? "text" : "pointer",
-                border: isEditing ? "2px solid hsl(var(--primary))" : "none",
-                borderRadius: isEditing ? 4 : 0,
-              }}
-            />
-          </foreignObject>
-          {/* Hidden text content for #reference clicks — only when not editing */}
-          {!isEditing && <foreignObject width={w} height={h} style={{position:"absolute", left:0, top:0, pointerEvents:"none"}}>
-            <div style={{position:"absolute", left:0, top:0, width:0, height:0, overflow:"hidden"}}>
-              {renderTextContent()}
-            </div>
-          </foreignObject>}
+                  return p;
+                })}
+              </text>
+            );
+          })}
           {/* Selection box (hugs the actual measured bounds) */}
           {isSelected && !isEditing && (
             <rect
@@ -697,8 +697,10 @@ export default function StormWhiteboardPage(){
   };
 
   const previewEl = drawing && drawing.type!=="move" ? (
-    <g opacity={0.7}>
-      {drawing.type==="pen" ? (
+    <g opacity={drawing.type==="selection" ? 1 : 0.7}>
+      {drawing.type==="selection" ? (
+        <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} fill="rgba(99,102,241,0.08)" stroke="hsl(var(--primary))" strokeWidth={1/scale} strokeDasharray="6 4" rx={2}/>
+      ) : drawing.type==="pen" ? (
         // Preview the pen path at world coordinates, offsetting by the
         // recorded first point so the line is anchored to the click.
         (() => {
@@ -792,17 +794,17 @@ export default function StormWhiteboardPage(){
               onMouseDown={(e)=> e.stopPropagation()}
             >
               {[
-                {k:"select", l:"Select (V / 1)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>},
-                {k:"hand", l:"Hand (H / 2)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 0 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>},
-                {k:"pen", l:"Pen (P / 3)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>},
-                {k:"rect", l:"Rectangle (R / 4)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/></svg>},
-                {k:"ellipse", l:"Ellipse (O / 5)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="12" rx="10" ry="7"/></svg>},
-                {k:"diamond", l:"Diamond (D / 6)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 22 12 12 22 2 12z"/></svg>},
-                {k:"arrow", l:"Arrow (A / 7)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>},
-                {k:"line", l:"Line (L / 8)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 19 19 5"/></svg>},
-                {k:"text", l:"Text (T / 9)", i:<span className="text-base font-bold">T</span>},
+                {k:"select", l:"Select", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>},
+                {k:"hand", l:"Hand", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 0 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>},
+                {k:"pen", l:"Pen", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>},
+                {k:"rect", l:"Rectangle", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/></svg>},
+                {k:"ellipse", l:"Ellipse", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="12" rx="10" ry="7"/></svg>},
+                {k:"diamond", l:"Diamond", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 22 12 12 22 2 12z"/></svg>},
+                {k:"arrow", l:"Arrow", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>},
+                {k:"line", l:"Line", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 19 19 5"/></svg>},
+                {k:"text", l:"Text", i:<span className="text-base font-bold">T</span>},
                 {k:"image", l:"Image", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>},
-                {k:"eraser", l:"Eraser (E / 0)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>},
+                {k:"eraser", l:"Eraser", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>},
               ].map(t=> (
                 <button
                   key={t.k}
@@ -842,7 +844,7 @@ export default function StormWhiteboardPage(){
                 <div className="flex items-center gap-0.5 ml-1">
                   {[
                     {c:"#fffef8"},
-                    {c:"#ffffff"},
+                    {c:"#e5e7eb"},
                     {c:"#0e0e0f"},
                     {c:"#fde68a"},
                     {c:"#bae6fd"},
@@ -853,6 +855,85 @@ export default function StormWhiteboardPage(){
                   ))}
                 </div>
               </div>
+
+              {/* Text properties — visible when a text element is selected */}
+              {selectedTextEl && (
+                <>
+                  <div className="h-px bg-border" />
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-primary">Text</div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Font</span>
+                    <select
+                      className="flex-1 h-7 px-1 border rounded text-xs bg-white dark:bg-zinc-900"
+                      value={selectedTextEl.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui"}
+                      onChange={(e) => updateTextEl(selectedTextEl.id, { fontFamily: e.target.value })}
+                    >
+                      <option value="'Caveat','Kalam','Segoe UI',system-ui">Caveat</option>
+                      <option value="'Kalam','Caveat',system-ui">Kalam</option>
+                      <option value="Inter, system-ui, sans-serif">Inter</option>
+                      <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                      <option value="'Courier New', monospace">Courier</option>
+                      <option value="system-ui, sans-serif">System</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Size</span>
+                    <input type="range" min={10} max={64} value={selectedTextEl.fontSize || 20} onChange={(e) => updateTextEl(selectedTextEl.id, { fontSize: parseInt(e.target.value) })} className="flex-1" />
+                    <span className="font-mono w-8 text-right">{selectedTextEl.fontSize || 20}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Style</span>
+                    <button
+                      onClick={() => updateTextEl(selectedTextEl.id, { fontWeight: (selectedTextEl.fontWeight === "bold" ? "normal" : "bold") })}
+                      className={`h-7 w-7 rounded border flex items-center justify-center font-bold text-sm ${selectedTextEl.fontWeight === "bold" ? "bg-primary text-primary-foreground border-primary" : "bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}
+                      title="Bold"
+                    >B</button>
+                    <button
+                      onClick={() => updateTextEl(selectedTextEl.id, { fontStyle: (selectedTextEl.fontStyle === "italic" ? "normal" : "italic") })}
+                      className={`h-7 w-7 rounded border flex items-center justify-center italic text-sm ${selectedTextEl.fontStyle === "italic" ? "bg-primary text-primary-foreground border-primary" : "bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}
+                      title="Italic"
+                    >I</button>
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => updateTextEl(selectedTextEl.id, { textAlign: "left" })}
+                      className={`h-7 w-7 rounded border flex items-center justify-center text-sm ${(selectedTextEl.textAlign || "left") === "left" ? "bg-primary text-primary-foreground border-primary" : "bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}
+                      title="Align left"
+                    >≡</button>
+                    <button
+                      onClick={() => updateTextEl(selectedTextEl.id, { textAlign: "center" })}
+                      className={`h-7 w-7 rounded border flex items-center justify-center text-sm ${selectedTextEl.textAlign === "center" ? "bg-primary text-primary-foreground border-primary" : "bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}
+                      title="Align center"
+                    >≡</button>
+                    <button
+                      onClick={() => updateTextEl(selectedTextEl.id, { textAlign: "right" })}
+                      className={`h-7 w-7 rounded border flex items-center justify-center text-sm ${selectedTextEl.textAlign === "right" ? "bg-primary text-primary-foreground border-primary" : "bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}
+                      title="Align right"
+                    >≡</button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Color</span>
+                    <input type="color" value={selectedTextEl.color || "#111827"} onChange={(e) => updateTextEl(selectedTextEl.id, { color: e.target.value })} className="h-7 w-7 p-0 border rounded" />
+                    <div className="flex items-center gap-0.5">
+                      {["#111827", "#ffffff", "#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#7c3aed"].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => updateTextEl(selectedTextEl.id, { color: c })}
+                          className="h-5 w-5 rounded border"
+                          style={{ background: c, borderColor: (selectedTextEl.color || "#111827") === c ? "hsl(var(--primary))" : "rgba(0,0,0,0.25)" }}
+                          title={c}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">BG</span>
+                    <input type="color" value={(selectedTextEl.backgroundColor && selectedTextEl.backgroundColor !== "transparent") ? selectedTextEl.backgroundColor : "#ffffff"} onChange={(e) => updateTextEl(selectedTextEl.id, { backgroundColor: e.target.value })} className="h-7 w-7 p-0 border rounded" />
+                    <button onClick={() => updateTextEl(selectedTextEl.id, { backgroundColor: "transparent" })} className="flex-1 text-xs underline">none</button>
+                  </div>
+                </>
+              )}
+
+              <div className="h-px bg-border" />
               <div className="flex items-center gap-1 text-xs">
                 <input placeholder="#(Storm Name) to reference…" value={searchHash} onChange={e=> setSearchHash(e.target.value)} dir="auto" className="flex-1 h-7 px-2 border rounded text-xs" />
                 {searchHash && (searchData as any)?.storms?.length>0 && (
@@ -883,6 +964,102 @@ export default function StormWhiteboardPage(){
                 <span className="text-muted-foreground font-mono px-1">{elements.length} els</span>
               </div>
             </div>
+            {/* HTML edit overlay — must be INSIDE containerRef so left/top align with SVG world */}
+          {editingTextId && (() => {
+            const el = elements.find((e:any) => e.id === editingTextId);
+            if(!el || el.type !== "text") return null;
+            const fontSize = (el.fontSize || 20) * scale;
+            const lineHeight = el.lineHeight || 1.2;
+            const measureCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
+            const fontFamily = (el.fontFamily || "'Caveat','Kalam','Segoe UI',system-ui").replace(/^"|"$/g, "");
+            let maxLineW = 0, lineH = 0;
+            if(measureCanvas){
+              const ctx = measureCanvas.getContext("2d");
+              if(ctx){
+                ctx.font = `${el.fontStyle || "normal"} ${el.fontWeight || "normal"} ${(el.fontSize || 20)}px ${fontFamily}`;
+                lineH = Math.ceil((el.fontSize || 20) * lineHeight);
+                const lines = String(el.text || "").split(/\r?\n/);
+                for(const ln of lines){ const w = ctx.measureText(ln || " ").width; if(w > maxLineW) maxLineW = w; }
+              }
+            }
+            if(!lineH){ lineH = Math.ceil((el.fontSize || 20) * 1.2); }
+            const padX = 4, padY = 4;
+            const MIN_W = 120;
+            const textW = maxLineW > 0 ? Math.ceil(maxLineW) + padX*2 : MIN_W;
+            const lines = String(el.text || "").split(/\r?\n/).length || 1;
+            const textH = lines * lineH + padY*2;
+            const wPx = Math.max(MIN_W, textW) * scale;
+            const hPx = Math.max(lineH, textH) * scale;
+            const left = el.x * scale + pan.x;
+            const top = el.y * scale + pan.y;
+            return (
+              <textarea
+                autoFocus
+                ref={(node) => {
+                  if(node){
+                    node.focus();
+                    const len = node.value.length;
+                    try { node.setSelectionRange(len, len); } catch {}
+                  }
+                }}
+                value={el.text || ""}
+                placeholder="Type something…"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const isRtl = /[\u0600-\u06FF]/.test(v);
+                  const newLines = v.split(/\r?\n/);
+                  let newMaxW = 0;
+                  if(measureCanvas){
+                    const ctx = measureCanvas.getContext("2d");
+                    if(ctx){
+                      ctx.font = `${el.fontStyle || "normal"} ${el.fontWeight || "normal"} ${(el.fontSize || 20)}px ${fontFamily}`;
+                      for(const ln of newLines){ const w = ctx.measureText(ln || " ").width; if(w > newMaxW) newMaxW = w; }
+                    }
+                  }
+                  const newW = (newMaxW > 0 ? Math.ceil(newMaxW) + padX*2 : MIN_W);
+                  const newH = newLines.length * lineH + padY*2;
+                  setElements((prev: any[]) => prev.map((x: any) => x.id === el.id
+                    ? { ...x, text: v, dir: isRtl ? "rtl" : "ltr", w: newW, h: newH }
+                    : x));
+                  setTextDraft(v);
+                }}
+                onKeyDown={(e) => {
+                  if(e.key === "Escape"){
+                    e.preventDefault();
+                    (e.target as HTMLTextAreaElement).blur();
+                  } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){
+                    e.preventDefault();
+                    (e.target as HTMLTextAreaElement).blur();
+                  }
+                }}
+                onBlur={() => {
+                  const final = (el.text || "").trim();
+                  if(final === ""){
+                    setElements((prev: any[]) => prev.filter((x: any) => x.id !== el.id));
+                  }
+                  setEditingTextId(null);
+                  setTextDraft("");
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                dir={el.dir || "auto"}
+                spellCheck={false}
+                className="absolute outline-none resize-none overflow-hidden rounded p-1 z-30"
+                style={{
+                  left, top, width: wPx, minHeight: hPx,
+                  fontFamily,
+                  fontSize: `${fontSize}px`,
+                  lineHeight,
+                  fontWeight: el.fontWeight || "normal",
+                  fontStyle: el.fontStyle || "normal",
+                  textAlign: el.textAlign || "left",
+                  color: el.color || "#111827",
+                  background: bgColor,
+                  border: "1.5px dashed hsl(var(--primary))",
+                }}
+              />
+            );
+          })()}
           </div>
 
       {renameOpen && (
