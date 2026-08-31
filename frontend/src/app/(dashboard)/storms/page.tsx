@@ -51,8 +51,8 @@ export default function StormsPage() {
   const [renameId, setRenameId] = React.useState<string | null>(null);
   const [renameName, setRenameName] = React.useState("");
 
-  // Obsidian-like physics: always ON per request, cards stable (high damping)
-  const physicsEnabled = true;
+  // Static per request — cards stay where placed, only drag moves them
+  const physicsEnabled = false;
   const physRef = React.useRef<Map<string, { x: number; y: number; vx: number; vy: number }>>(new Map());
   const [physicsTick, setPhysicsTick] = React.useState(0);
   const rafRef = React.useRef<number | null>(null);
