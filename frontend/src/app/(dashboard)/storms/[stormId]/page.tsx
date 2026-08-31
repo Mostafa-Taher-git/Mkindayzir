@@ -195,7 +195,7 @@ export default function StormWhiteboardPage(){
     const world = screenToWorld(e.clientX, e.clientY);
     const id = uid();
     if(tool==="pen"){
-      setDrawing({ id, type:"pen", points: [[world.x, world.y]], stroke, strokeWidth });
+      setDrawing({ id, type:"pen", x: world.x, y: world.y, points: [[0, 0]], stroke, strokeWidth });
     } else if(tool==="rect"||tool==="ellipse"||tool==="diamond"){
       setDrawing({ id, type:tool, x:world.x, y:world.y, w:0, h:0, stroke, fill, strokeWidth });
     } else if(tool==="arrow"||tool==="line"){
@@ -221,7 +221,8 @@ export default function StormWhiteboardPage(){
       return;
     }
     if(drawing.type==="pen"){
-      setDrawing((d:any)=> ({...d, points: [...d.points, [world.x, world.y]]}));
+      // points are stored as offsets relative to the click origin (drawing.x, drawing.y)
+      setDrawing((d:any)=> ({...d, points: [...d.points, [world.x - d.x, world.y - d.y]]}));
       return;
     }
     if(["rect","ellipse","diamond"].includes(drawing.type)){
@@ -247,10 +248,24 @@ export default function StormWhiteboardPage(){
     }
     if(drawing.type==="pen"){
       if(drawing.points.length<2){ setDrawing(null); return; }
+      // points are offsets from drawing.x/drawing.y → compute bounding box
       const xs = drawing.points.map((p:number[])=>p[0]), ys=drawing.points.map((p:number[])=>p[1]);
-      const minX=Math.min(...xs), minY=Math.min(...ys), maxX=Math.max(...xs), maxY=Math.max(...ys);
-      const el={id:drawing.id, type:"pen", x:minX, y:minY, w:maxX-minX, h:maxY-minY, points: drawing.points.map((p:number[])=>[p[0]-minX, p[1]-minY]), stroke: drawing.stroke, strokeWidth: drawing.strokeWidth};
+      const minDx=Math.min(...xs), minDy=Math.min(...ys), maxDx=Math.max(...xs), maxDy=Math.max(...ys);
+      // shift to local 0..w / 0..h, then translate the element so all points are positive
+      const localPts = drawing.points.map((p:number[])=>[p[0] - minDx, p[1] - minDy]);
+      const el={
+        id: drawing.id,
+        type: "pen",
+        x: drawing.x + minDx,
+        y: drawing.y + minDy,
+        w: maxDx - minDx,
+        h: maxDy - minDy,
+        points: localPts,
+        stroke: drawing.stroke,
+        strokeWidth: drawing.strokeWidth,
+      };
       pushHistory([...elements, el]);
+      setSelectedId(el.id);
     } else if(["rect","ellipse","diamond","arrow","line"].includes(drawing.type)){
       if(Math.abs(drawing.w||0)<4 && Math.abs((drawing.x2||drawing.x)-(drawing.x||0))<4){ setDrawing(null); return; }
       const el = {...drawing};
@@ -410,7 +425,7 @@ export default function StormWhiteboardPage(){
     if(el.type==="pen"){
       const d = el.points.map((p:number[],i:number)=> `${i===0?"M":"L"} ${p[0]} ${p[1]}`).join(" ");
       return (
-        <g key={el.id} data-el-id={el.id} className="cursor-pointer">
+        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`} className="cursor-pointer">
           <path d={d} fill="none" stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={0.95}
             style={{filter: "url(#sketch)"}} />
           {isSelected && <rect x={-4} y={-4} width={el.w+8} height={el.h+8} fill="none" stroke={selStroke} strokeDasharray="6 6" />}
@@ -517,11 +532,17 @@ export default function StormWhiteboardPage(){
   const previewEl = drawing && drawing.type!=="move" ? (
     <g opacity={0.7}>
       {drawing.type==="pen" ? (
-        <path d={drawing.points.map((p:number[],i:number)=> `${i===0?"M":"L"} ${p[0]- (drawing.points[0][0]-drawing.id.length)} ${p[1]}`).join(" ")} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round"/>
+        // Preview the pen path at world coordinates, offsetting by the
+        // recorded first point so the line is anchored to the click.
+        (() => {
+          const [ox, oy] = drawing.points[0] || [0,0];
+          const d = drawing.points.map((p:number[],i:number)=> `${i===0?"M":"L"} ${p[0] - ox + drawing.x} ${p[1] - oy + drawing.y}`).join(" ");
+          return <path d={d} fill="none" stroke={drawing.stroke} strokeWidth={drawing.strokeWidth} strokeLinecap="round"/>;
+        })()
       ) : ["rect","ellipse","diamond"].includes(drawing.type) ? (
-        <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} rx={8} fill={fill==="transparent"?"none":fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray="6 4"/>
+        <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} rx={8} fill={drawing.fill==="transparent"?"none":drawing.fill} stroke={drawing.stroke} strokeWidth={drawing.strokeWidth} strokeDasharray="6 4"/>
       ) : (drawing.type==="arrow"||drawing.type==="line") ? (
-        <path d={`M ${drawing.x} ${drawing.y} L ${drawing.x2} ${drawing.y2}`} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray="6 4" markerEnd={drawing.type==="arrow"?"url(#arrowhead)":undefined}/>
+        <path d={`M ${drawing.x} ${drawing.y} L ${drawing.x2} ${drawing.y2}`} fill="none" stroke={drawing.stroke} strokeWidth={drawing.strokeWidth} strokeLinecap="round" strokeDasharray="6 4" markerEnd={drawing.type==="arrow"?"url(#arrowhead)":undefined}/>
       ) : null}
     </g>
   ) : null;
