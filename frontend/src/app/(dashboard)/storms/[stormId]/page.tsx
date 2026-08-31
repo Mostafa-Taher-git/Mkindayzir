@@ -56,7 +56,6 @@ export default function StormWhiteboardPage(){
   const [editingTextId, setEditingTextId] = React.useState<string|null>(null);
   const [textDraft, setTextDraft] = React.useState("");
   const [searchHash, setSearchHash] = React.useState("");
-  const [showLib, setShowLib] = React.useState(true);
   const [bgColor, setBgColor] = React.useState<string>("#fffef8");
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -569,37 +568,6 @@ export default function StormWhiteboardPage(){
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* libraries */}
-        {showLib && (
-          <div className="w-56 border-r bg-surface p-3 space-y-3 overflow-auto hidden lg:block">
-            <div className="flex items-center justify-between"><h4 className="font-mono text-xs uppercase tracking-wider">Libraries</h4><Button variant="ghost" size="sm" className="h-6" onClick={()=> setShowLib(false)}>×</Button></div>
-            <div>
-              <p className="text-xs font-medium mb-2">Basic</p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {type:"rect", label:"▭"},
-                  {type:"ellipse", label:"○"},
-                  {type:"diamond", label:"◇"},
-                  {type:"arrow", label:"→"},
-                  {type:"line", label:"—"},
-                  {type:"text", label:"T"},
-                ].map(it=> (
-                  <button key={it.type} onClick={()=> setTool(it.type as any)} className={`h-10 border-2 rounded-lg flex items-center justify-center text-sm font-mono ${tool===it.type ? "border-primary bg-primary/10":"border-outline hover:border-primary"}`}>{it.label}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-medium mb-1">Hand-drawn tips</p>
-              <p className="text-xs text-muted-foreground">All strokes are sketchy. Zoom/pan infinite canvas, drag images anywhere, resize via selection. Type #(Storm Name) to reference another storm — click to open it.</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium mb-1">Images</p>
-              <Button size="sm" className="w-full" onClick={()=> fileInputRef.current?.click()}>Add image</Button>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </div>
-          </div>
-        )}
-
         {/* canvas */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Canvas (full area) — all tool/property/zoom UIs are floating overlays */}
