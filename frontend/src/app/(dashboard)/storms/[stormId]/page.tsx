@@ -49,6 +49,8 @@ export default function StormWhiteboardPage(){
   const [strokeWidth, setStrokeWidth] = React.useState(2);
   const [elements, setElements] = React.useState<any[]>([]);
   const [selectedId, setSelectedId] = React.useState<string|null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const isSelectedId = React.useCallback((id:string)=> selectedIds.includes(id) || selectedId===id, [selectedIds, selectedId]);
   const [history, setHistory] = React.useState<any[][]>([]);
   const [redoStack, setRedoStack] = React.useState<any[][]>([]);
   const [pan, setPan] = React.useState({x:0,y:0});
@@ -178,7 +180,7 @@ export default function StormWhiteboardPage(){
       } else {
         // Start box-selection drag (Excalidraw marquee)
         const world = screenToWorld(e.clientX, e.clientY);
-        setSelectedId(null);
+        setSelectedId(null); setSelectedIds([]);
         setDrawing({ type:"selection", x: world.x, y: world.y, w: 0, h: 0 });
         return;
       }
@@ -313,8 +315,9 @@ export default function StormWhiteboardPage(){
         const y1 = el.type==="arrow"||el.type==="line" ? Math.min(el.y, el.y2??el.y) : ely;
         return !(x2 < sx || x1 > ex || y2 < sy || y1 > ey);
       }).map((el:any)=> el.id);
-      if(hitIds.length===1) setSelectedId(hitIds[0]);
-      else if(hitIds.length>1) setSelectedId(hitIds[0]); // TODO multi-select
+      if(hitIds.length===1) { setSelectedId(hitIds[0]); setSelectedIds(hitIds); }
+      else if(hitIds.length>1) { setSelectedId(hitIds[0]); setSelectedIds(hitIds); }
+      else { setSelectedId(null); setSelectedIds([]); }
       setDrawing(null);
       return;
     }
@@ -408,9 +411,10 @@ export default function StormWhiteboardPage(){
   };
 
   const deleteSelected = ()=>{
-    if(!selectedId) return;
-    pushHistory(elements.filter(e=>e.id!==selectedId));
-    setSelectedId(null);
+    const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : []);
+    if(!ids.length) return;
+    pushHistory(elements.filter((e:any)=> !ids.includes(e.id)));
+    setSelectedId(null); setSelectedIds([]);
   };
   const duplicateSelected = ()=>{
     if(!selectedId) return;
@@ -440,7 +444,7 @@ export default function StormWhiteboardPage(){
       const r=await api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(q)}&workspace=${wsParam}`);
       return r as any;
     },
-    enabled: inlineHashQ !== null,
+    enabled: inlineHashQ !== null && inlineHashQ.length > 0,
   });
 
   // All storms in workspace for # pill resolution (clickable links) — include archived
@@ -565,7 +569,7 @@ export default function StormWhiteboardPage(){
     if(el.type==="pen"){
       const d = el.points.map((p:number[],i:number)=> `${i===0?"M":"L"} ${p[0]} ${p[1]}`).join(" ");
       return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`} className="cursor-pointer">
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }} transform={`translate(${el.x},${el.y})`} className="cursor-pointer" onMouseDown={(e)=> { e.stopPropagation(); if(e.shiftKey){ setSelectedIds(s=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }}>
           <path d={d} fill="none" stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={0.95}
             style={{filter: "url(#sketch)"}} />
           {isSelected && <rect x={-4} y={-4} width={el.w+8} height={el.h+8} fill="none" stroke={selStroke} strokeDasharray="6 6" />}
@@ -574,7 +578,7 @@ export default function StormWhiteboardPage(){
     }
     if(el.type==="rect"){
       return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }} transform={`translate(${el.x},${el.y})`}>
           <rect width={el.w} height={el.h} rx={8} ry={8} fill={el.fill==="transparent"?"none":el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinecap="round"
             style={{filter: "url(#sketch)"}} />
           {isSelected && <rect x={-3} y={-3} width={el.w+6} height={el.h+6} fill="none" stroke={selStroke} strokeDasharray="6 6" rx={8}/>}
@@ -583,7 +587,7 @@ export default function StormWhiteboardPage(){
     }
     if(el.type==="ellipse"){
       return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }} transform={`translate(${el.x},${el.y})`}>
           <ellipse cx={el.w/2} cy={el.h/2} rx={el.w/2} ry={el.h/2} fill={el.fill==="transparent"?"none":el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth}
             style={{filter: "url(#sketch)"}}/>
           {isSelected && <rect x={-3} y={-3} width={el.w+6} height={el.h+6} fill="none" stroke={selStroke} strokeDasharray="6 6" rx={12}/>}
@@ -593,7 +597,7 @@ export default function StormWhiteboardPage(){
     if(el.type==="diamond"){
       const cx=el.w/2, cy=el.h/2;
       return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }} transform={`translate(${el.x},${el.y})`}>
           <path d={`M ${cx} 0 L ${el.w} ${cy} L ${cx} ${el.h} L 0 ${cy} Z`} fill={el.fill==="transparent"?"none":el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinejoin="round"
             style={{filter: "url(#sketch)"}}/>
           {isSelected && <rect x={-3} y={-3} width={el.w+6} height={el.h+6} fill="none" stroke={selStroke} strokeDasharray="6 6"/>}
@@ -603,7 +607,7 @@ export default function StormWhiteboardPage(){
     if(el.type==="arrow"||el.type==="line"){
       const x1= el.x, y1= el.y, x2= el.x2?? el.x+el.w, y2= el.y2?? el.y+el.h;
       return (
-        <g key={el.id} data-el-id={el.id}>
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }}>
           <path d={sketchyPath(x1,y1,x2,y2)} fill="none" stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinecap="round" markerEnd={el.type==="arrow"?"url(#arrowhead)":undefined}
             style={{filter: "url(#sketch)"}}/>
           {isSelected && <circle cx={x1} cy={y1} r={4} fill={selStroke} />}
@@ -732,7 +736,7 @@ export default function StormWhiteboardPage(){
     }
     if(el.type==="image"){
       return (
-        <g key={el.id} data-el-id={el.id} transform={`translate(${el.x},${el.y})`}>
+        <g key={el.id} data-el-id={el.id} onMouseDown={(e:any)=> { e.stopPropagation(); if((e as any).shiftKey){ setSelectedIds((s:any)=> s.includes(el.id)? s : [...s, el.id]); setSelectedId(el.id); } else if(!isSelectedId(el.id)){ setSelectedId(el.id); setSelectedIds([el.id]); } }} transform={`translate(${el.x},${el.y})`}>
           <image href={el.src} width={el.w} height={el.h} preserveAspectRatio="xMidYMid meet" style={{borderRadius:8}} />
           <rect width={el.w} height={el.h} fill="none" stroke={isSelected?selStroke:"rgba(0,0,0,0.15)"} strokeWidth={isSelected?2:1} rx={8}/>
         </g>
@@ -1105,7 +1109,7 @@ export default function StormWhiteboardPage(){
                 }}
               />
               {/* inline # list — appears under the box you type "#" in */}
-              {inlineHashQ !== null && (inlineSearchData as any)?.storms?.length > 0 && (
+              {inlineHashQ !== null && inlineHashQ.length > 0 && (inlineSearchData as any)?.storms?.length > 0 && (
                 <div
                   className="absolute z-40 bg-white dark:bg-zinc-900 border-2 border-zinc-900 rounded-lg shadow-[4px_4px_0_0_rgba(0,0,0,1)] max-h-48 overflow-auto w-56"
                   style={{ left, top: top + hPx + 6 }}
