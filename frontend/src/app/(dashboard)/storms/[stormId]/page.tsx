@@ -407,22 +407,21 @@ export default function StormWhiteboardPage(){
     setSelectedId(copy.id);
   };
 
-  // # reference search — now workspace-aware
+  // # reference search — now workspace-aware, shows all (even archived) when empty
   const { data: searchData } = useQuery({
     queryKey: ["storm-search", wsParam, searchHash],
     queryFn: async()=>{
-      if(!searchHash) return {storms:[]};
       const r=await api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(searchHash)}&workspace=${wsParam}`);
       return r as any;
     },
-    enabled: !!searchHash,
+    enabled: true,
   });
 
-  // All storms in workspace for # pill resolution (clickable links)
+  // All storms in workspace for # pill resolution (clickable links) — include archived
   const { data: allStormsData } = useQuery({
     queryKey: ["storms", wsParam],
     queryFn: async()=>{
-      const r=await api.get<{storms:Storm[]}>(`/api/storms/?workspace=${wsParam}`);
+      const r=await api.get<{storms:Storm[]}>(`/api/storms/?workspace=${wsParam}&includeArchived=true`);
       return r as any;
     },
   });
@@ -956,10 +955,10 @@ export default function StormWhiteboardPage(){
               <div className="h-px bg-border" />
               <div className="flex items-center gap-1 text-xs">
                 <input placeholder="#(Storm Name) to reference…" value={searchHash} onChange={e=> setSearchHash(e.target.value)} dir="auto" className="flex-1 h-7 px-2 border rounded text-xs" />
-                {searchHash && (searchData as any)?.storms?.length>0 && (
-                  <div className="absolute mt-7 right-3 bg-white dark:bg-zinc-900 border rounded shadow-lg p-1 z-10 w-56">
+                {(searchData as any)?.storms?.length>0 && (
+                  <div className="absolute mt-7 right-3 bg-white dark:bg-zinc-900 border rounded shadow-lg p-1 z-10 w-56 max-h-56 overflow-auto">
                     {(searchData as any).storms.map((s:Storm)=> (
-                      <button key={s.id} onClick={()=> { navigator.clipboard.writeText(`#(${s.name})`); alert(`Copied #(${s.name}) — paste into text`); setSearchHash(""); }} className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-xs">{s.name}</button>
+                      <button key={s.id} onClick={()=> { navigator.clipboard.writeText(`#(${s.name})`); alert(`Copied #(${s.name}) — paste into text`); setSearchHash(""); }} className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-xs">{s.name} { (s as any).isArchived ? "· archived" : ""}</button>
                     ))}
                   </div>
                 )}

@@ -79,7 +79,7 @@ class StormService:
     @staticmethod
     async def search_storms(db: AsyncSession, user: dict, qstr: str, workspace: str | None = None, limit: int = 10):
         ctx = await StormService._resolve_workspace(db, user, workspace)
-        q = select(Storm).where(Storm.deletedAt.is_(None), Storm.isArchived == False, *ctx["where"])  # noqa
+        q = select(Storm).where(Storm.deletedAt.is_(None), *ctx["where"])  # include archived for # refs
         if qstr:
             q = q.where(Storm.name.ilike(f"%{qstr}%"))
         q = q.order_by(Storm.name.asc()).limit(limit)
