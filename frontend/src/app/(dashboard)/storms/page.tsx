@@ -107,8 +107,8 @@ export default function StormsPage() {
       if (dragging || linkDrag) { raf = requestAnimationFrame(tick); rafRef.current = raf; return; }
       const ids = Array.from(m.keys());
       // params tuned for 200x88 nodes
-      const repulsion = 40000; // coulomb k stable
-      const springK = 0.025;
+      const repulsion = 0; // allow dense packing per request (no forced gap)
+      const springK = 0; // links removed — no spring
       const springLen = 100;
       const centerK = 0.0008;
       const damping = 0.92;
@@ -441,61 +441,6 @@ export default function StormsPage() {
           className="absolute inset-0"
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: "0 0" }}
         >
-          {/* links */}
-          <svg className="absolute inset-0 overflow-visible pointer-events-none" style={{ width: 10000, height: 10000, left: -5000, top: -5000 }}>
-            {links.map((l) => {
-              const a = renderMap.get(l.fromStormId);
-              const b = renderMap.get(l.toStormId);
-              if (!a || !b) return null;
-              const pa = cornerPos(a, l.fromCorner);
-              const pb = cornerPos(b, l.toCorner);
-              // hand-drawn slight curve
-              const mx = (pa.x + pb.x) / 2;
-              const my = (pa.y + pb.y) / 2;
-              const dx = pb.x - pa.x;
-              const dy = pb.y - pa.y;
-              const off = Math.min(24, Math.hypot(dx, dy) * 0.15);
-              const cx = mx + (dy ? (dx > 0 ? -off : off) * 0.3 : 0);
-              const cy = my + (dx ? (dy > 0 ? off : -off) * 0.3 : 0);
-              return (
-                <g key={l.id} className="pointer-events-auto" data-link={l.id}>
-                  <path
-                    d={`M ${pa.x} ${pa.y} Q ${cx} ${cy} ${pb.x} ${pb.y}`}
-                    fill="none"
-                    stroke="#ff535b"
-                    strokeWidth={4}
-                    strokeLinecap="round"
-                    strokeOpacity={0.95}
-                    className="hover:stroke-[#991b1b] cursor-pointer"
-                    style={{ filter: "drop-shadow(0 1px 2px rgba(255,83,91,0.45))" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm("Cut this link?")) deleteLinkMut.mutate(l.id);
-                    }}
-                  />
-                  <circle cx={pa.x} cy={pa.y} r={5} fill="#ff535b" stroke="white" strokeWidth={1.5} />
-                  <circle cx={pb.x} cy={pb.y} r={5} fill="#ff535b" stroke="white" strokeWidth={1.5} />
-                </g>
-              );
-            })}
-            {linkDrag && (() => {
-              const a = renderMap.get(linkDrag.fromId);
-              if (!a) return null;
-              const pa = cornerPos(a, linkDrag.fromCorner);
-              return (
-                <path
-                  d={`M ${pa.x} ${pa.y} L ${linkDrag.curX} ${linkDrag.curY}`}
-                  fill="none"
-                  stroke="#ff535b"
-                  strokeWidth={4}
-                  strokeDasharray="8 6"
-                  strokeLinecap="round"
-                  strokeOpacity={0.9}
-                />
-              );
-            })()}
-          </svg>
-
           {/* storm nodes */}
           {renderStorms.map((s) => (
             <div
@@ -503,46 +448,14 @@ export default function StormsPage() {
               data-storm-node
               onMouseDown={(e) => startNodeDrag(e, s)}
               onClick={(e) => handleNodeClick(s, e)}
-              className="absolute group flex items-center justify-center bg-[#092a3a] border-2 border-[#001522] shadow-[3px_3px_0_0_rgba(0,21,34,1)] hover:border-[#ff535b] cursor-pointer"
-              style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12 }}
+              className="absolute group flex items-center justify-center bg-[#092a3a] border-2 border-[#001522] hover:border-[#ff535b] cursor-pointer"
+              style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12, boxShadow: "3px 3px 0 0 rgba(0,21,34,1), 0 0 12px rgba(255,83,91,0.45)" }}
               title={s.name}
             >
               {/* hand-drawn border wobble via outline offset */}
               <span className="px-3 text-sm font-medium font-mono text-center leading-tight truncate w-[92%] select-none text-[#c7e7ff]" dir="auto">
                 {s.name}
               </span>
-
-              {/* 4 corner circles */}
-              {[0, 1, 2, 3].map((corner) => {
-                const isTop = corner < 2;
-                const isLeft = corner % 2 === 0;
-                // count links per circle for badge/cap UI
-                const cnt = links.filter(
-                  (l) => (l.fromStormId === s.id && l.fromCorner === corner) || (l.toStormId === s.id && l.toCorner === corner)
-                ).length;
-                const atCap = cnt >= 3;
-                return (
-                  <button
-                    key={corner}
-                    data-circle
-                    data-storm={s.id}
-                    data-corner={corner}
-                    onMouseDown={(e) => startLinkDrag(e, s.id, corner)}
-                    title={atCap ? "Max 3 lines" : "Drag to link"}
-                    className={`absolute w-3.5 h-3.5 rounded-full border-2 bg-[#092a3a] flex items-center justify-center
-                      ${atCap ? "border-zinc-500 opacity-60 cursor-not-allowed" : "border-[#001522] hover:bg-[#ff535b] hover:border-[#ff535b] hover:scale-110 cursor-crosshair"}
-                      transition-all`}
-                    style={{
-                      left: isLeft ? -CIRCLE_R : undefined,
-                      right: !isLeft ? -CIRCLE_R : undefined,
-                      top: isTop ? -CIRCLE_R : undefined,
-                      bottom: !isTop ? -CIRCLE_R : undefined,
-                    }}
-                  >
-                    <span className="w-1 h-1 rounded-full bg-[#c7e7ff] group-hover:bg-white" />
-                  </button>
-                );
-              })}
 
               {/* actions */}
               <div className="absolute -top-2 -right-2 hidden group-hover:flex gap-1">
