@@ -59,6 +59,7 @@ export default function StormWhiteboardPage(){
   const [editingTextId, setEditingTextId] = React.useState<string|null>(null);
   const [textDraft, setTextDraft] = React.useState("");
   const [searchHash, setSearchHash] = React.useState("");
+  const [searchFocused, setSearchFocused] = React.useState(false);
   const [bgColor, setBgColor] = React.useState<string>("#fffef8");
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -954,8 +955,8 @@ export default function StormWhiteboardPage(){
 
               <div className="h-px bg-border" />
               <div className="flex items-center gap-1 text-xs">
-                <input placeholder="#(Storm Name) to reference…" value={searchHash} onChange={e=> setSearchHash(e.target.value)} dir="auto" className="flex-1 h-7 px-2 border rounded text-xs" />
-                {(searchData as any)?.storms?.length>0 && (
+                <input placeholder="#(Storm Name) to reference…" value={searchHash} onFocus={()=> setSearchFocused(true)} onBlur={()=> setTimeout(()=> setSearchFocused(false), 180)} onChange={e=> setSearchHash(e.target.value)} dir="auto" className="flex-1 h-7 px-2 border rounded text-xs" />
+                {searchFocused && (searchData as any)?.storms?.length>0 && (
                   <div className="absolute mt-7 right-3 bg-white dark:bg-zinc-900 border rounded shadow-lg p-1 z-10 w-56 max-h-56 overflow-auto">
                     {(searchData as any).storms.map((s:Storm)=> (
                       <button key={s.id} onClick={()=> { navigator.clipboard.writeText(`#(${s.name})`); alert(`Copied #(${s.name}) — paste into text`); setSearchHash(""); }} className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-xs">{s.name} { (s as any).isArchived ? "· archived" : ""}</button>
