@@ -298,16 +298,31 @@ export default function StormsPage() {
         const startWorld = screenToWorld(dragging.startX, dragging.startY, rect);
         const dx = cur.x - startWorld.x;
         const dy = cur.y - startWorld.y;
-        // persist each storm in group and sync physics
+        // optimistic: update cache immediately so no snap-back to old pos
+        const updated = storms.map((s) => {
+          if (dragging.group.includes(s.id)) {
+            const o = dragging.orig.get(s.id);
+            if (o) return { ...s, x: o.x + dx, y: o.y + dy };
+          }
+          return s;
+        });
+        queryClient.setQueryData(["storms", wsParam, showArchived], { storms: updated });
+        queryClient.setQueryData(["storms", wsParam, false], (old: any) => old ? { ...old, storms: updated.filter((s:any)=>!s.isArchived) } : old);
+        queryClient.setQueryData(["storms", wsParam, true], (old: any) => old ? { ...old, storms: updated } : old);
+        if (physicsEnabled) {
+          for (const sid of dragging.group) {
+            const orig = dragging.orig.get(sid);
+            if (!orig) continue;
+            const p = physRef.current.get(sid);
+            if (p) { p.x = orig.x + dx; p.y = orig.y + dy; p.vx = 0; p.vy = 0; }
+          }
+        }
+        // persist each storm in group
         for (const sid of dragging.group) {
           const orig = dragging.orig.get(sid);
           if (!orig) continue;
           const nx = orig.x + dx;
           const ny = orig.y + dy;
-          if (physicsEnabled) {
-            const p = physRef.current.get(sid);
-            if (p) { p.x = nx; p.y = ny; p.vx = 0; p.vy = 0; }
-          }
           try { await api.patch(`/api/storms/${sid}`, { x: nx, y: ny }); } catch {}
         }
         queryClient.invalidateQueries({ queryKey: ["storms"] });
