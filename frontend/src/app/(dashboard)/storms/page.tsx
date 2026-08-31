@@ -51,6 +51,12 @@ export default function StormsPage() {
   const [renameId, setRenameId] = React.useState<string | null>(null);
   const [renameName, setRenameName] = React.useState("");
 
+  // Obsidian-like physics: nodes repel, linked nodes attract via springs, damping
+  const [physicsEnabled, setPhysicsEnabled] = React.useState(true);
+  const physRef = React.useRef<Map<string, { x: number; y: number; vx: number; vy: number }>>(new Map());
+  const [physicsTick, setPhysicsTick] = React.useState(0);
+  const rafRef = React.useRef<number | null>(null);
+
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const { data: stormsData, isLoading } = useQuery({
@@ -74,6 +80,92 @@ export default function StormsPage() {
   const links: Link[] = (linksData as any)?.links ?? [];
 
   const stormMap = React.useMemo(() => new Map(storms.map((s) => [s.id, s])), [storms]);
+
+  // Initialize physics positions from storms when they load or change
+  React.useEffect(() => {
+    if (!physicsEnabled) return;
+    const m = physRef.current;
+    for (const s of storms) {
+      if (!m.has(s.id)) m.set(s.id, { x: s.x, y: s.y, vx: (Math.random()-0.5)*0.5, vy: (Math.random()-0.5)*0.5 });
+      else {
+        // keep physical pos but nudge if server moved far (e.g., after drag persist)
+        const p = m.get(s.id)!;
+        if (Math.hypot(p.x - s.x, p.y - s.y) > 200) { p.x = s.x; p.y = s.y; p.vx *= 0.5; p.vy *= 0.5; }
+      }
+    }
+    // remove deleted
+    for (const k of Array.from(m.keys())) if (!storms.find(s=>s.id===k)) m.delete(k);
+  }, [storms, physicsEnabled]);
+
+  // Physics tick — Obsidian-like: repulsion between all, spring along links, center gravity, damping
+  React.useEffect(() => {
+    if (!physicsEnabled) { if (rafRef.current) cancelAnimationFrame(rafRef.current); return; }
+    if (storms.length === 0) return;
+    let raf = 0;
+    const tick = () => {
+      const m = physRef.current;
+      if (dragging || linkDrag) { raf = requestAnimationFrame(tick); rafRef.current = raf; return; }
+      const ids = Array.from(m.keys());
+      // params tuned for 200x88 nodes
+      const repulsion = 90000; // coulomb k
+      const springK = 0.025;
+      const springLen = 100;
+      const centerK = 0.0008;
+      const damping = 0.82;
+      const maxV = 8;
+      // compute center
+      let cx = 0, cy = 0; for (const id of ids) { const p=m.get(id)!; cx+=p.x; cy+=p.y; }
+      if (ids.length) { cx/=ids.length; cy/=ids.length; }
+      // reset forces
+      const forces = new Map<string,{fx:number,fy:number}>();
+      for (const id of ids) forces.set(id,{fx:0,fy:0});
+      // repulsion O(n^2) — fine for <100 nodes
+      for (let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++){
+        const a=m.get(ids[i])!, b=m.get(ids[j])!;
+        let dx=b.x-a.x, dy=b.y-a.y;
+        let dist=Math.hypot(dx,dy)||0.1;
+        if(dist<600){
+          const f= repulsion / (dist*dist);
+          const fx= (dx/dist)*f, fy=(dy/dist)*f;
+          forces.get(ids[i])!.fx -= fx; forces.get(ids[i])!.fy -= fy;
+          forces.get(ids[j])!.fx += fx; forces.get(ids[j])!.fy += fy;
+        }
+      }
+      // springs for links
+      for (const l of links) {
+        const a=m.get(l.fromStormId), b=m.get(l.toStormId);
+        if(!a||!b) continue;
+        let dx=b.x-a.x, dy=b.y-a.y;
+        let dist=Math.hypot(dx,dy)||0.1;
+        const f= springK * (dist - springLen);
+        const fx=(dx/dist)*f, fy=(dy/dist)*f;
+        forces.get(l.fromStormId)!.fx += fx; forces.get(l.fromStormId)!.fy += fy;
+        forces.get(l.toStormId)!.fx -= fx; forces.get(l.toStormId)!.fy -= fy;
+      }
+      // center gravity + integrate
+      for (const id of ids){
+        const p=m.get(id)!; const f=forces.get(id)!;
+        // center pull
+        f.fx += (cx - p.x)*centerK;
+        f.fy += (cy - p.y)*centerK;
+        p.vx = (p.vx + f.fx) * damping;
+        p.vy = (p.vy + f.fy) * damping;
+        // clamp
+        p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
+        p.vy = Math.max(-maxV, Math.min(maxV, p.vy));
+        // jitter if nearly static but unconnected — keep floating like Obsidian
+        if (Math.hypot(p.vx,p.vy)<0.08) { p.vx += (Math.random()-0.5)*0.15; p.vy += (Math.random()-0.5)*0.15; }
+        p.x += p.vx;
+        p.y += p.vy;
+      }
+      setPhysicsTick(t=>t+1);
+      raf = requestAnimationFrame(tick);
+      rafRef.current = raf;
+    };
+    raf = requestAnimationFrame(tick);
+    rafRef.current = raf;
+    return () => cancelAnimationFrame(raf);
+  }, [physicsEnabled, links, dragging, linkDrag, storms.length]);
 
   const createMut = useMutation({
     mutationFn: async (name: string) => {
@@ -206,13 +298,16 @@ export default function StormsPage() {
         const startWorld = screenToWorld(dragging.startX, dragging.startY, rect);
         const dx = cur.x - startWorld.x;
         const dy = cur.y - startWorld.y;
-        // persist each storm in group
+        // persist each storm in group and sync physics
         for (const sid of dragging.group) {
           const orig = dragging.orig.get(sid);
           if (!orig) continue;
           const nx = orig.x + dx;
           const ny = orig.y + dy;
-          // fire and forget, but await sequentially to avoid flood
+          if (physicsEnabled) {
+            const p = physRef.current.get(sid);
+            if (p) { p.x = nx; p.y = ny; p.vx = 0; p.vy = 0; }
+          }
           try { await api.patch(`/api/storms/${sid}`, { x: nx, y: ny }); } catch {}
         }
         queryClient.invalidateQueries({ queryKey: ["storms"] });
@@ -239,8 +334,17 @@ export default function StormsPage() {
     const group = getLinkedGroup(storm.id);
     const orig = new Map<string, { x: number; y: number }>();
     for (const sid of group) {
-      const s = stormMap.get(sid);
-      if (s) orig.set(sid, { x: s.x, y: s.y });
+      if (physicsEnabled) {
+        const p = physRef.current.get(sid);
+        if (p) orig.set(sid, { x: p.x, y: p.y });
+        else {
+          const s = stormMap.get(sid);
+          if (s) orig.set(sid, { x: s.x, y: s.y });
+        }
+      } else {
+        const s = stormMap.get(sid);
+        if (s) orig.set(sid, { x: s.x, y: s.y });
+      }
     }
     setDragging({ id: storm.id, startX: e.clientX, startY: e.clientY, orig, group });
     (setDragging as any)._dx = 0;
@@ -266,17 +370,26 @@ export default function StormsPage() {
 
   // derived render positions with drag offset
   const renderStorms = React.useMemo(() => {
-    if (!dragging) return storms;
+    // Base positions: physics if enabled, else server storms
+    const base: Storm[] = physicsEnabled
+      ? storms.map(s => {
+          const p = physRef.current.get(s.id);
+          // depend on physicsTick to re-read after each tick
+          void physicsTick;
+          return p ? { ...s, x: p.x, y: p.y } : s;
+        })
+      : storms;
+    if (!dragging) return base;
     const dx = (dragging as any)._dx || 0;
     const dy = (dragging as any)._dy || 0;
-    return storms.map((s) => {
+    return base.map((s) => {
       if (dragging.group.includes(s.id)) {
         const o = dragging.orig.get(s.id);
         if (o) return { ...s, x: o.x + dx, y: o.y + dy };
       }
       return s;
     });
-  }, [storms, dragging]);
+  }, [storms, dragging, physicsEnabled, physicsTick]);
 
   const renderMap = React.useMemo(() => new Map(renderStorms.map((s) => [s.id, s])), [renderStorms]);
 
@@ -289,6 +402,9 @@ export default function StormsPage() {
           <span className="text-sm text-muted-foreground">{storms.length} storms</span>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant={physicsEnabled ? "default" : "outline"} size="sm" onClick={() => setPhysicsEnabled(v=>!v)} title="Obsidian-like physics">
+            {physicsEnabled ? "Physics ●" : "Physics ○"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? "Hide archived" : "Show archived"}
           </Button>
@@ -329,7 +445,7 @@ export default function StormsPage() {
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: "0 0" }}
         >
           {/* links */}
-          <svg className="absolute inset-0 overflow-visible pointer-events-none" style={{ width: 5000, height: 5000, left: -1000, top: -1000 }}>
+          <svg className="absolute inset-0 overflow-visible pointer-events-none" style={{ width: 10000, height: 10000, left: -5000, top: -5000 }}>
             {links.map((l) => {
               const a = renderMap.get(l.fromStormId);
               const b = renderMap.get(l.toStormId);
@@ -349,17 +465,19 @@ export default function StormsPage() {
                   <path
                     d={`M ${pa.x} ${pa.y} Q ${cx} ${cy} ${pb.x} ${pb.y}`}
                     fill="none"
-                    stroke="rgba(0,0,0,0.55)"
-                    strokeWidth={2}
+                    stroke="#ef4444"
+                    strokeWidth={4}
                     strokeLinecap="round"
-                    className="dark:stroke-white/60 hover:stroke-primary cursor-pointer"
+                    strokeOpacity={0.95}
+                    className="hover:stroke-[#991b1b] cursor-pointer"
+                    style={{ filter: "drop-shadow(0 1px 2px rgba(220,38,38,0.4))" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (confirm("Cut this link?")) deleteLinkMut.mutate(l.id);
                     }}
                   />
-                  <circle cx={pa.x} cy={pa.y} r={2} fill="currentColor" className="text-primary" />
-                  <circle cx={pb.x} cy={pb.y} r={2} fill="currentColor" className="text-primary" />
+                  <circle cx={pa.x} cy={pa.y} r={5} fill="#ef4444" stroke="white" strokeWidth={1.5} />
+                  <circle cx={pb.x} cy={pb.y} r={5} fill="#ef4444" stroke="white" strokeWidth={1.5} />
                 </g>
               );
             })}
@@ -371,10 +489,11 @@ export default function StormsPage() {
                 <path
                   d={`M ${pa.x} ${pa.y} L ${linkDrag.curX} ${linkDrag.curY}`}
                   fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  strokeDasharray="6 6"
+                  stroke="#ef4444"
+                  strokeWidth={4}
+                  strokeDasharray="8 6"
                   strokeLinecap="round"
+                  strokeOpacity={0.9}
                 />
               );
             })()}

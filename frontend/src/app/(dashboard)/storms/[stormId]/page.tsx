@@ -2,6 +2,7 @@ import * as React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -40,6 +41,8 @@ export default function StormWhiteboardPage(){
   const { stormId } = useParams() as { stormId: string };
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const workspace = useWorkspace();
+  const wsParam = workspace.type === "org" ? (workspace as any).orgId : "personal";
   const [tool, setTool] = React.useState<"select"|"hand"|"pen"|"rect"|"ellipse"|"diamond"|"arrow"|"line"|"text"|"image"|"eraser">("select");
   const [stroke, setStroke] = React.useState("#111827");
   const [fill, setFill] = React.useState("transparent");
@@ -404,15 +407,24 @@ export default function StormWhiteboardPage(){
     setSelectedId(copy.id);
   };
 
-  // # reference search
+  // # reference search — now workspace-aware
   const { data: searchData } = useQuery({
-    queryKey: ["storm-search", searchHash],
+    queryKey: ["storm-search", wsParam, searchHash],
     queryFn: async()=>{
       if(!searchHash) return {storms:[]};
-      const r=await api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(searchHash)}`);
+      const r=await api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(searchHash)}&workspace=${wsParam}`);
       return r as any;
     },
     enabled: !!searchHash,
+  });
+
+  // All storms in workspace for # pill resolution (clickable links)
+  const { data: allStormsData } = useQuery({
+    queryKey: ["storms", wsParam],
+    queryFn: async()=>{
+      const r=await api.get<{storms:Storm[]}>(`/api/storms/?workspace=${wsParam}`);
+      return r as any;
+    },
   });
 
   const updateStormMut = useMutation({
@@ -657,12 +669,20 @@ export default function StormWhiteboardPage(){
                         key={j}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const found = (searchData as any)?.storms?.find((s: Storm) => s.name === name)
-                            || elements.find(x => x.type === "text" && x.text === name);
+                          const all = (allStormsData as any)?.storms as Storm[] | undefined;
+                          const found = all?.find((s: Storm) => s.name === name)
+                            || (searchData as any)?.storms?.find((s: Storm) => s.name === name);
                           if(found?.id) navigate(`/storms/${found.id}`);
-                          else alert(`Storm "${name}" not found — create it in Storms graph.`);
+                          else {
+                            // fallback: try live search for this exact name
+                            api.get<{storms:Storm[]}>(`/api/storms/search?q=${encodeURIComponent(name)}&workspace=${wsParam}`).then((r:any)=>{
+                              const hit = (r.storms as Storm[])?.find(s=>s.name===name);
+                              if(hit?.id) navigate(`/storms/${hit.id}`);
+                              else alert(`Storm "${name}" not found — create it in Storms graph.`);
+                            }).catch(()=> alert(`Storm "${name}" not found — create it in Storms graph.`));
+                          }
                         }}
-                        style={{ textDecoration: "underline", cursor: "pointer", fill: "hsl(var(--primary))", fontWeight: 700 }}
+                        style={{ textDecoration: "underline", cursor: "pointer", fill: "#dc2626", fontWeight: 700 }}
                       >#{name}</tspan>
                     );
                   }
