@@ -51,8 +51,8 @@ export default function StormsPage() {
   const [renameId, setRenameId] = React.useState<string | null>(null);
   const [renameName, setRenameName] = React.useState("");
 
-  // Obsidian-like physics: nodes repel, linked nodes attract via springs, damping
-  const [physicsEnabled, setPhysicsEnabled] = React.useState(true);
+  // Obsidian-like physics: always ON per request, cards stable (high damping)
+  const physicsEnabled = true;
   const physRef = React.useRef<Map<string, { x: number; y: number; vx: number; vy: number }>>(new Map());
   const [physicsTick, setPhysicsTick] = React.useState(0);
   const rafRef = React.useRef<number | null>(null);
@@ -107,12 +107,12 @@ export default function StormsPage() {
       if (dragging || linkDrag) { raf = requestAnimationFrame(tick); rafRef.current = raf; return; }
       const ids = Array.from(m.keys());
       // params tuned for 200x88 nodes
-      const repulsion = 90000; // coulomb k
+      const repulsion = 40000; // coulomb k stable
       const springK = 0.025;
       const springLen = 100;
       const centerK = 0.0008;
-      const damping = 0.82;
-      const maxV = 8;
+      const damping = 0.92;
+      const maxV = 2;
       // compute center
       let cx = 0, cy = 0; for (const id of ids) { const p=m.get(id)!; cx+=p.x; cy+=p.y; }
       if (ids.length) { cx/=ids.length; cy/=ids.length; }
@@ -153,8 +153,8 @@ export default function StormsPage() {
         // clamp
         p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
         p.vy = Math.max(-maxV, Math.min(maxV, p.vy));
-        // jitter if nearly static but unconnected — keep floating like Obsidian
-        if (Math.hypot(p.vx,p.vy)<0.08) { p.vx += (Math.random()-0.5)*0.15; p.vy += (Math.random()-0.5)*0.15; }
+        // stable: tiny jitter only if isolated
+        if (Math.hypot(p.vx,p.vy)<0.03) { p.vx += (Math.random()-0.5)*0.02; p.vy += (Math.random()-0.5)*0.02; }
         p.x += p.vx;
         p.y += p.vy;
       }
@@ -402,9 +402,6 @@ export default function StormsPage() {
           <span className="text-sm text-muted-foreground">{storms.length} storms</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant={physicsEnabled ? "default" : "outline"} size="sm" onClick={() => setPhysicsEnabled(v=>!v)} title="Obsidian-like physics">
-            {physicsEnabled ? "Physics ●" : "Physics ○"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? "Hide archived" : "Show archived"}
           </Button>
@@ -465,19 +462,19 @@ export default function StormsPage() {
                   <path
                     d={`M ${pa.x} ${pa.y} Q ${cx} ${cy} ${pb.x} ${pb.y}`}
                     fill="none"
-                    stroke="#ef4444"
+                    stroke="#ff535b"
                     strokeWidth={4}
                     strokeLinecap="round"
                     strokeOpacity={0.95}
                     className="hover:stroke-[#991b1b] cursor-pointer"
-                    style={{ filter: "drop-shadow(0 1px 2px rgba(220,38,38,0.4))" }}
+                    style={{ filter: "drop-shadow(0 1px 2px rgba(255,83,91,0.45))" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (confirm("Cut this link?")) deleteLinkMut.mutate(l.id);
                     }}
                   />
-                  <circle cx={pa.x} cy={pa.y} r={5} fill="#ef4444" stroke="white" strokeWidth={1.5} />
-                  <circle cx={pb.x} cy={pb.y} r={5} fill="#ef4444" stroke="white" strokeWidth={1.5} />
+                  <circle cx={pa.x} cy={pa.y} r={5} fill="#ff535b" stroke="white" strokeWidth={1.5} />
+                  <circle cx={pb.x} cy={pb.y} r={5} fill="#ff535b" stroke="white" strokeWidth={1.5} />
                 </g>
               );
             })}
@@ -489,7 +486,7 @@ export default function StormsPage() {
                 <path
                   d={`M ${pa.x} ${pa.y} L ${linkDrag.curX} ${linkDrag.curY}`}
                   fill="none"
-                  stroke="#ef4444"
+                  stroke="#ff535b"
                   strokeWidth={4}
                   strokeDasharray="8 6"
                   strokeLinecap="round"
@@ -506,12 +503,12 @@ export default function StormsPage() {
               data-storm-node
               onMouseDown={(e) => startNodeDrag(e, s)}
               onClick={(e) => handleNodeClick(s, e)}
-              className="absolute group flex items-center justify-center bg-white dark:bg-zinc-900 border-2 border-zinc-900 dark:border-zinc-700 shadow-[3px_3px_0_0_rgba(0,0,0,1)] dark:shadow-[3px_3px_0_0_rgba(255,255,255,0.15)] hover:border-primary cursor-pointer"
+              className="absolute group flex items-center justify-center bg-[#092a3a] border-2 border-[#001522] shadow-[3px_3px_0_0_rgba(0,21,34,1)] hover:border-[#ff535b] cursor-pointer"
               style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12 }}
               title={s.name}
             >
               {/* hand-drawn border wobble via outline offset */}
-              <span className="px-3 text-sm font-medium font-mono text-center leading-tight truncate w-[92%] select-none" dir="auto">
+              <span className="px-3 text-sm font-medium font-mono text-center leading-tight truncate w-[92%] select-none text-[#c7e7ff]" dir="auto">
                 {s.name}
               </span>
 
@@ -532,8 +529,8 @@ export default function StormsPage() {
                     data-corner={corner}
                     onMouseDown={(e) => startLinkDrag(e, s.id, corner)}
                     title={atCap ? "Max 3 lines" : "Drag to link"}
-                    className={`absolute w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-zinc-900 flex items-center justify-center
-                      ${atCap ? "border-zinc-400 opacity-60 cursor-not-allowed" : "border-zinc-900 dark:border-zinc-200 hover:bg-primary hover:border-primary hover:scale-110 cursor-crosshair"}
+                    className={`absolute w-3.5 h-3.5 rounded-full border-2 bg-[#092a3a] flex items-center justify-center
+                      ${atCap ? "border-zinc-500 opacity-60 cursor-not-allowed" : "border-[#001522] hover:bg-[#ff535b] hover:border-[#ff535b] hover:scale-110 cursor-crosshair"}
                       transition-all`}
                     style={{
                       left: isLeft ? -CIRCLE_R : undefined,
@@ -542,7 +539,7 @@ export default function StormsPage() {
                       bottom: !isTop ? -CIRCLE_R : undefined,
                     }}
                   >
-                    <span className="w-1 h-1 rounded-full bg-zinc-900 dark:bg-zinc-200 group-hover:bg-white" />
+                    <span className="w-1 h-1 rounded-full bg-[#c7e7ff] group-hover:bg-white" />
                   </button>
                 );
               })}
@@ -587,11 +584,11 @@ export default function StormsPage() {
 
         {!isLoading && storms.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-900 dark:border-zinc-700 p-8 rounded-xl shadow-[6px_6px_0_0_rgba(0,0,0,1)] text-center max-w-sm pointer-events-auto">
-              <StormIcon className="h-10 w-10 mx-auto mb-3" />
-              <h3 className="font-bold font-mono uppercase">No storms yet</h3>
-              <p className="text-sm text-muted-foreground mt-1">Create your first storm — just a name. Link storms via the 4 corner circles (3 lines per circle, 12 per storm).</p>
-              <Button className="mt-4" onClick={() => setNewOpen(true)}>New Storm</Button>
+            <div className="bg-[#092a3a] border-2 border-[#001522] p-8 rounded-xl shadow-[6px_6px_0_0_rgba(0,21,34,1)] text-center max-w-sm pointer-events-auto">
+              <StormIcon className="h-10 w-10 mx-auto mb-3 text-[#c7e7ff]" />
+              <h3 className="font-bold font-mono uppercase text-[#c7e7ff]">No storms yet</h3>
+              <p className="text-sm text-[#c7e7ff]/70 mt-1">Create your first storm — just a name. Link storms via the 4 corner circles (3 lines per circle, 12 per storm).</p>
+              <Button className="mt-4 bg-[#ff535b] hover:bg-[#ff535b]/90 text-white border-2 border-[#001522]" onClick={() => setNewOpen(true)}>New Storm</Button>
             </div>
           </div>
         )}
