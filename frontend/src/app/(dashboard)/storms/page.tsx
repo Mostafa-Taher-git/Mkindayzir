@@ -462,10 +462,10 @@ export default function StormsPage() {
               key={s.id}
               data-storm-node
               onMouseDown={(e) => startNodeDrag(e, s)}
-              onClick={(e) => handleNodeClick(s, e)}
+              onDoubleClick={(e) => handleNodeClick(s, e)}
               className="absolute group flex items-center justify-center bg-[#092a3a] border-2 border-[#001522] hover:border-[#ff535b] cursor-pointer"
               style={{ left: s.x, top: s.y, width: s.width, height: s.height, borderRadius: 12, boxShadow: "3px 3px 0 0 rgba(0,21,34,1), 0 0 12px rgba(255,83,91,0.45)" }}
-              title={s.name}
+              title={s.name + " — double-click to open"}
             >
               {/* hand-drawn border wobble via outline offset */}
               <span className="px-3 text-sm font-medium font-mono text-center leading-tight truncate w-[92%] select-none text-[#c7e7ff]" dir="auto">
