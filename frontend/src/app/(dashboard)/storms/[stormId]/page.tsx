@@ -131,7 +131,15 @@ export default function StormWhiteboardPage(){
 
   const handleSvgMouseDown = (e: React.MouseEvent)=>{
     const target = e.target as Element;
-    if(tool==="hand" || e.button===1 || (e.altKey && e.button===0)){
+    // If user is currently editing text and clicks the textarea, do nothing (let textarea handle it).
+    if(editingTextId && (target as HTMLElement).tagName === "TEXTAREA") return;
+    // If user is editing text and clicks anywhere else, finish the current edit.
+    if(editingTextId){
+      setEditingTextId(null);
+      setTextDraft("");
+      // do not consume this event — let it continue to whatever tool action is below
+    }
+    if(tool==="hand" || e.button===1 || (e.altKey && e.button===0) || spaceHeld){
       setIsPanning(true);
       setPanStart({x:e.clientX, y:e.clientY, panX:pan.x, panY:pan.y});
       return;
@@ -347,9 +355,57 @@ export default function StormWhiteboardPage(){
 
   React.useEffect(()=>{ if(stormData?.name) setRenameVal(stormData.name); },[stormData?.name]);
 
-  // render helpers
-  const renderElement = (el:any)=>{
+  // Keyboard shortcuts: standard whiteboard UX.
+  // 1=select, 2=hand, 3=pen, 4=rect, 5=ellipse, 6=diamond, 7=arrow, 8=line, 9=text, 0=eraser
+  // V=select, H=hand, P=pen, R=rect, O=ellipse, D=diamond, A=arrow, L=line, T=text, E=eraser
+  // Ctrl/Cmd+Z=undo, Ctrl/Cmd+Shift+Z / Ctrl+Y=redo, Ctrl/Cmd+D=duplicate, Delete/Backspace=delete
+  // Hold Space = pan from any tool. Esc = release current action.
+  const [spaceHeld, setSpaceHeld] = React.useState(false);
+  React.useEffect(()=>{
+    const isFormFocus = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if(!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || (el as any).isContentEditable;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // space held (no key combo)
+      if(e.code === "Space" && !isFormFocus()){
+        if(!spaceHeld) setSpaceHeld(true);
+        return;
+      }
+      if(isFormFocus()) return;
+      if(e.ctrlKey || e.metaKey){
+        const k = e.key.toLowerCase();
+        if(k === "z" && !e.shiftKey){ e.preventDefault(); undo(); return; }
+        if((k === "z" && e.shiftKey) || k === "y"){ e.preventDefault(); redo(); return; }
+        if(k === "d"){ e.preventDefault(); if(selectedId) duplicateSelected(); return; }
+        return;
+      }
+      if(e.key === "Delete" || e.key === "Backspace"){
+        if(selectedId){ e.preventDefault(); deleteSelected(); return; }
+      }
+      if(e.key === "Escape"){
+        if(editingTextId){ setEditingTextId(null); setTextDraft(""); return; }
+        if(selectedId){ setSelectedId(null); return; }
+        setTool("select");
+        return;
+      }
+      const keyMap: Record<string, any> = { "1":"select","v":"select","2":"hand","h":"hand","3":"pen","p":"pen","4":"rect","r":"rect","5":"ellipse","o":"ellipse","6":"diamond","d":"diamond","7":"arrow","a":"arrow","8":"line","l":"line","9":"text","t":"text","0":"eraser","e":"eraser" };
+      const next = keyMap[e.key.toLowerCase()];
+      if(next){ setTool(next); }
+    };
+    const onKeyUp = (e: KeyboardEvent) => { if(e.code === "Space") setSpaceHeld(false); };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); };
+  }, [selectedId, editingTextId, spaceHeld, undo, redo, duplicateSelected, deleteSelected]);
+
+  // while editing a text element, hide the rendered text under the editor
+  const renderElement = (el:any, hideIfEditing = false)=>{
     const isSelected = el.id===selectedId;
+    const isEditing = editingTextId===el.id;
+    if(hideIfEditing && isEditing) return null;
     const selStroke = isSelected ? "hsl(var(--primary))" : undefined;
     if(el.type==="pen"){
       const d = el.points.map((p:number[],i:number)=> `${i===0?"M":"L"} ${p[0]} ${p[1]}`).join(" ");
@@ -419,7 +475,20 @@ export default function StormWhiteboardPage(){
                 padding: 4,
                 minWidth: 80,
               }}
-              onDoubleClick={()=>{ setEditingTextId(el.id); setTextDraft(el.text||""); }}
+              onMouseDown={(e)=> e.stopPropagation()}
+              onClick={(e)=>{
+                e.stopPropagation();
+                // Single-click on a text element: select AND immediately enter edit mode (one click to start typing).
+                setSelectedId(el.id);
+                setEditingTextId(el.id);
+                setTextDraft(el.text || "");
+              }}
+              onDoubleClick={(e)=>{
+                e.stopPropagation();
+                // Double-click also opens the editor (idempotent).
+                setEditingTextId(el.id);
+                setTextDraft(el.text || "");
+              }}
             >
               {parts.map((p,i)=>{
                 if(p.startsWith("#(") && p.endsWith(")")){
@@ -512,68 +581,7 @@ export default function StormWhiteboardPage(){
 
         {/* canvas */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* toolbar */}
-          <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-surface">
-            {!showLib && <Button variant="ghost" size="sm" onClick={()=> setShowLib(true)}>Libraries</Button>}
-            {[
-              {k:"select", l:"Select", i:"↖"},
-              {k:"hand", l:"Hand", i:"✋"},
-              {k:"pen", l:"Pen", i:"✎"},
-              {k:"rect", l:"Rect", i:"▭"},
-              {k:"ellipse", l:"Ellipse", i:"○"},
-              {k:"diamond", l:"Diamond", i:"◇"},
-              {k:"arrow", l:"Arrow", i:"→"},
-              {k:"line", l:"Line", i:"—"},
-              {k:"text", l:"Text", i:"T"},
-              {k:"image", l:"Image", i:"🖼"},
-              {k:"eraser", l:"Eraser", i:"⌫"},
-            ].map(t=> (
-              <button key={t.k} onClick={()=> setTool(t.k as any)} title={t.l} className={`h-8 px-3 rounded-md border text-sm font-mono flex items-center gap-1 ${tool===t.k ? "bg-primary text-primary-foreground border-primary":"bg-white dark:bg-zinc-900 border-outline hover:border-primary"}`}>{t.i} <span className="hidden sm:inline">{t.l}</span></button>
-            ))}
-            <div className="h-6 w-px bg-border mx-1" />
-            <label className="flex items-center gap-1 text-xs">Stroke<input type="color" value={stroke} onChange={e=> setStroke(e.target.value)} className="h-7 w-7 p-0 border rounded" /></label>
-            <label className="flex items-center gap-1 text-xs">Fill<input type="color" value={fill==="transparent"?"#ffffff":fill} onChange={e=> setFill(e.target.value)} className="h-7 w-7 p-0 border rounded" /><button onClick={()=> setFill("transparent")} className="text-xs underline">none</button></label>
-            <label className="flex items-center gap-1 text-xs">Width<input type="range" min={1} max={8} value={strokeWidth} onChange={e=> setStrokeWidth(parseInt(e.target.value))} /></label>
-            <div className="h-6 w-px bg-border mx-1" />
-            <label className="flex items-center gap-1 text-xs">BG<input type="color" value={bgColor} onChange={e=> setBgColor(e.target.value)} className="h-7 w-7 p-0 border rounded" /></label>
-            <div className="flex items-center gap-0.5 border rounded-md p-0.5">
-              {[
-                {c:"#fffef8", n:"Paper"},
-                {c:"#ffffff", n:"White"},
-                {c:"#0e0e0f", n:"Dark"},
-                {c:"#fde68a", n:"Yellow"},
-                {c:"#bae6fd", n:"Blue"},
-                {c:"#fbcfe8", n:"Pink"},
-                {c:"#bbf7d0", n:"Green"},
-              ].map(sw=>(
-                <button key={sw.c} onClick={()=> setBgColor(sw.c)} title={sw.n} className="h-6 w-6 rounded border" style={{background: sw.c, borderColor: bgColor===sw.c ? "hsl(var(--primary))" : "rgba(0,0,0,0.2)"}} />
-              ))}
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={duplicateSelected} disabled={!selectedId}>Duplicate</Button>
-              <Button variant="destructive" size="sm" onClick={deleteSelected} disabled={!selectedId}>Delete</Button>
-              <div className="flex items-center gap-1 border rounded-md p-1 ml-2">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()=> setScale(s=> Math.min(3,s+0.1))}>+</Button>
-                <span className="text-xs font-mono w-10 text-center">{Math.round(scale*100)}%</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()=> setScale(s=> Math.max(0.2,s-0.1))}>−</Button>
-              </div>
-            </div>
-          </div>
-
-          {/* # autocomplete */}
-          <div className="px-2 py-1 border-b bg-amber-50 dark:bg-amber-950/20 text-xs flex items-center gap-2">
-            <span className="font-mono">Reference storm:</span>
-            <span className="text-muted-foreground">Type #(Storm Name) in text — e.g. #(My Storm)</span>
-            <input placeholder="Search storms to copy name… #( )" value={searchHash} onChange={e=> setSearchHash(e.target.value)} className="ml-auto h-7 px-2 border rounded text-xs w-48" dir="auto" />
-            {searchHash && (searchData as any)?.storms?.length>0 && (
-              <div className="absolute mt-8 right-4 bg-white dark:bg-zinc-900 border rounded shadow-lg p-2 z-10 w-64">
-                {(searchData as any).storms.map((s:Storm)=> (
-                  <button key={s.id} onClick={()=> { navigator.clipboard.writeText(`#(${s.name})`); alert(`Copied #(${s.name}) — paste into text`); setSearchHash(""); }} className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-xs">{s.name}</button>
-                ))}
-              </div>
-            )}
-          </div>
-
+          {/* Canvas (full area) — all tool/property/zoom UIs are floating overlays */}
           <div
             ref={containerRef}
             className="flex-1 relative overflow-hidden select-none"
@@ -607,7 +615,7 @@ export default function StormWhiteboardPage(){
                     </g>
                   ))}
                 </g>
-                {elements.map(renderElement)}
+                {elements.map((el:any)=> renderElement(el, true))}
                 {previewEl}
               </g>
             </svg>
@@ -620,14 +628,106 @@ export default function StormWhiteboardPage(){
                 <div className="absolute" style={{left: el.x*scale+pan.x, top: el.y*scale+pan.y, width: el.w*scale, height: el.h*scale, pointerEvents:"none", border: "1px dashed hsl(var(--primary))"}} />
               );
             })()}
-          </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 border-t bg-surface text-xs font-mono text-muted-foreground">
-            <span>Pan: Space+drag or Hand tool • Zoom: Ctrl+Wheel • Undo: Ctrl+Z • Double-click text to edit</span>
-            <span className="ml-auto">{elements.length} elements</span>
+            {/* Floating tool rail — top-left vertical (mimics the standard whiteboard UX) */}
+            <div
+              className="absolute top-3 left-3 z-20 flex flex-col gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg"
+              onMouseDown={(e)=> e.stopPropagation()}
+            >
+              {[
+                {k:"select", l:"Select (V / 1)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>},
+                {k:"hand", l:"Hand (H / 2)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 0 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>},
+                {k:"pen", l:"Pen (P / 3)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>},
+                {k:"rect", l:"Rectangle (R / 4)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/></svg>},
+                {k:"ellipse", l:"Ellipse (O / 5)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="12" rx="10" ry="7"/></svg>},
+                {k:"diamond", l:"Diamond (D / 6)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 22 12 12 22 2 12z"/></svg>},
+                {k:"arrow", l:"Arrow (A / 7)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>},
+                {k:"line", l:"Line (L / 8)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 19 19 5"/></svg>},
+                {k:"text", l:"Text (T / 9)", i:<span className="text-base font-bold">T</span>},
+                {k:"image", l:"Image", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>},
+                {k:"eraser", l:"Eraser (E / 0)", i:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>},
+              ].map(t=> (
+                <button
+                  key={t.k}
+                  onClick={()=> setTool(t.k as any)}
+                  title={t.l}
+                  className={`h-9 w-9 rounded-md flex items-center justify-center ${tool===t.k ? "bg-primary text-primary-foreground" : "hover:bg-accent text-foreground"}`}
+                >{t.i}</button>
+              ))}
+              <div className="h-px bg-border my-0.5" />
+              <button onClick={undo} disabled={history.length===0} title="Undo (Ctrl+Z)" className="h-9 w-9 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-30"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.7 2.8L3 13"/></svg></button>
+              <button onClick={redo} disabled={redoStack.length===0} title="Redo (Ctrl+Y)" className="h-9 w-9 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-30"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.7 2.8L21 13"/></svg></button>
+              <div className="h-px bg-border my-0.5" />
+              <button onClick={deleteSelected} disabled={!selectedId} title="Delete (Del)" className="h-9 w-9 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-30"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+              <button onClick={duplicateSelected} disabled={!selectedId} title="Duplicate (Ctrl+D)" className="h-9 w-9 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-30"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+            </div>
+
+            {/* Floating properties panel — top-right */}
+            <div
+              className="absolute top-3 right-3 z-20 flex flex-col gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-2 shadow-lg min-w-[200px]"
+              onMouseDown={(e)=> e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Stroke</span>
+                <input type="color" value={stroke} onChange={e=> setStroke(e.target.value)} className="h-7 w-7 p-0 border rounded" />
+                <input type="range" min={1} max={8} value={strokeWidth} onChange={e=> setStrokeWidth(parseInt(e.target.value))} className="flex-1" />
+                <span className="font-mono w-6 text-right">{strokeWidth}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">Fill</span>
+                <input type="color" value={fill==="transparent"?"#ffffff":fill} onChange={e=> setFill(e.target.value)} className="h-7 w-7 p-0 border rounded" />
+                <button onClick={()=> setFill("transparent")} className="flex-1 text-xs underline">none</button>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="font-mono uppercase tracking-wider text-muted-foreground w-10">BG</span>
+                <input type="color" value={bgColor} onChange={e=> setBgColor(e.target.value)} className="h-7 w-7 p-0 border rounded" />
+                <div className="flex items-center gap-0.5 ml-1">
+                  {[
+                    {c:"#fffef8"},
+                    {c:"#ffffff"},
+                    {c:"#0e0e0f"},
+                    {c:"#fde68a"},
+                    {c:"#bae6fd"},
+                    {c:"#fbcfe8"},
+                    {c:"#bbf7d0"},
+                  ].map(sw=>(
+                    <button key={sw.c} onClick={()=> setBgColor(sw.c)} className="h-5 w-5 rounded border" style={{background: sw.c, borderColor: bgColor===sw.c ? "hsl(var(--primary))" : "rgba(0,0,0,0.25)"}} />
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <input placeholder="#(Storm Name) to reference…" value={searchHash} onChange={e=> setSearchHash(e.target.value)} dir="auto" className="flex-1 h-7 px-2 border rounded text-xs" />
+                {searchHash && (searchData as any)?.storms?.length>0 && (
+                  <div className="absolute mt-7 right-3 bg-white dark:bg-zinc-900 border rounded shadow-lg p-1 z-10 w-56">
+                    {(searchData as any).storms.map((s:Storm)=> (
+                      <button key={s.id} onClick={()=> { navigator.clipboard.writeText(`#(${s.name})`); alert(`Copied #(${s.name}) — paste into text`); setSearchHash(""); }} className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-xs">{s.name}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Floating zoom controls — bottom-left */}
+            <div
+              className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg"
+              onMouseDown={(e)=> e.stopPropagation()}
+            >
+              <button onClick={()=> setScale(s=> Math.max(0.2,s-0.1))} title="Zoom out" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">−</button>
+              <button onClick={()=> { setPan({x:80,y:80}); setScale(1); }} title="Reset zoom" className="h-8 px-2 rounded-md flex items-center justify-center hover:bg-accent text-xs font-mono">{Math.round(scale*100)}%</button>
+              <button onClick={()=> setScale(s=> Math.min(3,s+0.1))} title="Zoom in" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">+</button>
+            </div>
+
+            {/* Floating canvas actions — bottom-right */}
+            <div
+              className="absolute bottom-3 right-3 z-20 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg text-xs"
+              onMouseDown={(e)=> e.stopPropagation()}
+            >
+              <button onClick={exportPNG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> PNG</button>
+              <button onClick={exportSVG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> SVG</button>
+              <span className="text-muted-foreground font-mono px-1">{elements.length} els</span>
+            </div>
           </div>
-        </div>
-      </div>
 
       {/* Inline text editor — overlaid on canvas at element position, scaled with pan/zoom */}
       {editingTextId && (() => {
@@ -636,10 +736,21 @@ export default function StormWhiteboardPage(){
         const fontSize = (el.fontSize||20) * scale;
         const left = el.x * scale + pan.x;
         const top = el.y * scale + pan.y;
-        const w = Math.max(180, el.w) * scale;
+        const baseW = Math.max(180, el.w);
+        // Auto-fit width to the longest line in the current draft, capped at 720px world units.
+        const lines = (textDraft || "").split(/\r?\n/);
+        const longest = lines.reduce((m, ln) => Math.max(m, ln.length), 0);
+        const charW = (el.fontSize || 20) * 0.6;
+        const fitW = Math.min(720, Math.max(baseW, Math.ceil(longest * charW) + 24));
+        const w = fitW * scale;
         return (
           <textarea
-            autoFocus
+            // Capture-phase mouseDown so the canvas mousedown handler can't steal
+            // focus or finish the edit while the user is typing.
+            onMouseDown={(e)=>{ e.stopPropagation(); }}
+            onClick={(e)=>{ e.stopPropagation(); }}
+            onFocus={(e)=>{ /* make sure the caret is visible */ requestAnimationFrame(()=>{ e.target.select(); }); }}
+            ref={(node)=>{ if(node){ node.focus(); node.setSelectionRange(node.value.length, node.value.length); } }}
             value={textDraft}
             onChange={(e)=>{
               const v = e.target.value;
@@ -667,7 +778,7 @@ export default function StormWhiteboardPage(){
             }}
             placeholder="Type here — Enter for new line, Esc to finish…"
             dir="auto"
-            className="absolute bg-transparent outline-none resize-none overflow-hidden border-2 border-dashed border-primary rounded p-1 z-30"
+            className="absolute bg-white text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 outline-none resize-none overflow-hidden border-2 border-primary rounded p-1 z-30 shadow-xl"
             style={{
               left, top, width: w, minHeight: fontSize*1.4+8,
               fontFamily: "'Caveat','Kalam','Segoe UI',system-ui",
@@ -691,6 +802,8 @@ export default function StormWhiteboardPage(){
           </div>
         </div>
       )}
+    </div>
+  </div>
     </div>
   );
 }
