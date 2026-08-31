@@ -697,24 +697,23 @@ export default function StormWhiteboardPage(){
               </div>
             </div>
 
-            {/* Floating zoom controls — bottom-left */}
+            {/* Floating zoom + canvas actions — stacked bottom-right */}
             <div
-              className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg"
+              className="absolute bottom-3 right-3 z-20 flex flex-col items-end gap-1.5"
               onMouseDown={(e)=> e.stopPropagation()}
             >
-              <button onClick={()=> setScale(s=> Math.max(0.2,s-0.1))} title="Zoom out" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">−</button>
-              <button onClick={()=> { setPan({x:80,y:80}); setScale(1); }} title="Reset zoom" className="h-8 px-2 rounded-md flex items-center justify-center hover:bg-accent text-xs font-mono">{Math.round(scale*100)}%</button>
-              <button onClick={()=> setScale(s=> Math.min(3,s+0.1))} title="Zoom in" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">+</button>
-            </div>
-
-            {/* Floating canvas actions — bottom-right */}
-            <div
-              className="absolute bottom-3 right-3 z-20 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg text-xs"
-              onMouseDown={(e)=> e.stopPropagation()}
-            >
-              <button onClick={exportPNG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> PNG</button>
-              <button onClick={exportSVG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> SVG</button>
-              <span className="text-muted-foreground font-mono px-1">{elements.length} els</span>
+              {/* Zoom controls (top) */}
+              <div className="flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg">
+                <button onClick={()=> setScale(s=> Math.max(0.2,s-0.1))} title="Zoom out" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">−</button>
+                <button onClick={()=> { setPan({x:80,y:80}); setScale(1); }} title="Reset zoom" className="h-8 px-2 rounded-md flex items-center justify-center hover:bg-accent text-xs font-mono">{Math.round(scale*100)}%</button>
+                <button onClick={()=> setScale(s=> Math.min(3,s+0.1))} title="Zoom in" className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-lg">+</button>
+              </div>
+              {/* Export + element count (bottom) */}
+              <div className="flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border-2 border-outline rounded-lg p-1 shadow-lg text-xs">
+                <button onClick={exportPNG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> PNG</button>
+                <button onClick={exportSVG} className="h-8 px-2 rounded-md flex items-center gap-1 hover:bg-accent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h6.5L20 12.5V18a2 2 0 0 1-2 2h-7"/><path d="M9 18h6"/><path d="M9 21h6"/></svg> SVG</button>
+                <span className="text-muted-foreground font-mono px-1">{elements.length} els</span>
+              </div>
             </div>
           </div>
 
