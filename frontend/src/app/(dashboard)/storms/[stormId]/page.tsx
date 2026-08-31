@@ -789,7 +789,7 @@ export default function StormWhiteboardPage(){
           {/* Canvas (full area) — all tool/property/zoom UIs are floating overlays */}
           <div
             ref={containerRef}
-            className="flex-1 relative overflow-hidden select-none"
+            className={`flex-1 relative select-none ${editingTextId ? "overflow-visible" : "overflow-hidden"}`}
             style={{ background: bgColor }}
             onMouseDown={handleSvgMouseDown}
             onMouseMove={handleSvgMouseMove}
